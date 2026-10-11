@@ -7,9 +7,9 @@
 #include "visor/bindings/host.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
-#include "visor/ui/button.hpp"
-#include "visor/ui/rectangle.hpp"
+#include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/run_loop.hpp"
+#include "visor/ui/widgets/button/button.hpp"
 
 void run_run_loop_tests() {
     using visor::base::PointI;

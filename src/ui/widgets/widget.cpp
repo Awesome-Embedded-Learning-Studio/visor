@@ -3,7 +3,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/ui/painter.hpp"
-#include "visor/ui/widget.hpp"
+#include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {
 

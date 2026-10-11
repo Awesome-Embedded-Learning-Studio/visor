@@ -10,11 +10,11 @@
 #include "visor/base/geometry/size.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
-#include "visor/ui/button.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/painter.hpp"
-#include "visor/ui/rectangle.hpp"
-#include "visor/ui/widget.hpp"
+#include "visor/ui/primitives/rectangle/rectangle.hpp"
+#include "visor/ui/widgets/button/button.hpp"
+#include "visor/ui/widgets/widget.hpp"
 
 namespace {
 

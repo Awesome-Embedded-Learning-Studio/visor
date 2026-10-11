@@ -3,7 +3,7 @@
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/ui/canvas_painter.hpp"
-#include "visor/ui/widget.hpp"
+#include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {
 

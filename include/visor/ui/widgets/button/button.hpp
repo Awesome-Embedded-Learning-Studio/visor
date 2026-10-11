@@ -1,6 +1,6 @@
 #pragma once
 
-#include "visor/ui/widget.hpp"
+#include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {
 

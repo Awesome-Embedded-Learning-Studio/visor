@@ -1,4 +1,4 @@
-#include "visor/ui/button.hpp"
+#include "visor/ui/widgets/button/button.hpp"
 
 #include "visor/canvas/color.hpp"
 #include "visor/ui/painter.hpp"

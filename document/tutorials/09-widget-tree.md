@@ -41,7 +41,7 @@ class Painter {
 
 ## Widget 基类：一棵树两种走法
 
-`include/visor/ui/widget.hpp` 里是基类的全部声明，实现在 `src/ui/widget.cpp`。每个控件三样东西：一块边界矩形、一个可见开关、一张固定容量的孩子表。
+`include/visor/ui/widgets/widget.hpp` 里是基类的全部声明，实现在 `src/ui/widgets/widget.cpp`。每个控件三样东西：一块边界矩形、一个可见开关、一张固定容量的孩子表。控件的家园按类分目录：交互控件一组源码住 `ui/widgets/` 下的自己的子目录（按钮在 `ui/widgets/button/`），非交互的展示物归 `ui/primitives/`（矩形在 `ui/primitives/rectangle/`），painter、run_loop 这些公共件留 `ui/` 根上，它们不是控件，是控件脚下的地板。
 
 ```cpp
 inline constexpr std::size_t kMaxChildren = 8;
@@ -181,7 +181,7 @@ ctest --test-dir build --output-on-failure
 ./build/tests/visor.tests && echo ok
 ```
 
-红绿实验做一次命中顺序的。打开 `src/ui/widget.cpp`，把 `hit_test` 里的逆序遍历改成先序——把这一行
+红绿实验做一次命中顺序的。打开 `src/ui/widgets/widget.cpp`，把 `hit_test` 里的逆序遍历改成先序——把这一行
 
 ```cpp
 for (std::size_t i = child_count_; i > 0; --i) {

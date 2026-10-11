@@ -1,4 +1,4 @@
-#include "visor/ui/rectangle.hpp"
+#include "visor/ui/primitives/rectangle/rectangle.hpp"
 
 #include "visor/ui/painter.hpp"
 

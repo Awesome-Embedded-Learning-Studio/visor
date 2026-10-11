@@ -4,7 +4,7 @@
 #include <variant>
 
 #include "visor/bindings/events.hpp"
-#include "visor/ui/widget.hpp"
+#include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {
 

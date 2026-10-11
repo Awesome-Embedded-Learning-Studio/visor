@@ -1,0 +1,12 @@
+PROJECT_NAME           = visor
+PROJECT_NUMBER         = 0.1.0
+INPUT                  = include README.md
+INPUT_ENCODING         = UTF-8
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = README.md
+GENERATE_LATEX         = NO
+OUTPUT_DIRECTORY       = document/api
+HAVE_DOT               = YES
+EXTRACT_ALL            = YES
+WARN_IF_UNDOCUMENTED   = NO
+QUIET                  = YES

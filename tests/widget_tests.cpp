@@ -185,4 +185,51 @@ void run_widget_tests() {
     panel.draw(visor::ui::CanvasPainter{replay_second});
     VISOR_CHECK(std::equal(replay_first.pixels().begin(), replay_first.pixels().end(),
                            replay_second.pixels().begin()));
+
+    // Focus: the tree holds it, the walk hands it on. Tab order is draw order,
+    // the walk wraps past the last one, and hidden branches take no part.
+    visor::ui::Rectangle focus_panel(root_bounds);
+    visor::ui::Button alpha(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 4, .h = 4}});
+    visor::ui::Button beta(RectI{.pos = PointI{6, 0}, .size = SizeI{.w = 4, .h = 4}});
+    visor::ui::Button gamma(RectI{.pos = PointI{12, 0}, .size = SizeI{.w = 4, .h = 4}});
+    VISOR_CHECK(focus_panel.add_child(&alpha));
+    VISOR_CHECK(focus_panel.add_child(&beta));
+    VISOR_CHECK(focus_panel.add_child(&gamma));
+    VISOR_CHECK(!alpha.focused());
+    VISOR_CHECK(alpha.focusable());
+    VISOR_CHECK(focus_panel.advance_focus());
+    VISOR_CHECK(alpha.focused());
+    VISOR_CHECK(focus_panel.advance_focus());
+    VISOR_CHECK(beta.focused() && !alpha.focused());
+    VISOR_CHECK(focus_panel.advance_focus());
+    VISOR_CHECK(gamma.focused());
+    // Wrap: past the last one, the first takes it back.
+    VISOR_CHECK(focus_panel.advance_focus());
+    VISOR_CHECK(alpha.focused() && !gamma.focused());
+    // A hidden branch is skipped in traversal too.
+    beta.set_visible(false);
+    VISOR_CHECK(focus_panel.advance_focus());
+    VISOR_CHECK(gamma.focused());
+    // The holder itself hidden: focus moves on to the first visible focusable.
+    gamma.set_visible(false);
+    VISOR_CHECK(focus_panel.advance_focus());
+    VISOR_CHECK(alpha.focused() && !gamma.focused());
+    gamma.set_visible(true);
+    // A tree without a single focusable widget refuses and stays put.
+    visor::ui::Rectangle bare(left_bounds);
+    VISOR_CHECK(!bare.advance_focus());
+
+    // The focus ring on real pixels: the holder's border turns dark, its
+    // interior stays lit, and dropping the focus restores the plain fill.
+    visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> ring_frame;
+    const visor::ui::CanvasPainter ring_painter{ring_frame};
+    ring_frame.set_clear(visor::canvas::Color::Off);
+    alpha.set_focused(true);
+    alpha.draw(ring_painter);
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::Off);
+    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::On);
+    alpha.set_focused(false);
+    ring_frame.set_clear(visor::canvas::Color::Off);
+    alpha.draw(ring_painter);
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On);
 }

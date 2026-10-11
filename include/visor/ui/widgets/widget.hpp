@@ -27,6 +27,10 @@ inline constexpr std::size_t kMaxChildren = 8;
  * walks the same tree backwards so the widget that paints last is the one that
  * receives the click.
  *
+ * Focus lives here too: at most one widget holds the keyboard focus at a time,
+ * draw() paints the one-pixel ring for the holder, and advance_focus() walks
+ * draw order to hand it on when Tab arrives.
+ *
  * The replay contract: on_draw() paints and nothing else. It must not read
  * events, advance animation or mutate state, because strip rendering will draw
  * the same widget several times per frame and only a stateless replay keeps
@@ -65,13 +69,31 @@ class Widget {
     /// release that hits nobody leaves every press standing.
     virtual void on_pointer_up() noexcept {}
 
+    /// Whether Tab traversal may hand this widget the keyboard focus. The
+    /// honest base takes no input at all; interactive controls override.
+    [[nodiscard]] virtual bool focusable() const noexcept { return false; }
+
+    /// Whether this widget holds the keyboard focus. At most one widget per
+    /// tree holds it, and advance_focus() is what keeps that invariant.
+    [[nodiscard]] bool focused() const noexcept;
+    void set_focused(bool on) noexcept;
+
+    /// Moves focus to the next focusable widget in draw order, wrapping past
+    /// the end. Hidden branches take no part, matching draw() and hit_test().
+    /// Returns false when nothing in the subtree is focusable; focus stays.
+    bool advance_focus() noexcept;
+
   protected:
     /// Paints this widget only; the tree walk around it belongs to draw().
     virtual void on_draw(const Painter& painter) const noexcept = 0;
 
   private:
+    static Widget* find_focused_in(Widget& node) noexcept;
+    static Widget* find_focusable_after(Widget& node, Widget* current, bool& seen_current) noexcept;
+
     base::RectI bounds_;
     bool visible_ = true;
+    bool focused_ = false;
     std::array<Widget*, kMaxChildren> children_{};
     std::size_t child_count_ = 0;
 };

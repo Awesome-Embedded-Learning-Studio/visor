@@ -15,6 +15,9 @@ class Button : public Widget {
   public:
     using Widget::Widget;
 
+    /// Buttons take the keyboard: focus traversal may land here.
+    [[nodiscard]] bool focusable() const noexcept override { return true; }
+
     [[nodiscard]] bool pressed() const noexcept;
     void on_pointer_down() noexcept override;
     void on_pointer_up() noexcept override;

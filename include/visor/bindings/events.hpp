@@ -20,6 +20,12 @@ struct KeyUp {
     std::uint32_t code;
 };
 
+/// @brief The one key code the core names itself. Focus traversal is the
+///        tree's own semantic, so the dispatcher has to recognize the
+///        traversal key; every other code stays host-defined and opaque. The
+///        value is the evdev Tab code, the natural mapping for PC hosts.
+inline constexpr std::uint32_t kKeyTab = 15;
+
 /// @brief The pointer moved. pos is in canvas coordinates.
 struct PointerMove {
     base::PointI pos;

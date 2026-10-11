@@ -20,9 +20,17 @@ void dispatch_event(Widget& root, const host::Event& event) noexcept {
                 if (Widget* hit = root.hit_test(word.pos); hit != nullptr) {
                     hit->on_pointer_up();
                 }
+            } else if constexpr (std::is_same_v<Word, host::KeyDown>) {
+                // The one named key code: focus traversal is the tree's own
+                // semantic, so the dispatcher has to recognize it. Every other
+                // code waits for its first key-consuming control.
+                if (word.code == host::kKeyTab) {
+                    static_cast<void>(root.advance_focus());
+                }
             }
-            // KeyDown/KeyUp wait for the focus chain, PointerMove for gestures;
-            // both arrive in later batches on top of this same dispatcher.
+            // KeyUp and PointerMove wait for consumers: release tracking for
+            // keyboard activation, gestures for the pointer. Both arrive on
+            // top of this same dispatcher.
         },
         event);
 }

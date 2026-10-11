@@ -12,9 +12,9 @@ namespace visor::ui {
  *        the dispatcher knows every event word, the widgets know none of them.
  *
  * Pointer presses and releases go to whoever hit testing picks; the point that
- * finds no widget delivers to nobody. Keyboard and movement events have no
- * consumer until focus and gestures arrive, so they end the round unconsumed
- * beyond the count.
+ * finds no widget delivers to nobody. Tab (the one named key code) moves the
+ * focus along the tree; every other key code and the pointer movement end the
+ * round unconsumed beyond the count until their consumers arrive.
  */
 void dispatch_event(Widget& root, const host::Event& event) noexcept;
 

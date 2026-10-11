@@ -65,4 +65,38 @@ void run_run_loop_tests() {
         VISOR_CHECK(button.pressed());
         VISOR_CHECK_EQ(screen.get(PointI{4, 4}), visor::canvas::Color::Off);
     }
+
+    // Tab arrives as a key event and moves the focus: the first press lands on
+    // the first button in draw order, the second walks on, and the ring pixels
+    // follow the holder.
+    {
+        visor::ui::Rectangle panel(root_bounds);
+        visor::ui::Button one(button_bounds);
+        visor::ui::Button two(RectI{.pos = PointI{10, 10}, .size = SizeI{.w = 6, .h = 4}});
+        VISOR_CHECK(panel.add_child(&one));
+        VISOR_CHECK(panel.add_child(&two));
+        visor::host::OffscreenHost screen(20, 20);
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+        const auto host = screen.table();
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
+        VISOR_CHECK(!one.focused());
+        VISOR_CHECK(two.focused());
+        // The ring is real pixels: two's border went dark inside the lit
+        // panel, one's corner went back to plain lit.
+        VISOR_CHECK_EQ(screen.get(PointI{10, 10}), visor::canvas::Color::Off);
+        VISOR_CHECK_EQ(screen.get(PointI{2, 2}), visor::canvas::Color::On);
+    }
+
+    // Tab over a tree without a single focusable widget: consumed, counted,
+    // nothing moves, nothing breaks.
+    {
+        visor::ui::Rectangle root(root_bounds);
+        visor::host::OffscreenHost screen(20, 20);
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+        const auto host = screen.table();
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        VISOR_CHECK_EQ(visor::ui::run_once(host, root, frame), 1);
+    }
 }

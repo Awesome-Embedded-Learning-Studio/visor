@@ -10,10 +10,20 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 option(VISOR_SANITIZE "ASan+UBSan 开关" OFF)
+option(VISOR_TSAN "TSan 开关" OFF)
+# The two sanitizers are configure-time exclusive: their runtime libraries
+# cannot load into one process, so the conflict fails here, not at link time.
+if(VISOR_SANITIZE AND VISOR_TSAN)
+    message(FATAL_ERROR "VISOR_SANITIZE 与 VISOR_TSAN 互斥：分目录构建，各自只开一个")
+endif()
 add_compile_options(-fno-exceptions -fno-rtti -fno-threadsafe-statics -Wall -Wextra -Werror)
 if(VISOR_SANITIZE)
     add_compile_options(-fsanitize=address,undefined)
     add_link_options(-fsanitize=address,undefined)
+endif()
+if(VISOR_TSAN)
+    add_compile_options(-fsanitize=thread)
+    add_link_options(-fsanitize=thread)
 endif()
 
 # Tool version locks: format and tidy share LLVM 22.1.8, docs use Doxygen 1.18.0, see document/toolchain.md.

@@ -9,6 +9,7 @@ int main() {
     run_pen_tests();
     run_point_tests();
     run_rect_tests();
+    run_render_tests();
     run_ring_queue_tests();
     run_run_loop_tests();
     run_smoke_tests();

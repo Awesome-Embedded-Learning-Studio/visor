@@ -285,13 +285,3 @@ ctest --test-dir build --output-on-failure
 先别跑，自己推一遍：这一次比特 0..63 全亮，接缝上第 63 位也占了，第一个长度为 2 的连续清位从哪里开始？把你的答案填进断言的期望值，跑 `ctest --test-dir build --output-on-failure` 验证。推对了你会看到绿，推错了 FAIL 行会指明这条断言，表达式原文都印在那里，你再回头推第二遍。实验完把 63 改回去。
 
 下一章正式开机：画布，1bpp 的位布局、奇数宽度的填充位、还有一个叫 `Color` 的名字为什么这样定。
-
-## 参考
-
-- [B1 批记（2026-10-07）：移植与两处修复的记录][note]
-- [第二章 几何词汇表][prev]
-- [第四章 画布][next]
-
-[note]: ../../.claude/notes/2026-10-07-b1.md
-[prev]: 02-geometry.md
-[next]: 04-canvas.md

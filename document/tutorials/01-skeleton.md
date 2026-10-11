@@ -2,21 +2,22 @@
 
 这一章不写一行 GUI 代码。在画第一个像素之前，我们要先把“每写一批，就能用一条命令验证一批”的骨架立起来：仓库怎么组织、CMake 怎么配置、测试从哪里进、格式和静态检查怎么跑、API 文档怎么生成。visor 是教学工程，价值在过程本身，而过程可教的前提是每一步都能跑、能看、能被工具逮住错误。作者在之前的工程里养成的习惯是完成一批立刻验证、立刻记录，这一章就是把那个习惯固化进仓库结构。
 
-批次一（B1）的完整计划与当日实录见文末参考里的计划与批记。批记是每批完成当天写下的记录：验证跑了什么、接口怎么定的、哪些事还没定。本章按仓库现状带你走一遍。
+本章按仓库现状带你走一遍。
 
 ## 仓库在第一天长什么样
 
-我们把全部公共头文件放进 `include/visor/`，宿主侧的实现文件放进 `src/bindings/`，测试放进 `tests/`，取模工具独立住在 `tools/fontgen/`，教程与工具链名册放进 `document/`。
+我们把全部公共头文件放进 `include/visor/`，宿主侧的实现文件放进 `src/bindings/`，测试放进 `tests/`，取模工具独立住在 `tools/fontgen/`，教程与待办放进 `document/`。
 
 ```
 CMakeLists.txt        顶层构建与全部验证目标
+Doxyfile              API 文档配置
 .clang-format         格式规则
 .clang-tidy           静态检查与命名规则
 include/visor/        全部公共头文件（GUI 核心）
 src/bindings/         宿主侧实现（第六章起住进内容）
 tests/                统一测试入口
 tools/fontgen/        取模工具的独立目录
-document/             教程、工具链名册、API 文档配置（Doxyfile）与生成产物
+document/             教程与待办，公开文档都在这里
 ```
 
 头文件统一住在 `include/` 下，消费方一律写 `#include "visor/..."`。这条规则从测试就开始守：测试像真实使用者一样包含库的头，不给自己开私有的搜索路径。这样 public 与 private 的分界从第一天就是真实的，不需要以后再补承诺。
@@ -57,27 +58,18 @@ endif()
 
 `VISOR_SANITIZE` 是 ASan（AddressSanitizer，内存错误检测器）与 UBSan（UndefinedBehaviorSanitizer，未定义行为检测器）的总开关。它默认关闭，验收关卡那天我们会用它配置一个独立的构建目录，普通构建目录保持干净。
 
-### 工具版本锁
+### 可选的开发工具
 
-接下来一段是三个工具的版本检查，以 clang-format 为例：
+接下来一段把三个开发工具找出来，clang-format 只是其中之一：
 
 ```cmake
-# Tool version locks: format and tidy share LLVM 22.1.8, docs use Doxygen 1.18.0, see document/toolchain.md.
+# Optional developer tooling. Each check target is created only when its tool is
+# present, so a plain configure, build and test run never requires them. No version
+# pinning: a tool's version decides its own output, drift across versions is accepted.
 find_program(VISOR_CLANG_FORMAT NAMES clang-format)
-if(NOT VISOR_CLANG_FORMAT)
-    message(FATAL_ERROR "未找到 clang-format，需要 LLVM 22.1.8 工具集")
-endif()
-execute_process(
-    COMMAND ${VISOR_CLANG_FORMAT} --version
-    OUTPUT_VARIABLE visor_format_version OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT visor_format_version MATCHES "22\\.1\\.8")
-    message(FATAL_ERROR "clang-format 必须是 22.1.8，读到 ${visor_format_version}")
-endif()
+find_program(VISOR_CLANG_TIDY NAMES clang-tidy)
+find_program(VISOR_DOXYGEN NAMES doxygen)
 ```
-
-clang-tidy 22.1.8 与 Doxygen 1.18.0 各有一段一模一样结构的检查。configure 阶段版本不合就 `FATAL_ERROR`，构建根本不会开始。
-
-为什么把版本卡得这么死？格式检查的意义在于“同一份规则对任何人产出同一份结果”，而 clang-format 的小版本之间就可能改判。让 22.1.8 之外的版本跑检查，检查结果会漂移，绿灯就不再说明任何事。所以版本在 configure 时硬卡，全部工具的版本与角色记在 `document/toolchain.md` 名册里，那一份是权威。
 
 ### 两个库目标
 
@@ -219,13 +211,16 @@ file(GLOB_RECURSE VISOR_FORMAT_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/src/*.hpp
     ${CMAKE_SOURCE_DIR}/tests/*.hpp
     ${CMAKE_SOURCE_DIR}/tests/*.cpp)
-add_custom_target(visor.check-format
-    COMMAND ${VISOR_CLANG_FORMAT} --dry-run --Werror ${VISOR_FORMAT_SOURCES}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "clang-format 22.1.8 检查格式")
+
+if(VISOR_CLANG_FORMAT)
+    add_custom_target(visor.check-format
+        COMMAND ${VISOR_CLANG_FORMAT} --dry-run --Werror ${VISOR_FORMAT_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "clang-format 检查格式")
+endif()
 ```
 
-`--dry-run` 意味着不改任何文件，只报不平的地方，`--Werror` 把“报了”升级为“退出非零”。格式不合在任何一台版本正确的机器上都过不了这关，代码风格从此不靠人眼评审。
+`--dry-run` 意味着不改任何文件，只报不平的地方，`--Werror` 把“报了”升级为“退出非零”。格式不合的机器过不了这关，代码风格从此不靠人眼评审。目标包在 `if(VISOR_CLANG_FORMAT)` 里，装了工具才有它，没装也不影响构建。
 
 ## 静态检查
 
@@ -234,10 +229,13 @@ add_custom_target(visor.check-format
 ```cmake
 file(GLOB_RECURSE VISOR_TIDY_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/tests/*.cpp)
-add_custom_target(visor.check-tidy
-    COMMAND ${VISOR_CLANG_TIDY} --quiet -p ${CMAKE_BINARY_DIR} ${VISOR_TIDY_SOURCES}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "clang-tidy 22.1.8 静态检查")
+
+if(VISOR_CLANG_TIDY)
+    add_custom_target(visor.check-tidy
+        COMMAND ${VISOR_CLANG_TIDY} --quiet -p ${CMAKE_BINARY_DIR} ${VISOR_TIDY_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "clang-tidy 静态检查")
+endif()
 ```
 
 tidy 只直接跑 `.cpp` 文件，头文件经包含受查。`-p` 指向构建目录里的 `compile_commands.json`，tidy 拿到与真实构建一致的编译命令，宏与包含路径都不会猜错。
@@ -268,15 +266,15 @@ FormatStyle: file
 
 基础集开到七个家族，警告一律当错误。排除项每一条都有具体的理由：
 
-| 排除项 | 理由 |
-| --- | --- |
-| `bugprone-easily-swappable-parameters` | 像素坐标 `x, y` 与 `Rect` 的字段天然同名可换，这类“可换”是领域事实，不是缺陷 |
-| `misc-non-private-member-variables-in-classes` | 聚合结构体（`Point`、`Rect`）的成员就是公开数据，这是设计 |
-| `modernize-use-trailing-return-type` | 不采用尾置返回类型，写法保持传统 |
-| `portability-avoid-pragma-once` | 全仓头文件统一用 `#pragma once`，教学仓不引入包含保护宏的噪音 |
-| `readability-function-cognitive-complexity` | 认知复杂度对教学代码太吵，测试函数尤其爱超 |
-| `readability-identifier-length` | `x`、`y` 这类短名是坐标的正当名字 |
-| `readability-magic-numbers` | 位操作库满篇 `0xF8`、`0x80`，这些数字本身就是教学内容 |
+| 排除项                                         | 理由                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| `bugprone-easily-swappable-parameters`         | 像素坐标 `x, y` 与 `Rect` 的字段天然同名可换，这类“可换”是领域事实，不是缺陷 |
+| `misc-non-private-member-variables-in-classes` | 聚合结构体（`Point`、`Rect`）的成员就是公开数据，这是设计                    |
+| `modernize-use-trailing-return-type`           | 不采用尾置返回类型，写法保持传统                                             |
+| `portability-avoid-pragma-once`                | 全仓头文件统一用 `#pragma once`，教学仓不引入包含保护宏的噪音                |
+| `readability-function-cognitive-complexity`    | 认知复杂度对教学代码太吵，测试函数尤其爱超                                   |
+| `readability-identifier-length`                | `x`、`y` 这类短名是坐标的正当名字                                            |
+| `readability-magic-numbers`                    | 位操作库满篇 `0xF8`、`0x80`，这些数字本身就是教学内容                        |
 
 命名规则写在 `CheckOptions` 里：类型、结构体、枚举、Concept 一律 `PascalCase`，函数、变量、参数、成员、命名空间一律 `snake_case`，私有成员尾下划线，常量 `kPascalCase`（比如你将见到的 `kStrideBytes`），枚举值 `PascalCase`（比如 `Color::On`）。命名从此也是机器检查的一部分，风格问题不需要讨论。
 
@@ -287,13 +285,15 @@ tidy 在后面几章还会亲自上课，第二章你会看到它教我们指名
 API 文档用 Doxygen 生成，`visor.docs` 目标手动触发，不进默认构建：
 
 ```cmake
-add_custom_target(visor.docs
-    COMMAND ${VISOR_DOXYGEN} ${CMAKE_SOURCE_DIR}/document/Doxyfile
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Doxygen 生成 API 文档到 document/api")
+if(VISOR_DOXYGEN)
+    add_custom_target(visor.docs
+        COMMAND ${VISOR_DOXYGEN} ${CMAKE_SOURCE_DIR}/Doxyfile
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Doxygen 生成 API 文档")
+endif()
 ```
 
-`document/Doxyfile` 的关键项现状是：`INPUT = include README.md`，`OUTPUT_DIRECTORY = document/api`（`.gitignore` 已排除这个目录），`HAVE_DOT = YES` 借 graphviz（图形绘制工具）出类图，`EXTRACT_ALL = YES`，`WARN_IF_UNDOCUMENTED = NO`。最后一项是有意留的：头文件的 Doxygen 注释随章节逐步补齐，等铺开以后再翻成 YES，让缺失文档重新变成告警。相对路径按 `visor.docs` 目标的工作目录（仓库根）解析，配置文件本身住在 `document/` 不影响这一点。
+仓库根的 `Doxyfile` 与 `.clang-format`、`.clang-tidy` 住在一起，工具的配置文件都放根上，`document/` 只留公开文档。它的关键项现状是：`INPUT = include README.md`，`OUTPUT_DIRECTORY = build/api`（`build/` 整体已在 `.gitignore` 里，产物天然不入库），`HAVE_DOT = YES` 借 graphviz（图形绘制工具）出类图，`EXTRACT_ALL = YES`，`WARN_IF_UNDOCUMENTED = NO`。最后一项是有意留的：头文件的 Doxygen 注释随章节逐步补齐，等铺开以后再翻成 YES，让缺失文档重新变成告警。相对路径按 `visor.docs` 目标的工作目录（仓库根）解析。没装 Doxygen 就没有这个目标，API 文档对构建与测试没有影响。
 
 ## 取模工具的独立目录
 
@@ -346,11 +346,11 @@ cmake --build build --target visor.docs
 
 逐条核对可观察的结果：
 
-1. configure 正常结束。如果你的 clang-format、clang-tidy 或 Doxygen 版本不对，这一步就会以中文的 FATAL_ERROR 停下，告诉你读到了什么版本。
+1. configure 正常结束。三个开发工具没装也不报错，只是对应的检查目标不会创建。
 2. 构建零报错，`-Werror` 下连警告都没有。
 3. CTest（CMake 自带的测试运行器）报 `visor.tests` 通过，`100% tests passed`。此刻只有一个冒烟用例，但它走通了断言、计数、退出码整条链。
-4. `visor.check-format` 与 `visor.check-tidy` 退出码为 0。
-5. `document/api/html/index.html` 生成。
+4. 装了 clang-format 与 clang-tidy 的话，`visor.check-format` 与 `visor.check-tidy` 退出码为 0。
+5. 装了 Doxygen 的话，`build/api/html/index.html` 生成。
 
 再验取模目录的独立性：
 
@@ -362,19 +362,3 @@ grep -rn fontgen CMakeLists.txt src/ tests/
 ```
 
 `fontgen.smoke` 通过，grep 零匹配。零匹配就是证据：顶层构建对取模工具没有任何依赖方向上的牵连。
-
-有一件事照实交代：仓库此刻没有任何 git 提交，B1 的全部成果都悬在工作区，什么时候提交进仓库由作者定。所以本系列不带你做提交，验收以命令链为准。
-
-下一章我们写第一批真正的代码：几何词汇表，`Point`、`Size`、`Rect`。GUI 后面的一切对话都用这套词汇，而它的半开区间语义里有条试金石用例等着我们。
-
-## 参考
-
-- [B1 实施计划：构建骨架、第一章画布与矩形、取模模块目录][plan]
-- [B1 批记（2026-10-07）][note]
-- [visor 工具链与基建名册][toolchain]
-- [第二章 几何词汇表][next]
-
-[plan]: ../../.claude/plans/2026-10-07-b1-build-skeleton-and-chapter1.md
-[note]: ../../.claude/notes/2026-10-07-b1.md
-[toolchain]: ../toolchain.md
-[next]: 02-geometry.md

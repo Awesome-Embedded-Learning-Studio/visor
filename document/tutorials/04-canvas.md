@@ -6,7 +6,7 @@
 
 ## 先给墨色定名：Color，不叫 MonoState
 
-最省事的名字呼之欲出：既然每像素一比特，叫 `MonoState` 或者 `Mono` 好了。作者否掉了这条路，理由记录在批记里：不把 1bpp 泄进 API 名。RGB565（每像素 16 位的彩色格式，计划中的后续 profile）进场时，每个 profile 会有自己的一份 `Color`，profile 无关的泛型代码一个名字都不用改。
+最省事的名字呼之欲出：既然每像素一比特，叫 `MonoState` 或者 `Mono` 好了。作者否掉了这条路，理由是：不把 1bpp 泄进 API 名。RGB565（每像素 16 位的彩色格式，计划中的后续 profile）进场时，每个 profile 会有自己的一份 `Color`，profile 无关的泛型代码一个名字都不用改。
 
 定名之后的本体只有一行：
 
@@ -55,7 +55,7 @@ class Canvas {
     static constexpr std::size_t kStrideBytes = (kWidth + 7) / 8;
 ```
 
-模板参数是一个 `SizeI` 的值。B1 计划里最早写的是 `Canvas<13, 5>` 两个裸 `int`，实现阶段更新成尺寸做模板实参、`set_clear` 做清屏名、坐标走 `PointI`，这几次改动记录在计划的更新里。尺寸既然是编译期常量，行距（stride，一行占的字节数）`kStrideBytes` 与缓冲区大小也全部编译期定死：
+模板参数是一个 `SizeI` 的值。这里最早的设计是 `Canvas<13, 5>` 两个裸 `int`，实现时更新成尺寸做模板实参、`set_clear` 做清屏名、坐标走 `PointI`。尺寸既然是编译期常量，行距（stride，一行占的字节数）`kStrideBytes` 与缓冲区大小也全部编译期定死：
 
 ```cpp
   private:
@@ -213,13 +213,3 @@ ctest --test-dir build --output-on-failure
 先推演再跑：12 个像素，每行末字节变成 4 个像素位加 4 个填充位，`0xF8` 的断言会失败，实际值应该是多少？`(12, 4)` 那次 `set` 还会成功吗？跑一遍 `ctest --test-dir build --output-on-failure`，数一数红了几条断言，与你的推演对答案。实验完把 13 改回去。
 
 下一章给画布配笔。plot 与 fill 两级原语、越界静默的设计理由、还有一支 const 笔为什么照样能画。
-
-## 参考
-
-- [B1 批记（2026-10-07）：Color 定名与位布局决定][note]
-- [第三章 位操作库][prev]
-- [第五章 笔][next]
-
-[note]: ../../.claude/notes/2026-10-07-b1.md
-[prev]: 03-bit-ops.md
-[next]: 05-pen.md

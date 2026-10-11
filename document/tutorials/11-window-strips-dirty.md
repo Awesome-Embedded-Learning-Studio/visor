@@ -207,17 +207,3 @@ void DirtyRegions::push(base::RectI area) noexcept {
 红绿实验做在折叠上，它是不变量的心脏。打开 `src/ui/dirty_regions.cpp`，把 `collapse()` 末尾的 `areas_[0] = box;` 改成 `areas_[0] = areas_[0];`，算出来的包围盒不要了，第一格原地不动。重建并跑测试，会看到两拨红：先是收集器单元判例，`has_region` 与 `touches` 一连串 FAIL，被折叠的记录丢了。接着是条带判例的溢出坍缩场景，跨满三条带的盒子缩成一个角，`flush_count` 对不上 3，像素比对给出第一失配坐标。复原成 `areas_[0] = box;`，全绿。
 
 这条实验值得多看一眼：折叠退化成「丢掉历史」之后，正确性断言和节俭断言一起红。清单坏掉的方式有很多种，但漏画的后果只有一种，判例矩阵把它按在像素上。
-
-## 参考
-
-- [A15 起草指导][brief]：渲染核心与缓冲预算的规格原文。
-- [第九章 控件树与运行循环][ch9]：可重放纪律的来历，`run_once` 的第一版。
-- [第十章 焦点链与复选框][ch10]：宿主表分家，本章的替身住在分出去的那一半。
-- [B4 批记][b4note]：条带批次的前置决定（先用 1bpp 证一致）。
-- [B5 批记][b5note]：本章批次的验证结果与接口决定。
-
-[brief]: ../../.claude/spec/aels-a15-gui-brief.md
-[ch9]: 09-widget-tree.md
-[ch10]: 10-focus-checkbox.md
-[b4note]: ../../.claude/notes/2026-10-11-b4.md
-[b5note]: ../../.claude/notes/2026-10-11-b5.md

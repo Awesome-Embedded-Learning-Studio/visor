@@ -38,7 +38,7 @@ static_assert(Arithmetic<int> && Arithmetic<float> && Arithmetic<double>);
 
 算术类型都放行，唯独 `bool` 被明确挡在外面。`bool` 在 C++ 里算算术类型，但 `Point<bool>` 没有合理的含义，在门口就说明白，不等它在某个模板报错里冒出来。挡 `bool` 这件事写在静态断言里，概念哪天被人改松了，编译期当场翻红，不用等哪支测试来逮。
 
-这个文件名与 Concept 名都带着一段历史：B1 收尾评审时它还叫 `Arithmetictable`，批记把改名登记成开放项，首次提交之前改成了现在的 `Arithmetic`，连动文件名与全部引用。批记链接在文末，你跟着仓库走，看到的就是改完的样子。
+这个文件名与 Concept 名都带着一段历史：收尾评审时它还叫 `Arithmetictable`，评审把改名挂成待办，首次提交之前改成了现在的 `Arithmetic`，连动文件名与全部引用。你跟着仓库走，看到的就是改完的样子。
 
 ## Point：先写测试，再写实现
 
@@ -148,9 +148,7 @@ struct std::formatter<visor::base::Point<T>> {
 // NOLINTEND(bugprone-std-namespace-modification,cert-dcl58-cpp)
 ```
 
-注释里写明的第一件事：格式说明符不支持，标准做法是在 `parse()` 里对不认识的说明符抛 `format_error`，本项目禁异常，只能选择静默忽略，代价写在这里。
-
-第二件事：向 `std` 命名空间里添加特化是标准明文允许的扩展点，但 `bugprone-std-namespace-modification` 与 `cert-dcl58-cpp` 两个检查认不出这份许可，所以这一段用 `NOLINT` 圈起来，理由写在注释里而不是闷声压掉。以后跑 `visor.docs` 你还会遇见它的余波：Doxygen 不认这个特化的作用域，会报一条无害告警，批记里留了记录，可以开 `BUILTIN_STL_SUPPORT` 消除，暂时没动。
+注释把取舍写明：格式说明符不支持，标准做法是在 `parse()` 里对不认识的说明符抛 `format_error`，本项目禁异常，只能选择静默忽略，代价写在这里。
 
 ## Size 与“右下角”的算术
 
@@ -216,7 +214,7 @@ using RectD = Rect<double>;
 
 `contains` 的四个比较就是半开语义的全部：`>=` 左与上，`<` 右与下。`is_empty` 对宽高做小于等于零的判断，负尺寸不需要特殊分支，它就是空。
 
-`RectF` 与 `RectD` 这两行带了一段插曲：B1 首评时它们误指向了 `Point`，是复制粘贴留下的错，评审判定后登记进批记的开放项，首次提交之前改成了现在的 `Rect<float>` 与 `Rect<double>`。批记链接在文末。跟跑教程的诚实义务不变：仓库当时什么样就写什么样，错也要登记在案，改了也要交代改在哪一步。
+`RectF` 与 `RectD` 这两行带了一段插曲：首评时它们误指向了 `Point`，是复制粘贴留下的错，评审判定后挂成待办，首次提交之前改成了现在的 `Rect<float>` 与 `Rect<double>`。跟跑教程的诚实义务不变：仓库当时什么样就写什么样，错过就交代，改了就说清改在哪一步。
 
 求交运算放在 `include/visor/base/helpers/rect_helper.hpp`，不做成成员函数：
 
@@ -308,13 +306,3 @@ FAIL tests/rect_tests.cpp:54 !intersect(a, (RectI{.pos = PointI{10, 0}, ...
 退出码非零，CTest 报 `visor.tests` 失败。这就是断言框架在说话：文件、行号、表达式原文都在。把 `!` 去掉，再跑一次回到绿。以后每一章出问题，你都会与这行输出打交道。
 
 下一章往字节里走：位操作库。画布的每一比特都要靠它安放，而它本身带着一段从 Cinux 移植的故事，还修掉了两个真问题。
-
-## 参考
-
-- [B1 批记（2026-10-07）：几何与开放项记录][note]
-- [第一章 起步与骨架][prev]
-- [第三章 位操作库][next]
-
-[note]: ../../.claude/notes/2026-10-07-b1.md
-[prev]: 01-skeleton.md
-[next]: 03-bit-ops.md

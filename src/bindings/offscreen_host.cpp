@@ -8,7 +8,6 @@
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -39,19 +38,39 @@ void OffscreenHost::flush_thunk(void* context, const FlushRegion& region) noexce
 }
 
 void OffscreenHost::handle_flush(const FlushRegion& region) noexcept {
-    const bool full_frame = region.format == PixelFormat::Mono1 && region.rect.pos.x == 0 &&
-                            region.rect.pos.y == 0 && region.rect.size.w == width_ &&
-                            region.rect.size.h == height_ && region.rect.size.w > 0 &&
-                            region.rect.size.h > 0;
-    if (!full_frame) {
+    // The ch11 contract: any in-bounds region of the right format lands, not
+    // just whole frames. A strip and a dirty rectangle are as welcome as the
+    // full canvas; empty regions and out-of-bounds ones are refused and
+    // counted, because both mean a sender that computed its window wrong.
+    const bool acceptable = region.format == PixelFormat::Mono1 && region.pixels != nullptr &&
+                            !region.rect.is_empty() && region.rect.pos.x >= 0 &&
+                            region.rect.pos.y >= 0 &&
+                            region.rect.pos.x + region.rect.size.w <= width_ &&
+                            region.rect.pos.y + region.rect.size.h <= height_;
+    if (!acceptable) {
         ++rejected_count_;
         return;
     }
+    // Bit-true copy one pixel at a time: region pixels may sit on any bit
+    // offset, the frame packing never changes. The same pixel_bit_position the
+    // canvas packs with unpacks here, the formula's one home paying off.
     const std::size_t stride = (static_cast<std::size_t>(width_) + 7) / 8;
-    for (int row = 0; row < height_; ++row) {
-        const std::size_t src = static_cast<std::size_t>(row) * region.stride_bytes;
-        const std::size_t dst = static_cast<std::size_t>(row) * stride;
-        std::copy_n(region.pixels + src, stride, frame_.data() + dst);
+    for (int row = 0; row < region.rect.size.h; ++row) {
+        const std::uint8_t* src_row =
+            region.pixels + (static_cast<std::size_t>(row) * region.stride_bytes);
+        const std::size_t dst_base =
+            (static_cast<std::size_t>(region.rect.pos.y) + static_cast<std::size_t>(row)) * stride;
+        for (int col = 0; col < region.rect.size.w; ++col) {
+            const auto src_x = static_cast<std::size_t>(col);
+            const auto dst_x = static_cast<std::size_t>(region.rect.pos.x) + src_x;
+            const base::bit::BitMask<std::uint8_t> src_word{src_row[src_x / 8]};
+            const bool on =
+                src_word.has(base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(src_x)));
+            const std::size_t dst_index = dst_base + (dst_x / 8);
+            base::bit::BitMask<std::uint8_t> dst_word{frame_[dst_index]};
+            dst_word.deposit(base::bit::bit_at(canvas::pixel_bit_position(dst_x)), on ? 1 : 0);
+            frame_[dst_index] = dst_word.raw;
+        }
     }
     ++flush_count_;
 }

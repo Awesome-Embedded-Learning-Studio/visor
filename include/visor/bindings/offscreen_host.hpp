@@ -17,10 +17,11 @@ namespace visor::host {
 /**
  * @brief A fake screen living in PC memory: the first host to fill the table.
  *
- * Receives full frames, counts what it refuses, feeds scripted events and a
- * scripted clock for the core to poll, and can dump itself as a PBM image.
- * The OLED and Cinux hosts of later tiers grow from this same shape: fill the
- * table, keep a frame, decode nothing but pixels.
+ * Receives any in-bounds region (the full frame is just the largest one),
+ * counts what it refuses, feeds scripted events and a scripted clock for the
+ * core to poll, and can dump itself as a PBM image. The OLED and Cinux hosts
+ * of later tiers grow from this same shape: fill the table, keep a frame,
+ * decode nothing but pixels.
  *
  * This header is the PC half of the old bindings/host.hpp, split off in B4: a
  * freestanding build (MCU, Cinux kernel) includes host.hpp for the table alone
@@ -44,10 +45,11 @@ class OffscreenHost {
     /// Reads a received pixel; out-of-bounds reads as Off.
     [[nodiscard]] canvas::Color get(base::PointI p) const noexcept;
 
-    /// Successful full-frame receptions.
+    /// Successful region receptions, full frames included.
     [[nodiscard]] int flush_count() const noexcept;
 
-    /// Refused regions; ch1 accepts full frames of the right shape only.
+    /// Refused submissions: wrong format, null pixels, an empty region, or a
+    /// rectangle leaving the frame.
     [[nodiscard]] int rejected_count() const noexcept;
 
     /// Feeds one synthetic event for the core to poll through the table.

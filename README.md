@@ -48,7 +48,15 @@ git 首提交于 2026-10-11 完成，内容为 B1 全部成果加上收尾评审
 - 宿主表分家：核心侧 `bindings/host.hpp` 不再包含任何堆容器，`OffscreenHost` 与 `write_pbm` 搬入 `bindings/offscreen_host.hpp`（跨检问答采信项，标准库白名单对齐）。
 - 教程第十章。
 
-以下是计划，尚未实现：脏区域收集合并与条带渲染、RGB565 光栅 profile、三桌面窗口宿主（Linux、Windows、macOS）、真实 OLED 开发板、小 RAM 彩屏分块、fontgen 转换逻辑与工具界面。
+第五批次（B5）已完成（2026-10-11），内容有：
+
+- 坐标窗口：`CanvasPainter` 长出第二个构造参数，窗口是场景坐标系里的矩形，窗外裁掉、窗内平移进缓冲；单参构造（整幅）行为一字不差。
+- 条带重建：`render_strips` 按编译期条带高度循环渲染，尾条带比缓冲短，多余行不碰也不提交；条带缓冲是编译期光栅 profile，屏幕尺寸是运行期循环参数。
+- 离屏宿主放宽收件：从只收整幅改成界内即收（格式对、非空、界内），逐位搬运对齐任意 x 偏移，`pixel_bit_position` 兑现「宿主解码也用它」的承诺；核心侧新增 `submit_region` 一般形，`submit_frame` 退化成特例。
+- 脏区收集器 `DirtyRegions`：固定容量八格，重叠推入级联合并成包围盒，装不下折叠成包围盒，不变量是覆盖而非省（多画可以，漏画不行）。
+- 教程第十一章，四道差分判例守整幅与条带逐像素一致（尾块、旧位置恢复、全屏失效、溢出坍缩）。
+
+以下是计划，尚未实现：控件自我申报脏区（invalidate 管线）、RGB565 光栅 profile、三桌面窗口宿主（Linux、Windows、macOS）、真实 OLED 开发板、小 RAM 彩屏分块、fontgen 转换逻辑与工具界面。
 
 ## 构建与验证
 
@@ -81,7 +89,7 @@ VISOR_CHECK_JOBS=4 scripts/checks/acceptance.sh
 
 公开文档：
 
-- [跟跑教程][tutorials]：从空仓库到焦点链与复选框的十章正文，入口导读在[教程目录][tutorials-index]。
+- [跟跑教程][tutorials]：从空仓库到坐标窗口与条带重建的十一章正文，入口导读在[教程目录][tutorials-index]。
 - [工具链与基建名册][toolchain]：全部工具的版本、角色与强制时机。
 - 开发者面向的工作流（分工、提交口径、验收与架构硬边界）在 [CLAUDE.md](CLAUDE.md)，必跑验收说明在 [scripts/checks/README.md](scripts/checks/README.md)。
 

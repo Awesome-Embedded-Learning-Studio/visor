@@ -150,12 +150,15 @@ template <typename CanvasT>
         ++consumed;
         dispatch_event(root, event);
     }
-    const CanvasPainter<CanvasT> painter{frame};
-    root.draw(painter);
-    static_cast<void>(host::submit_frame(host, frame));
+    const base::RectI full{.pos = base::PointI{0, 0},
+                           .size = base::SizeI{.w = static_cast<int>(CanvasT::kWidth),
+                                               .h = static_cast<int>(CanvasT::kHeight)}};
+    render_window(root, frame, full, host);
     return consumed;
 }
 ```
+
+（代码块随第十一章同步过：提交一行换成了 `render_window`，窗口盖满整幅时它与原来的 `submit_frame` 干的是同一件事。）
 
 循环留给使用者：`run_once` 跑一轮就返回，返回值是这一轮消耗掉的事件数。核心不做死循环，什么时候停是外面的事。
 

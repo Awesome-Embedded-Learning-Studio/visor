@@ -2,6 +2,8 @@
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
+#include "visor/base/geometry/size.hpp"
+#include "visor/base/helpers/rect_helper.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/draw/pen.hpp"
 #include "visor/ui/painter.hpp"
@@ -16,24 +18,58 @@ namespace visor::ui {
  * semantics stay chapter-five property. Widgets never see this type; only the
  * code that owns a canvas does -- a run loop builds one per frame and hands it
  * to the tree as a plain Painter reference.
+ *
+ * The window is the chapter-eleven addition: the core never assumes the buffer
+ * equals the screen, so a painter carries the scene rectangle its buffer
+ * stores. Widgets draw in scene coordinates; strokes outside the window are
+ * clipped, strokes inside land shifted by the window origin. A full-frame
+ * painter is the window case where the scene rectangle is the whole canvas.
  */
 template <typename CanvasT>
 class CanvasPainter final : public Painter {
   public:
-    explicit CanvasPainter(CanvasT& canvas) noexcept : canvas_{canvas} {}
+    /// Whole-canvas window: the canvas is the entire scene, scene pixel (0, 0)
+    /// is the canvas corner.
+    explicit CanvasPainter(CanvasT& canvas) noexcept
+        : canvas_{canvas}, window_{.pos = base::PointI{0, 0},
+                                   .size = base::SizeI{.w = static_cast<int>(CanvasT::kWidth),
+                                                       .h = static_cast<int>(CanvasT::kHeight)}} {}
+
+    /// Sub-window: the canvas stores exactly this scene rectangle, its pixel
+    /// (0, 0) holds the window's top-left corner. A window may be smaller than
+    /// the canvas (the tail strip of a rebuild); the surplus rows are left
+    /// untouched and never submitted.
+    CanvasPainter(CanvasT& canvas, base::RectI window) noexcept
+        : canvas_{canvas}, window_{window} {}
 
     void fill(base::RectI area, canvas::Color ink) const noexcept override {
+        const base::RectI visible = base::intersect(area, window_);
+        if (visible.is_empty()) {
+            return;
+        }
         const draw::Pen<CanvasT, canvas::Color> pen{canvas_, ink};
-        pen.fill(area);
+        pen.fill(shift_to_buffer(visible));
     }
 
     void plot(base::PointI at, canvas::Color ink) const noexcept override {
+        // Same stance as Pen::plot toward out-of-bounds: a stroke outside the
+        // window vanishes silently, stroke algorithms never check bounds.
+        if (!window_.contains(at)) {
+            return;
+        }
         const draw::Pen<CanvasT, canvas::Color> pen{canvas_, ink};
-        pen.plot(at);
+        pen.plot(base::PointI{at.x - window_.pos.x, at.y - window_.pos.y});
     }
 
   private:
+    [[nodiscard]] base::RectI shift_to_buffer(base::RectI area) const noexcept {
+        return base::RectI{.pos =
+                               base::PointI{area.pos.x - window_.pos.x, area.pos.y - window_.pos.y},
+                           .size = area.size};
+    }
+
     CanvasT& canvas_;
+    base::RectI window_;
 };
 
 } // namespace visor::ui

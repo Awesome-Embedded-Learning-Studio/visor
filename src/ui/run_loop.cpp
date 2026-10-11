@@ -35,8 +35,8 @@ void deliver(Widget& root, const host::KeyDown& word) noexcept {
     }
 }
 
-// KeyUp and PointerMove have no consumer yet; the empty bodies are that policy
-// in writing, not a gap. Release tracking lands on KeyUp for keyboard
+// KeyUp and PointerMove have no consumer yet. The empty bodies are that
+// policy in writing, not a gap. Release tracking lands on KeyUp for keyboard
 // activation, PointerMove becomes gestures. Both arrive on this same set.
 void deliver([[maybe_unused]] Widget& root, [[maybe_unused]] const host::KeyUp& word) noexcept {}
 

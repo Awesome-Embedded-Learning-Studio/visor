@@ -1,5 +1,7 @@
 #include "visor/bindings/host.hpp"
+
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/offscreen_host.hpp"
 
 #include "visor/base/bit_ops/bitmask.hpp"
 #include "visor/base/geometry/point.hpp"

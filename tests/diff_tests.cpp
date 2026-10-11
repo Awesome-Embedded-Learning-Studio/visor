@@ -9,6 +9,7 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/host.hpp"
+#include "visor/bindings/offscreen_host.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
 #include "visor/draw/pen.hpp"

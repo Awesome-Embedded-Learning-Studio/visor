@@ -9,4 +9,5 @@ void run_host_tests();
 void run_pen_tests();
 void run_point_tests();
 void run_rect_tests();
+void run_ring_queue_tests();
 void run_smoke_tests();

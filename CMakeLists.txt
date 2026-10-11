@@ -67,7 +67,7 @@ add_library(visor.core INTERFACE)
 target_include_directories(visor.core INTERFACE ${CMAKE_SOURCE_DIR}/include)
 add_library(visor.host STATIC src/bindings/host.cpp)
 target_link_libraries(visor.host PUBLIC visor.core)
-add_library(visor.ui STATIC src/ui/widget.cpp)
+add_library(visor.ui STATIC src/ui/widget.cpp src/ui/rectangle.cpp src/ui/button.cpp)
 target_link_libraries(visor.ui PUBLIC visor.core)
 
 file(GLOB_RECURSE VISOR_FORMAT_SOURCES CONFIGURE_DEPENDS

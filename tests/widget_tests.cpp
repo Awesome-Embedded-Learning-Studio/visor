@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <vector>
@@ -8,7 +9,11 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/canvas/color.hpp"
+#include "visor/canvas/mono_canvas.hpp"
+#include "visor/ui/button.hpp"
+#include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/painter.hpp"
+#include "visor/ui/rectangle.hpp"
 #include "visor/ui/widget.hpp"
 
 namespace {
@@ -128,4 +133,56 @@ void run_widget_tests() {
     }
     VISOR_CHECK_EQ(taken, visor::ui::kMaxChildren);
     VISOR_CHECK_EQ(hoard.child_count(), visor::ui::kMaxChildren);
+
+    // Rectangle paints exactly its own bounds with its ink, nothing else.
+    visor::ui::Rectangle rect(left_bounds);
+    rect.fill = visor::canvas::Color::Off;
+    rect.draw(painter);
+    VISOR_CHECK_EQ(painter.fills().size(), 1U);
+    VISOR_CHECK_EQ(painter.fills()[0].area, left_bounds);
+    VISOR_CHECK_EQ(painter.fills()[0].ink, visor::canvas::Color::Off);
+
+    // Button: the state flip and the ink flip agree on both edges of a press.
+    visor::ui::Button button(left_bounds);
+    VISOR_CHECK(!button.pressed());
+    button.draw(painter);
+    VISOR_CHECK_EQ(painter.fills().size(), 2U);
+    VISOR_CHECK_EQ(painter.fills()[1].ink, visor::canvas::Color::On);
+    button.on_pointer_down();
+    VISOR_CHECK(button.pressed());
+    button.draw(painter);
+    VISOR_CHECK_EQ(painter.fills().size(), 3U);
+    VISOR_CHECK_EQ(painter.fills()[2].ink, visor::canvas::Color::Off);
+    button.on_pointer_up();
+    VISOR_CHECK(!button.pressed());
+    button.draw(painter);
+    VISOR_CHECK_EQ(painter.fills().size(), 4U);
+    VISOR_CHECK_EQ(painter.fills()[3].ink, visor::canvas::Color::On);
+
+    // The same story on real pixels: unpressed lights its bounds, pressed
+    // clears them again.
+    visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> frame;
+    const visor::ui::CanvasPainter frame_painter{frame};
+    frame.set_clear(visor::canvas::Color::Off);
+    button.draw(frame_painter);
+    VISOR_CHECK(frame.get(PointI{4, 4}) == visor::canvas::Color::On);
+    button.on_pointer_down();
+    frame.set_clear(visor::canvas::Color::Off);
+    button.draw(frame_painter);
+    VISOR_CHECK(frame.get(PointI{4, 4}) == visor::canvas::Color::Off);
+
+    // Replay contract: a panel with a pressed button on top, drawn twice,
+    // must leave identical bytes -- draw reads state and touches nothing.
+    visor::ui::Rectangle panel(root_bounds);
+    visor::ui::Button redial(left_bounds);
+    VISOR_CHECK(panel.add_child(&redial));
+    redial.on_pointer_down();
+    visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> replay_first;
+    visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> replay_second;
+    replay_first.set_clear(visor::canvas::Color::Off);
+    replay_second.set_clear(visor::canvas::Color::Off);
+    panel.draw(visor::ui::CanvasPainter{replay_first});
+    panel.draw(visor::ui::CanvasPainter{replay_second});
+    VISOR_CHECK(std::equal(replay_first.pixels().begin(), replay_first.pixels().end(),
+                           replay_second.pixels().begin()));
 }

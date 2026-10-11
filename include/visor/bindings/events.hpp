@@ -25,7 +25,10 @@ struct KeyUp {
 ///        activation, the keyboard's press, named so a control can recognize
 ///        them without host knowledge. Every other code stays host-defined and
 ///        opaque: controls may receive it and ignore it, never decode it. The
-///        values are the evdev codes, the natural mapping for PC hosts.
+///        values follow the evdev table so a Linux host passes its codes
+///        through untouched. Any other host maps its own keys onto these
+///        constants, and that mapping is the host's business, the same stance
+///        KeyDown takes above.
 inline constexpr std::uint32_t kKeyTab = 15;
 inline constexpr std::uint32_t kKeyEnter = 28;
 inline constexpr std::uint32_t kKeySpace = 57;

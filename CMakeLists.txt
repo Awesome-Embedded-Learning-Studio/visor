@@ -65,7 +65,7 @@ endif()
 # of the host-side bindings and the ui layer, collected into visor.host / visor.ui.
 add_library(visor.core INTERFACE)
 target_include_directories(visor.core INTERFACE ${CMAKE_SOURCE_DIR}/include)
-add_library(visor.host STATIC src/bindings/host.cpp)
+add_library(visor.host STATIC src/bindings/host.cpp src/bindings/offscreen_host.cpp)
 target_link_libraries(visor.host PUBLIC visor.core)
 add_library(
     visor.ui STATIC

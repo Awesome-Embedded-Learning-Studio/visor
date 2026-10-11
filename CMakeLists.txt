@@ -72,6 +72,7 @@ add_library(
     src/ui/widgets/widget.cpp
     src/ui/primitives/rectangle/rectangle.cpp
     src/ui/widgets/button/button.cpp
+    src/ui/widgets/checkbox/checkbox.cpp
     src/ui/run_loop.cpp)
 target_link_libraries(visor.ui PUBLIC visor.core)
 

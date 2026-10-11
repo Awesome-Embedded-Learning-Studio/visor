@@ -14,6 +14,7 @@
 #include "visor/ui/painter.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/widgets/button/button.hpp"
+#include "visor/ui/widgets/checkbox/checkbox.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 namespace {
@@ -200,12 +201,14 @@ void run_widget_tests() {
     VISOR_CHECK(focus_panel.advance_focus());
     VISOR_CHECK(alpha.focused());
     VISOR_CHECK(focus_panel.advance_focus());
-    VISOR_CHECK(beta.focused() && !alpha.focused());
+    VISOR_CHECK(beta.focused());
+    VISOR_CHECK(!alpha.focused());
     VISOR_CHECK(focus_panel.advance_focus());
     VISOR_CHECK(gamma.focused());
     // Wrap: past the last one, the first takes it back.
     VISOR_CHECK(focus_panel.advance_focus());
-    VISOR_CHECK(alpha.focused() && !gamma.focused());
+    VISOR_CHECK(alpha.focused());
+    VISOR_CHECK(!gamma.focused());
     // A hidden branch is skipped in traversal too.
     beta.set_visible(false);
     VISOR_CHECK(focus_panel.advance_focus());
@@ -213,7 +216,8 @@ void run_widget_tests() {
     // The holder itself hidden: focus moves on to the first visible focusable.
     gamma.set_visible(false);
     VISOR_CHECK(focus_panel.advance_focus());
-    VISOR_CHECK(alpha.focused() && !gamma.focused());
+    VISOR_CHECK(alpha.focused());
+    VISOR_CHECK(!gamma.focused());
     gamma.set_visible(true);
     // A tree without a single focusable widget refuses and stays put.
     visor::ui::Rectangle bare(left_bounds);
@@ -232,4 +236,48 @@ void run_widget_tests() {
     ring_frame.set_clear(visor::canvas::Color::Off);
     alpha.draw(ring_painter);
     VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On);
+
+    // Checkbox: the third control and the first toggler. Press flips, checked
+    // paints the box solid, unchecked leaves it hollow, and the box keeps two
+    // lit rows for ring and margin.
+    visor::ui::Checkbox toggle(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 8, .h = 8}});
+    VISOR_CHECK(!toggle.checked());
+    toggle.on_pointer_down();
+    VISOR_CHECK(toggle.checked());
+    toggle.on_pointer_down();
+    VISOR_CHECK(!toggle.checked());
+    toggle.on_pointer_down(); // stays checked for the pixel assertions
+    // The background belongs to the scene, not the control: the checkbox only
+    // paints its box, so the lit margins here come from the clear color.
+    ring_frame.set_clear(visor::canvas::Color::On);
+    toggle.draw(ring_painter);
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On); // no focus, no ring
+    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // box frame
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // solid mark
+    toggle.on_pointer_down();
+    ring_frame.set_clear(visor::canvas::Color::On);
+    toggle.draw(ring_painter);
+    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // frame stays
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On); // hollow interior
+    // Focused and checked: ring, lit margin, box frame, mark, each on its own row.
+    toggle.on_pointer_down();
+    toggle.set_focused(true);
+    ring_frame.set_clear(visor::canvas::Color::On);
+    toggle.draw(ring_painter);
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::Off); // ring
+    VISOR_CHECK(ring_frame.get(PointI{1, 1}) == visor::canvas::Color::On); // lit margin
+    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // box frame
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // mark
+
+    // The replay promise now covers focus and a toggled control too: a panel
+    // with a pressed button and a checked, focused checkbox, drawn twice,
+    // still leaves identical bytes.
+    visor::ui::Checkbox replay_toggle(left_bounds);
+    VISOR_CHECK(panel.add_child(&replay_toggle));
+    replay_toggle.on_pointer_down();
+    replay_toggle.set_focused(true);
+    panel.draw(visor::ui::CanvasPainter{replay_first});
+    panel.draw(visor::ui::CanvasPainter{replay_second});
+    VISOR_CHECK(std::equal(replay_first.pixels().begin(), replay_first.pixels().end(),
+                           replay_second.pixels().begin()));
 }

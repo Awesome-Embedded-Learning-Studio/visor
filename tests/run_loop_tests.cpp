@@ -10,6 +10,7 @@
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/run_loop.hpp"
 #include "visor/ui/widgets/button/button.hpp"
+#include "visor/ui/widgets/checkbox/checkbox.hpp"
 
 void run_run_loop_tests() {
     using visor::base::PointI;
@@ -98,5 +99,22 @@ void run_run_loop_tests() {
         const auto host = screen.table();
         Canvas<SizeI{.w = 20, .h = 20}> frame;
         VISOR_CHECK_EQ(visor::ui::run_once(host, root, frame), 1);
+    }
+
+    // A press on the checkbox flips it: the hit widget toggles on press, the
+    // submitted frame carries the solid mark, and release changes nothing.
+    {
+        visor::ui::Rectangle panel(root_bounds);
+        visor::ui::Checkbox box(RectI{.pos = PointI{4, 4}, .size = SizeI{.w = 8, .h = 8}});
+        VISOR_CHECK(panel.add_child(&box));
+        visor::host::OffscreenHost screen(20, 20);
+        VISOR_CHECK(screen.push_event(visor::host::PointerDown{.button = 1, .pos = PointI{6, 6}}));
+        VISOR_CHECK(screen.push_event(visor::host::PointerUp{.button = 1, .pos = PointI{6, 6}}));
+        const auto host = screen.table();
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
+        VISOR_CHECK(box.checked());
+        VISOR_CHECK_EQ(screen.get(PointI{8, 8}), visor::canvas::Color::Off);
+        VISOR_CHECK_EQ(screen.get(PointI{0, 0}), visor::canvas::Color::On);
     }
 }

@@ -1,4 +1,5 @@
 #include "visor/bindings/host.hpp"
+#include "visor/bindings/events.hpp"
 
 #include "visor/base/bit_ops/bitmask.hpp"
 #include "visor/base/geometry/point.hpp"
@@ -70,6 +71,14 @@ canvas::Color OffscreenHost::get(base::PointI p) const noexcept {
 bool OffscreenHost::save_pbm(std::string_view path) const noexcept {
     const std::size_t stride = (static_cast<std::size_t>(width_) + 7) / 8;
     return write_pbm(path, width_, height_, frame_, stride);
+}
+
+bool try_poll_event(const HostTable& host, Event& out) noexcept {
+    return host.poll_event != nullptr && host.poll_event(host.context, out);
+}
+
+std::uint64_t current_time_ms(const HostTable& host) noexcept {
+    return host.clock_ms != nullptr ? host.clock_ms(host.context) : 0;
 }
 
 bool write_pbm(std::string_view path, int width, int height, std::span<const std::uint8_t> rows,

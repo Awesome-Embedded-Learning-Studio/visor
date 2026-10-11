@@ -11,6 +11,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
@@ -81,4 +82,11 @@ void run_host_tests() {
         VISOR_CHECK(in.peek() == std::ifstream::traits_type::eof());
     }
     VISOR_CHECK(std::filesystem::remove(path));
+
+    // Ch2 entries on a bare table: poll reports no event, the clock reads zero,
+    // and neither crashes — the same stance as an empty flush entry.
+    const HostTable bare{};
+    visor::host::Event polled{};
+    VISOR_CHECK(!visor::host::try_poll_event(bare, polled));
+    VISOR_CHECK_EQ(visor::host::current_time_ms(bare), 0U);
 }

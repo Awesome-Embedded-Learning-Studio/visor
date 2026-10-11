@@ -3,6 +3,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 
 #include <cstddef>
@@ -33,11 +34,18 @@ struct FlushRegion {
 
 /**
  * @brief The one boundary between the core and the world: hosts fill it in, the
- *        core only ever calls through it. Ch1 carries a single entry, the
- *        display flush; ch2 grows event and clock entries.
+ *        core only ever calls through it. Ch2 carries three entries: the
+ *        display flush, the event poll, and the millisecond clock.
+ * @note  poll_event returns false when no event waits, never blocking; what a
+ *        full queue drops is the host's decision, not the core's.
+ *        clock_ms returns milliseconds since a host-chosen epoch. The value
+ *        may wrap, so durations are computed by unsigned subtraction
+ *        (now - then), never by comparing absolute values.
  */
 struct HostTable {
     void (*flush)(void* context, const FlushRegion& region) noexcept = nullptr;
+    bool (*poll_event)(void* context, Event& out) noexcept = nullptr;
+    std::uint64_t (*clock_ms)(void* context) noexcept = nullptr;
     void* context = nullptr;
 };
 
@@ -60,6 +68,19 @@ template <typename CanvasT>
     host.flush(host.context, region);
     return true;
 }
+
+/**
+ * @brief Polls one event through the table. A missing entry and a drained
+ *        queue both read as false, so the core survives a host that offers no
+ *        events at all, same stance as an empty flush.
+ */
+[[nodiscard]] bool try_poll_event(const HostTable& host, Event& out) noexcept;
+
+/**
+ * @brief Reads the host clock in milliseconds since the host's epoch. A
+ *        missing entry reads as zero: time never advances, and no caller dies.
+ */
+[[nodiscard]] std::uint64_t current_time_ms(const HostTable& host) noexcept;
 
 /**
  * @brief A fake screen living in PC memory: the first host to fill the table.

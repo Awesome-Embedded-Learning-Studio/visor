@@ -40,7 +40,15 @@ git 首提交于 2026-10-11 完成，内容为 B1 全部成果加上收尾评审
 - `run_once` 全帧运行循环与事件分发：指针事件按命中投递给虚接口，帧经宿主表提交，按钮闭环（事件进、状态变、像素出）全程经表验证。
 - 教程第九章。
 
-以下是计划，尚未实现：焦点链与 Tab 导航、脏区域收集合并与条带渲染、第三种基础控件、RGB565 光栅 profile、三桌面窗口宿主（Linux、Windows、macOS）、真实 OLED 开发板、小 RAM 彩屏分块、fontgen 转换逻辑与工具界面。
+第四批次（B4）已完成（2026-10-11），内容有：
+
+- 焦点链与 Tab 导航：焦点住在控件树上，至多一个持有者，`advance_focus` 按绘制顺序移交并回绕，隐藏分支不参与。焦点环由 `draw()` 统一绘制，控件不会忘画。
+- `kKeyTab` 是核心点名的唯一键码（evdev 值 15），分发器驱动走树，其余键码仍留给各自的消费控件。
+- `Checkbox`：第一个开关控件，按压即翻转。分发器没有点击合成，按压翻转是对按下与抬起两根事件词最老实的映射。
+- 宿主表分家：核心侧 `bindings/host.hpp` 不再包含任何堆容器，`OffscreenHost` 与 `write_pbm` 搬入 `bindings/offscreen_host.hpp`（跨检问答采信项，标准库白名单对齐）。
+- 教程第十章。
+
+以下是计划，尚未实现：脏区域收集合并与条带渲染、RGB565 光栅 profile、三桌面窗口宿主（Linux、Windows、macOS）、真实 OLED 开发板、小 RAM 彩屏分块、fontgen 转换逻辑与工具界面。
 
 ## 构建与验证
 
@@ -73,7 +81,7 @@ VISOR_CHECK_JOBS=4 scripts/checks/acceptance.sh
 
 公开文档：
 
-- [跟跑教程][tutorials]：从空仓库到控件树与运行循环的九章正文，入口导读在[教程目录][tutorials-index]。
+- [跟跑教程][tutorials]：从空仓库到焦点链与复选框的十章正文，入口导读在[教程目录][tutorials-index]。
 - [工具链与基建名册][toolchain]：全部工具的版本、角色与强制时机。
 - 开发者面向的工作流（分工、提交口径、验收与架构硬边界）在 [CLAUDE.md](CLAUDE.md)，必跑验收说明在 [scripts/checks/README.md](scripts/checks/README.md)。
 

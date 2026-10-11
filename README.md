@@ -23,7 +23,16 @@ visor 面向想看一个跨宿主 GUI 框架如何从零搭起来的读者。想
 
 git 首提交于 2026-10-11 完成，内容为 B1 全部成果加上收尾评审的四处小改（`RectF`/`RectD` 别名改正、`Arithmetictable` 改名 `Arithmetic`、概念头注释英语修正、补 `bool` 排除的静态断言）。
 
-以下是计划，尚未实现：事件与时钟进宿主表、脏区域收集与合并、控件树与焦点、RGB565 光栅 profile、三桌面窗口宿主（Linux、Windows、macOS）、真实 OLED 开发板、小 RAM 彩屏分块、fontgen 转换逻辑与工具界面。
+第二批次（B2）已完成（2026-10-11），内容有：
+
+- `visor::base::container::RingQueue` 固定容量环形队列（自 Cinux 移植）：一格留空区分满与空，满则拒新。
+- 事件词汇五件（键与指针的按下抬起移动），`std::variant` 承载，平凡可复制以静态断言承诺。
+- 宿主表长成三项：显示提交、事件读取、毫秒时钟；核心经判空包装拉取，空表不终止。
+- 离屏宿主喂合成事件与脚本化时钟，时钟回绕语义入测试。
+- 验收第六道：TSan 构建与测试（`VISOR_TSAN`，与 `VISOR_SANITIZE` 在 configure 阶段互斥）。
+- 教程第八章。
+
+以下是计划，尚未实现：核心侧运行循环（事件泵）、脏区域收集与合并、控件树与焦点、RGB565 光栅 profile、三桌面窗口宿主（Linux、Windows、macOS）、真实 OLED 开发板、小 RAM 彩屏分块、fontgen 转换逻辑与工具界面。
 
 ## 构建与验证
 
@@ -46,7 +55,7 @@ cmake --build build-asan && ctest --test-dir build-asan --output-on-failure   # 
 cmake -S tools/fontgen -B build-fontgen -G Ninja && cmake --build build-fontgen && ctest --test-dir build-fontgen   # 取模工具独立构建
 ```
 
-每批收尾的必跑验收是一条命令，五道检查（rel 测试、ASan/UBSan 测试、format、tidy、fontgen 独立构建）任何一步失败即停，说明见 [scripts/checks/README.md](scripts/checks/README.md)：
+每批收尾的必跑验收是一条命令，六道检查（rel 测试、ASan/UBSan 测试、TSan 测试、format、tidy、fontgen 独立构建）任何一步失败即停，说明见 [scripts/checks/README.md](scripts/checks/README.md)：
 
 ```bash
 VISOR_CHECK_JOBS=4 scripts/checks/acceptance.sh
@@ -56,7 +65,7 @@ VISOR_CHECK_JOBS=4 scripts/checks/acceptance.sh
 
 公开文档：
 
-- [跟跑教程][tutorials]：从空仓库到差分关卡的七章正文，入口导读在[教程目录][tutorials-index]。
+- [跟跑教程][tutorials]：从空仓库到事件与时钟的八章正文，入口导读在[教程目录][tutorials-index]。
 - [工具链与基建名册][toolchain]：全部工具的版本、角色与强制时机。
 - 开发者面向的工作流（分工、提交口径、验收与架构硬边界）在 [CLAUDE.md](CLAUDE.md)，必跑验收说明在 [scripts/checks/README.md](scripts/checks/README.md)。
 

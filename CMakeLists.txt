@@ -61,12 +61,14 @@ if(NOT visor_doxygen_version MATCHES "^1\\.18\\.0$")
 endif()
 
 # GUI core: platform-independent header-only library. Everything public lives under
-# include/visor and consumers include "visor/...". src/ carries implementation files of
-# the host-side bindings, collected into visor.host.
+# include/visor and consumers include "visor/...". src/ carries implementation files
+# of the host-side bindings and the ui layer, collected into visor.host / visor.ui.
 add_library(visor.core INTERFACE)
 target_include_directories(visor.core INTERFACE ${CMAKE_SOURCE_DIR}/include)
 add_library(visor.host STATIC src/bindings/host.cpp)
 target_link_libraries(visor.host PUBLIC visor.core)
+add_library(visor.ui STATIC src/ui/widget.cpp)
+target_link_libraries(visor.ui PUBLIC visor.core)
 
 file(GLOB_RECURSE VISOR_FORMAT_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/include/*.hpp

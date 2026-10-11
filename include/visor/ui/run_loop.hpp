@@ -86,6 +86,34 @@ void render_strips(const Widget& root, CanvasT& strip, base::SizeI screen,
 }
 
 /**
+ * @brief One round of the spec's full pipeline: pump events, rebuild the owed
+ *        strips, retire the debts.
+ *
+ * The economy path beside run_once: a round whose events changed nothing owes
+ * nothing and submits nothing, which is the whole point of the reports. The
+ * first frame is the caller's job -- paint it with render_window or
+ * render_strips, or push the whole screen as dirty -- because this loop only
+ * ever repaints what a report named. The collector clears after the rebuild:
+ * the owed pixels are on the host, nothing stays owed into the next round.
+ *
+ * @return Events consumed this round, drained events included even when no
+ *         widget wanted them.
+ */
+template <typename CanvasT>
+[[nodiscard]] int run_dirty(const host::HostTable& host, Widget& root, CanvasT& strip,
+                            base::SizeI screen, DirtyRegions& dirty) noexcept {
+    int consumed = 0;
+    host::Event event;
+    while (host::try_poll_event(host, event)) {
+        ++consumed;
+        dispatch_event(root, event);
+    }
+    render_strips(root, strip, screen, host, dirty);
+    dirty.clear();
+    return consumed;
+}
+
+/**
  * @brief One round of the spec's loop, full-frame simplification: pump every
  *        waiting event into the tree, repaint the whole frame, submit it.
  *

@@ -113,19 +113,27 @@ void Button::on_draw(const Painter& painter) const noexcept {
 
 ## 事件分发：控件只认接口，分发器只认 Widget
 
-事件从宿主表进来，`std::visit` 按事件词分发。指针按下和抬起走命中测试，找到谁就调谁的虚接口：
+事件从宿主表进来，`std::visit` 按事件词分发。每个事件词对应一个具名的投递函数 `deliver`，一个词一份策略，指针按下和抬起走命中测试，找到谁就调谁的虚接口：
 
 ```cpp
-if constexpr (std::is_same_v<Word, host::PointerDown>) {
+void deliver(Widget& root, const host::PointerDown& word) noexcept {
     if (Widget* hit = root.hit_test(word.pos); hit != nullptr) {
         hit->on_pointer_down();
     }
 }
 ```
 
+`std::visit` 那头只剩一行，泛型 lambda 把词原样转交，靠重载解析找到对应的 `deliver`：
+
+```cpp
+std::visit([&root](const auto& word) { deliver(root, word); }, event);
+```
+
+这个形状有一条编译期保险：泛型 lambda 会对变体的每个候选词各实例化一份函数体，某个词没有对应的 `deliver` 重载，实例化当场编译失败。早期版本把这组分支写成 `if constexpr` 链，链尾不接的词会静默落地，加一个事件词忘了补分支，没有任何工具报错，两个形状行为完全一致，差别全在加词那天兑现。
+
 `Widget` 基类上的 `on_pointer_down` 和 `on_pointer_up` 是虚函数，默认实现是空函数体：基类控件不接输入，什么都不做就是诚实的默认。`Button` 把两个都覆写。分发器手里只有 `Widget*`，调用走虚表，全程不问具体类型，RTTI 一行没沾。
 
-键盘事件和指针移动这一版直接落地，注释写明了去向：键盘等焦点链（下一批），移动等手势（更后面）。分发器是同一个，事件词在，消费者后到。
+键盘和指针移动两个词这一版没人消费，空的 `deliver` 函数体把这件事写在明面上：KeyUp 等键盘激活的松开跟踪，PointerMove 等手势。分发器是同一个，事件词在，消费者后到。Tab 键在下一批进场，落点就是 `deliver` 的 KeyDown 重载。
 
 一个设计事实值得看清楚：抬起事件也走命中测试。抬起落在按钮外面，命中的是别的控件或者谁都不是，按钮收不到抬起，也就不会弹起来。这是这一版的明确行为，不是疏忽。真实按键要的「按住时滑出去松手」语义，等手势批次在分发器上补，控件不用改。
 

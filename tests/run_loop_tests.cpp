@@ -117,4 +117,60 @@ void run_run_loop_tests() {
         VISOR_CHECK_EQ(screen.get(PointI{8, 8}), visor::canvas::Color::Off);
         VISOR_CHECK_EQ(screen.get(PointI{0, 0}), visor::canvas::Color::On);
     }
+
+    // Keyboard activation: Tab lands the focus on the checkbox, Enter flips it
+    // (the frame carries the solid mark), then Space flips it back while a
+    // code no control claims passes through and changes nothing.
+    {
+        visor::ui::Rectangle panel(root_bounds);
+        visor::ui::Checkbox box(RectI{.pos = PointI{4, 4}, .size = SizeI{.w = 8, .h = 8}});
+        VISOR_CHECK(panel.add_child(&box));
+        visor::host::OffscreenHost screen(20, 20);
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
+        const auto host = screen.table();
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
+        VISOR_CHECK(box.focused());
+        VISOR_CHECK(box.checked());
+        // (7,7) is the interior the mark fills; (6,6) is the frame both states share.
+        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::Off);
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = 42}));
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
+        VISOR_CHECK(!box.checked());
+        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::On);
+    }
+
+    // Activation with nobody holding the focus: the key is consumed and
+    // counted, reaches nobody, nothing moves.
+    {
+        visor::ui::Rectangle panel(root_bounds);
+        visor::ui::Checkbox box(RectI{.pos = PointI{4, 4}, .size = SizeI{.w = 8, .h = 8}});
+        VISOR_CHECK(panel.add_child(&box));
+        visor::host::OffscreenHost screen(20, 20);
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
+        const auto host = screen.table();
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1);
+        VISOR_CHECK(!box.checked());
+    }
+
+    // The button takes no keyboard activation yet, on purpose: a momentary
+    // press needs a frame showing the pressed state between down and up, so
+    // Enter on a focused button is consumed and does nothing. This pins the
+    // deferral until the timing story (key repeat or a tick) arrives.
+    {
+        visor::ui::Rectangle panel(root_bounds);
+        visor::ui::Button button(button_bounds);
+        VISOR_CHECK(panel.add_child(&button));
+        visor::host::OffscreenHost screen(20, 20);
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
+        const auto host = screen.table();
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
+        VISOR_CHECK(button.focused());
+        VISOR_CHECK(!button.pressed());
+    }
 }

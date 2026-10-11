@@ -11,6 +11,7 @@
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
 #include "visor/ui/canvas_painter.hpp"
+#include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/widgets/button/button.hpp"
@@ -280,4 +281,39 @@ void run_widget_tests() {
     panel.draw(visor::ui::CanvasPainter{replay_second});
     VISOR_CHECK(std::equal(replay_first.pixels().begin(), replay_first.pixels().end(),
                            replay_second.pixels().begin()));
+
+    // The report lane: state changes push their owed areas into the collector
+    // the tree was wired with. Wiring after assembly reaches the whole subtree,
+    // and an adoptee inherits the sink of the parent it joins.
+    visor::ui::DirtyRegions reports;
+    visor::ui::Rectangle wired_panel(root_bounds);
+    visor::ui::Button wired_one(left_bounds);
+    VISOR_CHECK(wired_panel.add_child(&wired_one));
+    wired_panel.set_dirty_sink(&reports);
+    wired_one.on_pointer_down(); // a control reports its own bounds
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1});
+    VISOR_CHECK_EQ(reports.at(0), left_bounds);
+    reports.clear();
+    wired_panel.set_visible(false); // hiding owes the old pixels
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1});
+    VISOR_CHECK_EQ(reports.at(0), root_bounds);
+    wired_panel.set_visible(true); // the same area again: merged, not duplicated
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1});
+    VISOR_CHECK_EQ(reports.at(0), root_bounds);
+    wired_panel.set_visible(true); // no flip, no pixel change, no report
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1});
+    reports.clear();
+    visor::ui::Button late(RectI{.pos = PointI{12, 12}, .size = SizeI{.w = 4, .h = 4}});
+    VISOR_CHECK(wired_panel.add_child(&late)); // the adoptee inherits the sink
+    late.on_pointer_down();
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1});
+    VISOR_CHECK_EQ(reports.at(0), late.bounds());
+    reports.clear();
+    wired_one.set_focused(true); // the ring's area is a debt like any other
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1});
+    VISOR_CHECK_EQ(reports.at(0), left_bounds);
+    wired_one.set_focused(true); // already holding: nothing changes
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1});
+    wired_one.set_focused(false);
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1}); // the same box, merged again
 }

@@ -6,6 +6,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/events.hpp"
 #include "visor/bindings/offscreen_host.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
@@ -13,6 +14,8 @@
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/run_loop.hpp"
+#include "visor/ui/widgets/button/button.hpp"
+#include "visor/ui/widgets/checkbox/checkbox.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 namespace {
@@ -336,5 +339,59 @@ void run_render_tests() {
         VISOR_CHECK(patch.get(PointI{0, 3}) == Color::Off);
         VISOR_CHECK_EQ(patched.flush_count(), 2);
         compare_hosts(integral, patched);
+    }
+
+    // Case 7, the pipeline end to end: a first frame painted by hand, then
+    // rounds of run_dirty where controls report their own debts. The flush
+    // count pins the economy -- only the strips a report named go out, an
+    // idle round sends nothing, and the collector retires with the rebuild.
+    {
+        // Ground covers the screen; the checkbox lives in strip 0, the
+        // button in the tail strip. (5,5) is the checkbox's inner mark,
+        // (2,2) its ring corner, (12,16) the button's ring corner.
+        visor::ui::Rectangle ground(kWholeScreen);
+        visor::ui::Checkbox box(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 6, .h = 6}});
+        visor::ui::Button tail_button(RectI{.pos = PointI{12, 16}, .size = SizeI{.w = 4, .h = 4}});
+        VISOR_CHECK(ground.add_child(&box));
+        VISOR_CHECK(ground.add_child(&tail_button));
+        DirtyRegions debts;
+        ground.set_dirty_sink(&debts);
+
+        visor::host::OffscreenHost screen(20, 20);
+        Canvas<SizeI{.w = 20, .h = 8}> strip;
+        strip.set_clear(Color::Off);
+        // The first frame is the caller's job: run_dirty only repaints
+        // what a report names, so it starts from a full render_strips.
+        visor::ui::render_strips(ground, strip, kScreenSize, screen.table());
+        VISOR_CHECK_EQ(screen.flush_count(), 3); // 8 + 8 + 4
+
+        // Round one: Tab focuses the checkbox, Space checks it. Both state
+        // flips report the same box, the collector merges them, and only
+        // strip 0 rebuilds.
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
+        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 2);
+        VISOR_CHECK_EQ(screen.flush_count(), 4);
+        VISOR_CHECK_EQ(debts.count(), std::size_t{0}); // retired with the rebuild
+        VISOR_CHECK(box.checked());
+        VISOR_CHECK(box.focused());
+        VISOR_CHECK(screen.get(PointI{5, 5}) == Color::Off); // the solid mark went out
+        VISOR_CHECK(screen.get(PointI{2, 2}) == Color::Off); // and the ring with it
+
+        // Round two: Tab walks to the tail button. The checkbox un-ring
+        // report and the button ring report live in different strips, so
+        // strips 0 and 2 rebuild and strip 1 stays home. The mark persists.
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(screen.flush_count(), 6);
+        VISOR_CHECK(tail_button.focused());
+        VISOR_CHECK(!box.focused());
+        VISOR_CHECK(screen.get(PointI{12, 16}) == Color::Off); // the ring moved to the button
+        VISOR_CHECK(screen.get(PointI{2, 2}) == Color::On);    // the box corner is plain again
+        VISOR_CHECK(screen.get(PointI{5, 5}) == Color::Off);   // the mark stays put
+
+        // Round three, idle: no events, no debts, nothing submitted.
+        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 0);
+        VISOR_CHECK_EQ(screen.flush_count(), 6);
     }
 }

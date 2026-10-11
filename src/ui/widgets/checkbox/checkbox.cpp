@@ -1,8 +1,11 @@
 #include "visor/ui/widgets/checkbox/checkbox.hpp"
 
+#include <cstdint>
+
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/ui/painter.hpp"
 
@@ -14,6 +17,16 @@ bool Checkbox::checked() const noexcept {
 
 void Checkbox::on_pointer_down() noexcept {
     checked_ = !checked_;
+    invalidate(bounds());
+}
+
+void Checkbox::on_key_down(std::uint32_t code) noexcept {
+    // Activation is the keyboard's press: the two named keys flip the box
+    // exactly as a pointer press does, every other code is none of ours.
+    if (code == host::kKeyEnter || code == host::kKeySpace) {
+        checked_ = !checked_;
+        invalidate(bounds());
+    }
 }
 
 void Checkbox::on_draw(const Painter& painter) const noexcept {

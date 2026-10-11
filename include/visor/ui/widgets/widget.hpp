@@ -5,6 +5,7 @@
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
+#include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
 
 namespace visor::ui {
@@ -31,6 +32,12 @@ inline constexpr std::size_t kMaxChildren = 8;
  * draw() paints the one-pixel ring for the holder, and advance_focus() walks
  * draw order to hand it on when Tab arrives.
  *
+ * Repaint debts are reported, never polled. State mutators push their owed
+ * areas into the DirtyRegions the tree was wired with; the renderer asks the
+ * collector which strips owe work. A widget with no sink wired (nobody called
+ * set_dirty_sink) drops its reports quietly, the same stance the empty host
+ * table takes at the other boundary.
+ *
  * The replay contract: on_draw() paints and nothing else. It must not read
  * events, advance animation or mutate state, because strip rendering will draw
  * the same widget several times per frame and only a stateless replay keeps
@@ -51,8 +58,14 @@ class Widget {
     void set_visible(bool on) noexcept;
 
     /// Adopts a child; returns false when the capacity is full or child is null.
+    /// An adopted subtree inherits this widget's dirty sink, so wiring the root
+    /// before or after assembly both reach every widget.
     [[nodiscard]] bool add_child(Widget* child) noexcept;
     [[nodiscard]] std::size_t child_count() const noexcept;
+
+    /// Wires the repaint reporter for this whole subtree. Called once at tree
+    /// assembly, usually on the root; late-added children inherit it too.
+    void set_dirty_sink(DirtyRegions* sink) noexcept;
 
     /// Draws this subtree pre-order, skipping every invisible widget.
     void draw(const Painter& painter) const noexcept;
@@ -69,6 +82,12 @@ class Widget {
     /// release that hits nobody leaves every press standing.
     virtual void on_pointer_up() noexcept {}
 
+    /// Receives a key code while this widget holds the focus. The dispatcher
+    /// routes every code except Tab here; a control compares against the codes
+    /// events.hpp names and ignores the rest. The default control consumes no
+    /// keys, so an empty body is the honest base again.
+    virtual void on_key_down([[maybe_unused]] std::uint32_t code) noexcept {}
+
     /// Whether Tab traversal may hand this widget the keyboard focus. The
     /// honest base takes no input at all; interactive controls override.
     [[nodiscard]] virtual bool focusable() const noexcept { return false; }
@@ -77,6 +96,10 @@ class Widget {
     /// tree holds it, and advance_focus() is what keeps that invariant.
     [[nodiscard]] bool focused() const noexcept;
     void set_focused(bool on) noexcept;
+
+    /// Returns the widget holding the focus in this subtree, null when nobody
+    /// does. The dispatcher routes a key code to this holder's on_key_down.
+    [[nodiscard]] Widget* focused_widget() noexcept;
 
     /// Moves focus to the next focusable widget in draw order, wrapping past
     /// the end. Hidden branches take no part, matching draw() and hit_test().
@@ -87,6 +110,15 @@ class Widget {
     /// Paints this widget only; the tree walk around it belongs to draw().
     virtual void on_draw(const Painter& painter) const noexcept = 0;
 
+    /// Reports an area as owing a repaint. State mutators call this as they
+    /// change; with no sink wired the report is dropped, which keeps widgets
+    /// usable in painter-only tests.
+    void invalidate(base::RectI area) noexcept {
+        if (dirty_ != nullptr) {
+            dirty_->push(area);
+        }
+    }
+
   private:
     static Widget* find_focused_in(Widget& node) noexcept;
     static Widget* find_focusable_after(Widget& node, Widget* current, bool& seen_current) noexcept;
@@ -96,6 +128,7 @@ class Widget {
     bool focused_ = false;
     std::array<Widget*, kMaxChildren> children_{};
     std::size_t child_count_ = 0;
+    DirtyRegions* dirty_ = nullptr;
 };
 
 } // namespace visor::ui

@@ -20,11 +20,15 @@ struct KeyUp {
     std::uint32_t code;
 };
 
-/// @brief The one key code the core names itself. Focus traversal is the
-///        tree's own semantic, so the dispatcher has to recognize the
-///        traversal key; every other code stays host-defined and opaque. The
-///        value is the evdev Tab code, the natural mapping for PC hosts.
+/// @brief The key codes the core names itself. Tab is the tree's own traversal
+///        semantic, so the dispatcher must recognize it. Enter and Space are
+///        activation, the keyboard's press, named so a control can recognize
+///        them without host knowledge. Every other code stays host-defined and
+///        opaque: controls may receive it and ignore it, never decode it. The
+///        values are the evdev codes, the natural mapping for PC hosts.
 inline constexpr std::uint32_t kKeyTab = 15;
+inline constexpr std::uint32_t kKeyEnter = 28;
+inline constexpr std::uint32_t kKeySpace = 57;
 
 /// @brief The pointer moved. pos is in canvas coordinates.
 struct PointerMove {

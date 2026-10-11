@@ -10,6 +10,11 @@ namespace visor::ui {
  * The press handlers carry no position on purpose: hit testing already decided
  * which widget receives the event, so the button only flips its state. The
  * pixel difference between the two states is the button's whole feedback.
+ *
+ * No keyboard activation yet, on purpose: a momentary button needs a frame
+ * that shows the pressed state between down and up, which needs the timing
+ * story (key repeat or a tick) that no batch has brought so far. Checkbox
+ * activates today because a toggle persists and paints by itself.
  */
 class Button : public Widget {
   public:

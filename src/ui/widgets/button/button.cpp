@@ -11,10 +11,12 @@ bool Button::pressed() const noexcept {
 
 void Button::on_pointer_down() noexcept {
     pressed_ = true;
+    invalidate(bounds());
 }
 
 void Button::on_pointer_up() noexcept {
     pressed_ = false;
+    invalidate(bounds());
 }
 
 void Button::on_draw(const Painter& painter) const noexcept {

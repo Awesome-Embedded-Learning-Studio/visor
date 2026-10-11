@@ -26,12 +26,16 @@ void deliver(Widget& root, const host::PointerUp& word) noexcept {
     }
 }
 
-// The one named key code: focus traversal is the tree's own semantic, so the
-// dispatcher has to recognize it. Every other code waits for its first
-// key-consuming control.
+// Tab is the tree's own semantic, so the dispatcher keeps it. Every other code
+// goes to the focused widget verbatim: the control decides what it consumes
+// against the codes events.hpp names, the core never decodes the rest.
 void deliver(Widget& root, const host::KeyDown& word) noexcept {
     if (word.code == host::kKeyTab) {
         static_cast<void>(root.advance_focus());
+        return;
+    }
+    if (Widget* holder = root.focused_widget(); holder != nullptr) {
+        holder->on_key_down(word.code);
     }
 }
 

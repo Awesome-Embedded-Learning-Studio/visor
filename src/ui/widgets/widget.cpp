@@ -4,6 +4,7 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/canvas/color.hpp"
+#include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
@@ -39,7 +40,23 @@ const base::RectI& Widget::bounds() const noexcept { return bounds_; }
 
 bool Widget::visible() const noexcept { return visible_; }
 
-void Widget::set_visible(bool on) noexcept { visible_ = on; }
+void Widget::set_visible(bool on) noexcept {
+    if (visible_ == on) {
+        return; // No flip, no pixel change, no debt.
+    }
+    visible_ = on;
+    // Hiding owes the old pixels (what is behind shows through), showing owes
+    // the new ones; the area is bounds either way.
+    invalidate(bounds_);
+}
+
+// NOLINTNEXTLINE(misc-no-recursion) -- same shape and same reason as draw().
+void Widget::set_dirty_sink(DirtyRegions* sink) noexcept {
+    dirty_ = sink;
+    for (std::size_t i = 0; i < child_count_; ++i) {
+        children_[i]->set_dirty_sink(sink);
+    }
+}
 
 bool Widget::add_child(Widget* child) noexcept {
     if (child == nullptr || child_count_ == kMaxChildren) {
@@ -47,6 +64,8 @@ bool Widget::add_child(Widget* child) noexcept {
     }
     children_[child_count_] = child;
     ++child_count_;
+    // The adopted subtree reports into the same sink, whenever one is wired.
+    child->set_dirty_sink(dirty_);
     return true;
 }
 
@@ -88,7 +107,17 @@ Widget* Widget::hit_test(base::PointI at) noexcept {
 
 bool Widget::focused() const noexcept { return focused_; }
 
-void Widget::set_focused(bool on) noexcept { focused_ = on; }
+void Widget::set_focused(bool on) noexcept {
+    if (focused_ == on) {
+        return; // The ring is already in the pixels it should be.
+    }
+    focused_ = on;
+    // The ring is framework policy painted at the holder's bounds, so the
+    // framework reports that area too: focus moving is a repaint debt twice.
+    invalidate(bounds_);
+}
+
+Widget* Widget::focused_widget() noexcept { return find_focused_in(*this); }
 
 // NOLINTNEXTLINE(misc-no-recursion) -- same shape and same reason as draw().
 Widget* Widget::find_focused_in(Widget& node) noexcept {

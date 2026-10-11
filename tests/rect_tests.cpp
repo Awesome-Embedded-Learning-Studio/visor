@@ -66,6 +66,14 @@ void run_rect_tests() {
     VISOR_CHECK_EQ(intersect(RectI{.pos = PointI{-10, -10}, .size = SizeI{.w = 12, .h = 12}}, a),
                    (RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 2, .h = 2}}));
 
+    // Bounding box: the smallest rect covering both operands.
+    VISOR_CHECK_EQ(bounding_box(a, b),
+                   (RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 15, .h = 15}}));
+    VISOR_CHECK_EQ(bounding_box(a, inner), a); // containment keeps the outer
+    VISOR_CHECK_EQ(bounding_box(a, a), a);
+    VISOR_CHECK_EQ(bounding_box(neg, a),
+                   (RectI{.pos = PointI{-5, -5}, .size = SizeI{.w = 15, .h = 15}}));
+
     // Point/Size arithmetic: pos + size is the exclusive bottom-right corner, minus walks back.
     VISOR_CHECK_EQ(a.pos + a.size, (PointI{10, 10}));
     VISOR_CHECK_EQ(offset((PointI{1, 2}), SizeI{.w = 3, .h = 4}), (PointI{4, 6}));

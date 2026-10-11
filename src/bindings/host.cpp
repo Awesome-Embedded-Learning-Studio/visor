@@ -23,7 +23,10 @@ OffscreenHost::OffscreenHost(int width, int height)
       frame_(((static_cast<std::size_t>(width) + 7) / 8) * static_cast<std::size_t>(height), 0) {}
 
 HostTable OffscreenHost::table() noexcept {
-    return HostTable{.flush = &OffscreenHost::flush_thunk, .context = this};
+    return HostTable{.flush = &OffscreenHost::flush_thunk,
+                     .poll_event = &OffscreenHost::poll_event_thunk,
+                     .clock_ms = &OffscreenHost::clock_thunk,
+                     .context = this};
 }
 
 void OffscreenHost::flush_thunk(void* context, const FlushRegion& region) noexcept {
@@ -54,6 +57,30 @@ int OffscreenHost::flush_count() const noexcept {
 
 int OffscreenHost::rejected_count() const noexcept {
     return rejected_count_;
+}
+
+bool OffscreenHost::push_event(const Event& event) noexcept {
+    if (feed_.push(event)) {
+        return true;
+    }
+    ++dropped_event_count_;
+    return false;
+}
+
+int OffscreenHost::dropped_event_count() const noexcept {
+    return dropped_event_count_;
+}
+
+void OffscreenHost::advance_ms(std::uint64_t delta) noexcept {
+    now_ms_ += delta;
+}
+
+bool OffscreenHost::poll_event_thunk(void* context, Event& out) noexcept {
+    return static_cast<OffscreenHost*>(context)->feed_.pop(out);
+}
+
+std::uint64_t OffscreenHost::clock_thunk(void* context) noexcept {
+    return static_cast<OffscreenHost*>(context)->now_ms_;
 }
 
 canvas::Color OffscreenHost::get(base::PointI p) const noexcept {

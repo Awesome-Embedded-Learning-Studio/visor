@@ -32,7 +32,15 @@ git 首提交于 2026-10-11 完成，内容为 B1 全部成果加上收尾评审
 - 验收第六道：TSan 构建与测试（`VISOR_TSAN`，与 `VISOR_SANITIZE` 在 configure 阶段互斥）。
 - 教程第八章。
 
-以下是计划，尚未实现：核心侧运行循环（事件泵）、脏区域收集与合并、控件树与焦点、RGB565 光栅 profile、三桌面窗口宿主（Linux、Windows、macOS）、真实 OLED 开发板、小 RAM 彩屏分块、fontgen 转换逻辑与工具界面。
+第三批次（B3）已完成（2026-10-11），内容有：
+
+- `visor::ui` 控件层：`Widget` 基类与固定容量孩子表，先序绘制、逆序命中，一树两走法。
+- `Painter` 运行时绘面接口与 `CanvasPainter` 模板适配器：运行时控件与编译期画布之间的一道缝。
+- `Rectangle` 与 `Button`，第一个有状态控件：按下翻转、抬起复原，状态与像素分别断言。
+- `run_once` 全帧运行循环与事件分发：指针事件按命中投递给虚接口，帧经宿主表提交，按钮闭环（事件进、状态变、像素出）全程经表验证。
+- 教程第九章。
+
+以下是计划，尚未实现：焦点链与 Tab 导航、脏区域收集合并与条带渲染、第三种基础控件、RGB565 光栅 profile、三桌面窗口宿主（Linux、Windows、macOS）、真实 OLED 开发板、小 RAM 彩屏分块、fontgen 转换逻辑与工具界面。
 
 ## 构建与验证
 
@@ -65,7 +73,7 @@ VISOR_CHECK_JOBS=4 scripts/checks/acceptance.sh
 
 公开文档：
 
-- [跟跑教程][tutorials]：从空仓库到事件与时钟的八章正文，入口导读在[教程目录][tutorials-index]。
+- [跟跑教程][tutorials]：从空仓库到控件树与运行循环的九章正文，入口导读在[教程目录][tutorials-index]。
 - [工具链与基建名册][toolchain]：全部工具的版本、角色与强制时机。
 - 开发者面向的工作流（分工、提交口径、验收与架构硬边界）在 [CLAUDE.md](CLAUDE.md)，必跑验收说明在 [scripts/checks/README.md](scripts/checks/README.md)。
 

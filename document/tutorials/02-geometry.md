@@ -286,8 +286,8 @@ template <Arithmetic T>
 跑整份测试：
 
 ```bash
-cmake --build build/rel
-ctest --test-dir build/rel --output-on-failure
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 `visor.tests` 通过，`point` 与 `rect` 两组用例都在其中。

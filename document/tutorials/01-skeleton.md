@@ -336,12 +336,12 @@ int main() {
 跟着走完这一章，你的仓库应该能用一条命令链让全部检查通过。在仓库根目录执行，其中 `-G Ninja` 选用 Ninja 作为构建执行器（负责实际调度编译动作的后端）：
 
 ```bash
-cmake -S . -B build/rel -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++
-cmake --build build/rel
-ctest --test-dir build/rel --output-on-failure
-cmake --build build/rel --target visor.check-format
-cmake --build build/rel --target visor.check-tidy
-cmake --build build/rel --target visor.docs
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++
+cmake --build build
+ctest --test-dir build --output-on-failure
+cmake --build build --target visor.check-format
+cmake --build build --target visor.check-tidy
+cmake --build build --target visor.docs
 ```
 
 逐条核对可观察的结果：
@@ -355,9 +355,9 @@ cmake --build build/rel --target visor.docs
 再验取模目录的独立性：
 
 ```bash
-cmake -S tools/fontgen -B build/fontgen -G Ninja
-cmake --build build/fontgen
-ctest --test-dir build/fontgen --output-on-failure
+cmake -S tools/fontgen -B build-fontgen -G Ninja
+cmake --build build-fontgen
+ctest --test-dir build-fontgen --output-on-failure
 grep -rn fontgen CMakeLists.txt src/ tests/
 ```
 

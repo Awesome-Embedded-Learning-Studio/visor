@@ -30,20 +30,26 @@ git 首提交于 2026-10-11 完成，内容为 B1 全部成果加上收尾评审
 需要先备好名册上的工具链（GCC 16.2.1、CMake 4.4.3、Ninja 1.13.2、clang-format 22.1.8、clang-tidy 22.1.8、Doxygen 1.18.0），其中三个工具版本在 configure 时硬卡，不符会直接报错。
 
 ```bash
-cmake -S . -B build/rel -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++
-cmake --build build/rel
-ctest --test-dir build/rel --output-on-failure
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 按需加跑：
 
 ```bash
-cmake --build build/rel --target visor.check-format   # 格式检查
-cmake --build build/rel --target visor.check-tidy     # 静态检查
-cmake --build build/rel --target visor.docs           # API 文档到 document/api/
-cmake -S . -B build/asan -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DVISOR_SANITIZE=ON
-cmake --build build/asan && ctest --test-dir build/asan --output-on-failure   # ASan/UBSan
-cmake -S tools/fontgen -B build/fontgen -G Ninja && cmake --build build/fontgen && ctest --test-dir build/fontgen   # 取模工具独立构建
+cmake --build build --target visor.check-format   # 格式检查
+cmake --build build --target visor.check-tidy     # 静态检查
+cmake --build build --target visor.docs           # API 文档到 document/api/
+cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DVISOR_SANITIZE=ON
+cmake --build build-asan && ctest --test-dir build-asan --output-on-failure   # ASan/UBSan
+cmake -S tools/fontgen -B build-fontgen -G Ninja && cmake --build build-fontgen && ctest --test-dir build-fontgen   # 取模工具独立构建
+```
+
+每批收尾的必跑验收是一条命令，五道检查（rel 测试、ASan/UBSan 测试、format、tidy、fontgen 独立构建）任何一步失败即停，说明见 [scripts/checks/README.md](scripts/checks/README.md)：
+
+```bash
+VISOR_CHECK_JOBS=4 scripts/checks/acceptance.sh
 ```
 
 ## 文档地图
@@ -52,6 +58,7 @@ cmake -S tools/fontgen -B build/fontgen -G Ninja && cmake --build build/fontgen 
 
 - [跟跑教程][tutorials]：从空仓库到差分关卡的七章正文，入口导读在[教程目录][tutorials-index]。
 - [工具链与基建名册][toolchain]：全部工具的版本、角色与强制时机。
+- 开发者面向的工作流（分工、提交口径、验收与架构硬边界）在 [CLAUDE.md](CLAUDE.md)，必跑验收说明在 [scripts/checks/README.md](scripts/checks/README.md)。
 
 API 文档不入库，`visor.docs` 目标生成到 `document/api/`。
 

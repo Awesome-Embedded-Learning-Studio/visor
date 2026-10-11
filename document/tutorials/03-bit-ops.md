@@ -270,8 +270,8 @@ using WordMask = BitMask<std::uint64_t>;
 ## 验收
 
 ```bash
-cmake --build build/rel
-ctest --test-dir build/rel --output-on-failure
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 `bit` 全部用例通过，与 `point`、`rect` 一起在 `visor.tests` 里过。
@@ -282,7 +282,7 @@ ctest --test-dir build/rel --output-on-failure
     map.set_range(0, 64);
 ```
 
-先别跑，自己推一遍：这一次比特 0..63 全亮，接缝上第 63 位也占了，第一个长度为 2 的连续清位从哪里开始？把你的答案填进断言的期望值，跑 `ctest --test-dir build/rel --output-on-failure` 验证。推对了你会看到绿，推错了 FAIL 行会指明这条断言，表达式原文都印在那里，你再回头推第二遍。实验完把 63 改回去。
+先别跑，自己推一遍：这一次比特 0..63 全亮，接缝上第 63 位也占了，第一个长度为 2 的连续清位从哪里开始？把你的答案填进断言的期望值，跑 `ctest --test-dir build --output-on-failure` 验证。推对了你会看到绿，推错了 FAIL 行会指明这条断言，表达式原文都印在那里，你再回头推第二遍。实验完把 63 改回去。
 
 下一章正式开机：画布，1bpp 的位布局、奇数宽度的填充位、还有一个叫 `Color` 的名字为什么这样定。
 

@@ -101,9 +101,9 @@ constexpr bool expected_on(int x, int y) {
 普通构建绿了，关卡还有第二道。ASan 与 UBSan（第一章配好的 `VISOR_SANITIZE` 开关）在独立的构建目录里，把同一套测试再跑一遍。为什么要独立目录？消毒器给每个内存访问插桩，编译产物完全不同，与普通构建混在一个目录里会互相污染，两个目录各干各的：
 
 ```bash
-cmake -S . -B build/asan -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DVISOR_SANITIZE=ON
-cmake --build build/asan
-ctest --test-dir build/asan --output-on-failure
+cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DVISOR_SANITIZE=ON
+cmake --build build-asan
+ctest --test-dir build-asan --output-on-failure
 ```
 
 这是项目第一次开消毒器目录，结果零报告。越界读写、悬垂指针、未定义行为，差分测试用断言抓不到的整类问题归它管。两种构建都通过，B1 的验证才算走完。
@@ -117,7 +117,7 @@ ctest --test-dir build/asan --output-on-failure
     VISOR_CHECK(mirror.save_pbm("visor_first_frame.pbm"));
 ```
 
-文件落在测试的工作目录 `build/rel/tests/visor_first_frame.pbm`（ASan 目录下也会有一份）。大多数认 PBM 的图片查看器都能打开它，GIMP 一类图像软件也行。
+文件落在测试的工作目录 `build/tests/visor_first_frame.pbm`（ASan 目录下也会有一份）。大多数认 PBM 的图片查看器都能打开它，GIMP 一类图像软件也行。
 
 看图之前有一条要提前说明，不然你会以为画反了：PBM 约定位 1 渲染为黑。画布里的 `Color::On`（亮）在图片里是黑块，背景是白。所以你看到的应该是一张白底图，黑块按场景对号：
 
@@ -132,10 +132,10 @@ ctest --test-dir build/asan --output-on-failure
 两种构建全部通过：
 
 ```bash
-cmake --build build/rel
-ctest --test-dir build/rel --output-on-failure
-cmake --build build/asan
-ctest --test-dir build/asan --output-on-failure
+cmake --build build
+ctest --test-dir build --output-on-failure
+cmake --build build-asan
+ctest --test-dir build-asan --output-on-failure
 ```
 
 两次都报 `visor.tests` 通过。

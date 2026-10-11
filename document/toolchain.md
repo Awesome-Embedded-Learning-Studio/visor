@@ -7,9 +7,9 @@
 | 工具 | 版本（2026-10-07 本机实测） | 角色 | 入口 | 何时强制 |
 | --- | --- | --- | --- | --- |
 | GCC | 16.2.1 | PC 主编译器，C++23 加三旗 | `cmake -DCMAKE_CXX_COMPILER=g++` | 每次构建 |
-| CMake | 4.4.3 | 构建系统 | `cmake -S . -B build/rel -G Ninja` | 每次配置，下限 3.28 |
+| CMake | 4.4.3 | 构建系统 | `cmake -S . -B build -G Ninja` | 每次配置，下限 3.28 |
 | Ninja | 1.13.2 | 构建后端 | 同上 `-G Ninja` | 每次构建 |
-| CTest | 4.4.3 | 统一验证入口 | `ctest --test-dir build/rel` | 每任务，任务 7 加 asan 目录双跑 |
+| CTest | 4.4.3 | 统一验证入口 | `ctest --test-dir build` | 每任务，任务 7 加 asan 目录双跑 |
 | clang-format | 22.1.8 | 代码格式 | `visor.check-format` 目标 | configure 校验版本，每任务提交前过 |
 | clang-tidy | 22.1.8 | 静态检查与命名规则 | `visor.check-tidy` 目标 | 每任务提交前过，警告即错误 |
 | Doxygen | 1.18.0 | API 文档 | `visor.docs` 目标 | 手动触发，configure 校验版本 |

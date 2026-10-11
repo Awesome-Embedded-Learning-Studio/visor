@@ -192,8 +192,8 @@ class Pen {
 ## 验收
 
 ```bash
-cmake --build build/rel
-ctest --test-dir build/rel --output-on-failure
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 `pen` 全部用例通过。
@@ -204,7 +204,7 @@ ctest --test-dir build/rel --output-on-failure
     odd_brush.fill((RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 3, .h = 1}}));
 ```
 
-覆盖像素变成 0、1、2，先心算新的首字节值，把它填进断言替换 `0x70`，跑 `ctest --test-dir build/rel --output-on-failure`。算对了绿，算错了 FAIL 行等着你。实验完改回去。
+覆盖像素变成 0、1、2，先心算新的首字节值，把它填进断言替换 `0x70`，跑 `ctest --test-dir build --output-on-failure`。算对了绿，算错了 FAIL 行等着你。实验完改回去。
 
 下一章走出核心：宿主表，GUI 核心与外部世界的全部边界。核心画、宿主收，第一版表里只有 flush 一项，外加一个住在 PC 内存里的假屏幕和它的 PBM 导出。
 

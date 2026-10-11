@@ -259,8 +259,8 @@ PBM 头的长度有一段小乌龙。`"P4\n13 5\n"` 逐字节数是 `P`、`4`、
 ## 验收
 
 ```bash
-cmake --build build/rel
-ctest --test-dir build/rel --output-on-failure
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 `host` 全部用例通过，PBM 往返也在里面。
@@ -271,12 +271,12 @@ ctest --test-dir build/rel --output-on-failure
     // VISOR_CHECK(std::filesystem::remove(path));
 ```
 
-重新构建、跑测试。测试的工作目录是 `build/rel/tests/`，文件落在那里。用十六进制查看工具看它：
+重新构建、跑测试。测试的工作目录是 `build/tests/`，文件落在那里。用十六进制查看工具看它：
 
 ```bash
-cmake --build build/rel
-ctest --test-dir build/rel
-xxd build/rel/tests/visor_test.pbm
+cmake --build build
+ctest --test-dir build
+xxd build/tests/visor_test.pbm
 ```
 
 预期能对上这张表：

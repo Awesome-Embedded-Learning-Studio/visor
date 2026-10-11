@@ -198,8 +198,8 @@ MSB 在前的直接后果：像素 0 是 `0x80`，不是 `0x01`。
 ## 验收
 
 ```bash
-cmake --build build/rel
-ctest --test-dir build/rel --output-on-failure
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 `canvas` 全部用例通过。
@@ -210,7 +210,7 @@ ctest --test-dir build/rel --output-on-failure
     using OddWidthCanvas = Canvas<SizeI{.w = 12, .h = 5}>;
 ```
 
-先推演再跑：12 个像素，每行末字节变成 4 个像素位加 4 个填充位，`0xF8` 的断言会失败，实际值应该是多少？`(12, 4)` 那次 `set` 还会成功吗？跑一遍 `ctest --test-dir build/rel --output-on-failure`，数一数红了几条断言，与你的推演对答案。实验完把 13 改回去。
+先推演再跑：12 个像素，每行末字节变成 4 个像素位加 4 个填充位，`0xF8` 的断言会失败，实际值应该是多少？`(12, 4)` 那次 `set` 还会成功吗？跑一遍 `ctest --test-dir build --output-on-failure`，数一数红了几条断言，与你的推演对答案。实验完把 13 改回去。
 
 下一章给画布配笔。plot 与 fill 两级原语、越界静默的设计理由、还有一支 const 笔为什么照样能画。
 

@@ -1,4 +1,8 @@
 build/
+build-asan/
+build-fontgen/
 .cache/
 document/api/
+
 .claude/
+CLAUDE.md

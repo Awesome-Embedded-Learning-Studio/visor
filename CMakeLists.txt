@@ -69,9 +69,9 @@ add_library(visor.host STATIC src/bindings/host.cpp)
 target_link_libraries(visor.host PUBLIC visor.core)
 add_library(
     visor.ui STATIC
-    src/ui/widget.cpp
-    src/ui/rectangle.cpp
-    src/ui/button.cpp
+    src/ui/widgets/widget.cpp
+    src/ui/primitives/rectangle/rectangle.cpp
+    src/ui/widgets/button/button.cpp
     src/ui/run_loop.cpp)
 target_link_libraries(visor.ui PUBLIC visor.core)
 

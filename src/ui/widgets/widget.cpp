@@ -2,6 +2,7 @@
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
+#include "visor/base/geometry/size.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/widgets/widget.hpp"

@@ -251,21 +251,21 @@ void run_widget_tests() {
     // paints its box, so the lit margins here come from the clear color.
     ring_frame.set_clear(visor::canvas::Color::On);
     toggle.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On); // no focus, no ring
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On);  // no focus, no ring
     VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // box frame
     VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // solid mark
     toggle.on_pointer_down();
     ring_frame.set_clear(visor::canvas::Color::On);
     toggle.draw(ring_painter);
     VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // frame stays
-    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On); // hollow interior
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On);  // hollow interior
     // Focused and checked: ring, lit margin, box frame, mark, each on its own row.
     toggle.on_pointer_down();
     toggle.set_focused(true);
     ring_frame.set_clear(visor::canvas::Color::On);
     toggle.draw(ring_painter);
     VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::Off); // ring
-    VISOR_CHECK(ring_frame.get(PointI{1, 1}) == visor::canvas::Color::On); // lit margin
+    VISOR_CHECK(ring_frame.get(PointI{1, 1}) == visor::canvas::Color::On);  // lit margin
     VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // box frame
     VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // mark
 

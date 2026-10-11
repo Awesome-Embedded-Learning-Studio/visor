@@ -41,6 +41,7 @@ class GateScene {
         VISOR_CHECK(root.add_child(&hole));
         VISOR_CHECK(root.add_child(&tail_dot));
         VISOR_CHECK(root.add_child(&head_dot));
+        hole.fill = Color::Off; // Rectangle defaults On; the dark hole is the point
         tail_dot.set_visible(false);
         head_dot.set_visible(false);
     }
@@ -272,5 +273,68 @@ void run_render_tests() {
         visor::ui::render_strips(scene.root, strip, kScreenSize, striped.table(), scattered);
         VISOR_CHECK_EQ(striped.flush_count(), 3);
         compare_hosts(integral, striped);
+    }
+
+    // Case 5, the batch dial: render_strips steps by the strip canvas height,
+    // so a taller strip canvas sends fewer, larger regions from the same loop.
+    // The 16-row canvas covers the screen in two sends, its tail window owning
+    // four of the sixteen stored rows; the 5-row canvas takes four sends and
+    // puts the hole right across the row-10 boundary, so a replay slip at the
+    // batch seam flips hole pixels. Both dials must land pixel-identical.
+    {
+        GateScene scene;
+        scene.tail_dot.set_visible(true);
+        visor::host::OffscreenHost integral(20, 20);
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        frame.set_clear(Color::Off);
+        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
+
+        visor::host::OffscreenHost batched(20, 20);
+        Canvas<SizeI{.w = 20, .h = 16}> half;
+        half.set_clear(Color::Off);
+        visor::ui::render_strips(scene.root, half, kScreenSize, batched.table());
+        VISOR_CHECK_EQ(batched.flush_count(), 2); // 16 + 4
+        compare_hosts(integral, batched);
+
+        visor::host::OffscreenHost fine(20, 20);
+        Canvas<SizeI{.w = 20, .h = 5}> slim;
+        slim.set_clear(Color::Off);
+        visor::ui::render_strips(scene.root, slim, kScreenSize, fine.table());
+        VISOR_CHECK_EQ(fine.flush_count(), 4);
+        compare_hosts(integral, fine);
+    }
+
+    // Case 6, the odd x: region pixels may start at any scene x, so the host
+    // copy cannot assume source and destination share a byte layout. The
+    // patch starts at x = 3 and its dark columns are the hole's left edge,
+    // so a copy shifted by one bit flips lit and dark pixels on camera.
+    {
+        const GateScene scene;
+        visor::host::OffscreenHost integral(20, 20);
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        frame.set_clear(Color::Off);
+        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
+
+        // The patched host first holds a full frame (it plays a screen with
+        // last round's pixels), then replays one small window over it.
+        visor::host::OffscreenHost patched(20, 20);
+        Canvas<SizeI{.w = 20, .h = 20}> whole;
+        whole.set_clear(Color::Off);
+        visor::ui::render_window(scene.root, whole, kWholeScreen, patched.table());
+        VISOR_CHECK_EQ(patched.flush_count(), 1);
+
+        Canvas<SizeI{.w = 8, .h = 4}> patch;
+        patch.set_clear(Color::Off);
+        const RectI patch_window{.pos = PointI{3, 5}, .size = SizeI{.w = 7, .h = 3}};
+        visor::ui::render_window(scene.root, patch, patch_window, patched.table());
+        // The painter shifted scene (3, 5) to buffer (0, 0) and scene (4, 6),
+        // the hole's first dark pixel, to buffer (1, 1); column 7 and row 3
+        // are surplus the 7x3 window never owns.
+        VISOR_CHECK(patch.get(PointI{0, 0}) == Color::On);
+        VISOR_CHECK(patch.get(PointI{1, 1}) == Color::Off);
+        VISOR_CHECK(patch.get(PointI{7, 0}) == Color::Off);
+        VISOR_CHECK(patch.get(PointI{0, 3}) == Color::Off);
+        VISOR_CHECK_EQ(patched.flush_count(), 2);
+        compare_hosts(integral, patched);
     }
 }

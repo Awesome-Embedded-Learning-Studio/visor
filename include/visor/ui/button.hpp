@@ -16,8 +16,8 @@ class Button : public Widget {
     using Widget::Widget;
 
     [[nodiscard]] bool pressed() const noexcept;
-    void on_pointer_down() noexcept;
-    void on_pointer_up() noexcept;
+    void on_pointer_down() noexcept override;
+    void on_pointer_up() noexcept override;
 
   protected:
     void on_draw(const Painter& painter) const noexcept override;

@@ -58,6 +58,13 @@ class Widget {
     /// on an invisible branch.
     [[nodiscard]] Widget* hit_test(base::PointI at) noexcept;
 
+    /// Receives a pointer press after hit testing picked this widget. The
+    /// default control takes no input, so doing nothing here is the honest base.
+    virtual void on_pointer_down() noexcept {}
+    /// Receives the matching release. Press and release pair per widget: a
+    /// release that hits nobody leaves every press standing.
+    virtual void on_pointer_up() noexcept {}
+
   protected:
     /// Paints this widget only; the tree walk around it belongs to draw().
     virtual void on_draw(const Painter& painter) const noexcept = 0;

@@ -39,11 +39,17 @@ void deliver(Widget& root, const host::KeyDown& word) noexcept {
     }
 }
 
-// KeyUp and PointerMove have no consumer yet. The empty bodies are that
-// policy in writing, not a gap. Release tracking lands on KeyUp for keyboard
-// activation, PointerMove becomes gestures. Both arrive on this same set.
-void deliver([[maybe_unused]] Widget& root, [[maybe_unused]] const host::KeyUp& word) noexcept {}
+// The release follows the same route as its press: to the focus holder,
+// verbatim. A control that tracks nothing ignores it, a button that pressed
+// on down completes its activation here.
+void deliver(Widget& root, const host::KeyUp& word) noexcept {
+    if (Widget* holder = root.focused_widget(); holder != nullptr) {
+        holder->on_key_up(word.code);
+    }
+}
 
+// PointerMove has no consumer yet. The empty body is that policy in
+// writing, not a gap: it becomes the gesture layer.
 void deliver([[maybe_unused]] Widget& root,
              [[maybe_unused]] const host::PointerMove& word) noexcept {}
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <variant>
+
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
@@ -96,6 +98,14 @@ void render_strips(const Widget& root, CanvasT& strip, base::SizeI screen,
  * ever repaints what a report named. The collector clears after the rebuild:
  * the owed pixels are on the host, nothing stays owed into the next round.
  *
+ * The rhythm rule: a round consumes at most one key event (a KeyDown or a
+ * KeyUp), leaving the rest queued for the rounds that follow; pointer events
+ * drain freely. A key press and its release can therefore never share a
+ * round, so the pressed state a control shows between them owns at least one
+ * full rebuild -- the timing story is structural, borrowed from neither the
+ * host's repeat behavior nor a clock. Pointer streams pay no such toll:
+ * their events are samples of position, not beats of time.
+ *
  * @return Events consumed this round, drained events included even when no
  *         widget wanted them.
  */
@@ -107,6 +117,10 @@ template <typename CanvasT>
     while (host::try_poll_event(host, event)) {
         ++consumed;
         dispatch_event(root, event);
+        if (std::holds_alternative<host::KeyDown>(event) ||
+            std::holds_alternative<host::KeyUp>(event)) {
+            break; // one key event per round: the rhythm rule above
+        }
     }
     render_strips(root, strip, screen, host, dirty);
     dirty.clear();
@@ -122,6 +136,10 @@ template <typename CanvasT>
  * needs them. Templates on the canvas type like every draw-side entry point:
  * the run loop owns the canvas/painter binding, widgets never do.
  *
+ * The same rhythm rule as run_dirty applies: at most one key event per
+ * round, pointer events drained freely, so a press and its release each own
+ * a frame wherever the loop runs.
+ *
  * @return Events consumed this round, drained events included even when no
  *         widget wanted them.
  */
@@ -132,6 +150,10 @@ template <typename CanvasT>
     while (host::try_poll_event(host, event)) {
         ++consumed;
         dispatch_event(root, event);
+        if (std::holds_alternative<host::KeyDown>(event) ||
+            std::holds_alternative<host::KeyUp>(event)) {
+            break; // one key event per round: the rhythm rule
+        }
     }
     const base::RectI full{.pos = base::PointI{0, 0},
                            .size = base::SizeI{.w = static_cast<int>(CanvasT::kWidth),

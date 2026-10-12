@@ -88,6 +88,13 @@ class Widget {
     /// keys, so an empty body is the honest base again.
     virtual void on_key_down([[maybe_unused]] std::uint32_t code) noexcept {}
 
+    /// Receives the matching release, if the widget still holds the focus
+    /// when it arrives. Release tracking is where keyboard activation
+    /// completes (Button presses on down, fires on up); the default control
+    /// tracks nothing, so an empty body is the honest base. Codes arrive
+    /// verbatim: a release the control never pressed is its to ignore.
+    virtual void on_key_up([[maybe_unused]] std::uint32_t code) noexcept {}
+
     /// Whether Tab traversal may hand this widget the keyboard focus. The
     /// honest base takes no input at all; interactive controls override.
     [[nodiscard]] virtual bool focusable() const noexcept { return false; }

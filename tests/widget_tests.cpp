@@ -10,6 +10,7 @@
 #include "visor/base/geometry/size.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
+#include "visor/draw/mono_bitmap.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
@@ -31,6 +32,10 @@ class RecordingPainter final : public visor::ui::Painter {
         visor::base::PointI at;
         visor::canvas::Color ink;
     };
+    struct BitmapDrawn {
+        visor::base::PointI at;
+        int scale = 1;
+    };
 
     void fill(visor::base::RectI area, visor::canvas::Color ink) const noexcept override {
         fills_.push_back(Fill{.area = area, .ink = ink});
@@ -38,13 +43,21 @@ class RecordingPainter final : public visor::ui::Painter {
     void plot(visor::base::PointI p, visor::canvas::Color ink) const noexcept override {
         plots_.push_back(Plotted{.at = p, .ink = ink});
     }
+    void draw_bitmap(visor::base::PointI at, const visor::draw::MonoBitmap& source,
+                     visor::canvas::Color ink, int scale) const noexcept override {
+        static_cast<void>(source);
+        static_cast<void>(ink);
+        bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
+    }
 
     [[nodiscard]] const std::vector<Fill>& fills() const noexcept { return fills_; }
     [[nodiscard]] const std::vector<Plotted>& plots() const noexcept { return plots_; }
+    [[nodiscard]] const std::vector<BitmapDrawn>& bitmaps() const noexcept { return bitmaps_; }
 
   private:
     mutable std::vector<Fill> fills_;
     mutable std::vector<Plotted> plots_;
+    mutable std::vector<BitmapDrawn> bitmaps_;
 };
 
 /// A minimal widget that records its draw order instead of painting.

@@ -2,6 +2,7 @@
 
 // Registry of test entry points. Add one declaration per new test file, main.cpp calls each in
 // turn.
+void run_bitmap_tests();
 void run_bit_tests();
 void run_canvas_tests();
 void run_diff_tests();

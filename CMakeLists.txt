@@ -39,12 +39,15 @@ find_program(VISOR_CLANG_TIDY NAMES clang-tidy)
 find_program(VISOR_DOXYGEN NAMES doxygen)
 
 # GUI core: platform-independent header-only library. Everything public lives under
-# include/visor and consumers include "visor/...". src/ carries implementation files
-# of the host-side bindings and the ui layer, collected into visor.host / visor.ui.
+# include/visor and consumers include "visor/...". src/bindings carries one directory
+# per host (B4 principle): the contract pieces sit at the top, each host
+# implementation below its own leaf. The ui layer stays flat in src/ui.
 add_library(visor.core INTERFACE)
 target_include_directories(visor.core INTERFACE ${CMAKE_SOURCE_DIR}/include)
-add_library(visor.host STATIC src/bindings/host.cpp src/bindings/offscreen_host.cpp)
+add_library(visor.host STATIC src/bindings/host.cpp)
 target_link_libraries(visor.host PUBLIC visor.core)
+add_library(visor.host.offscreen STATIC src/bindings/offscreen/offscreen_host.cpp)
+target_link_libraries(visor.host.offscreen PUBLIC visor.host)
 add_library(
     visor.ui STATIC
     src/ui/widgets/widget.cpp

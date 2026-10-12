@@ -36,9 +36,22 @@ namespace visor::ui {
 
 Widget::Widget(base::RectI bounds) noexcept : bounds_{bounds} {}
 
-const base::RectI& Widget::bounds() const noexcept { return bounds_; }
+const base::RectI& Widget::bounds() const noexcept {
+    return bounds_;
+}
 
-bool Widget::visible() const noexcept { return visible_; }
+bool Widget::visible() const noexcept {
+    return visible_;
+}
+
+void Widget::set_bounds(base::RectI bounds) noexcept {
+    if (bounds == bounds_) {
+        return; // Same box, same pixels, no debt.
+    }
+    invalidate(bounds_);
+    bounds_ = bounds;
+    invalidate(bounds_);
+}
 
 void Widget::set_visible(bool on) noexcept {
     if (visible_ == on) {
@@ -69,7 +82,9 @@ bool Widget::add_child(Widget* child) noexcept {
     return true;
 }
 
-std::size_t Widget::child_count() const noexcept { return child_count_; }
+std::size_t Widget::child_count() const noexcept {
+    return child_count_;
+}
 
 // The recursive walk is the tree's honest shape: a real scene nests only a few
 // levels deep (a screen, a panel, a control), and an explicit stack would buy a
@@ -105,7 +120,9 @@ Widget* Widget::hit_test(base::PointI at) noexcept {
     return this;
 }
 
-bool Widget::focused() const noexcept { return focused_; }
+bool Widget::focused() const noexcept {
+    return focused_;
+}
 
 void Widget::set_focused(bool on) noexcept {
     if (focused_ == on) {
@@ -117,7 +134,9 @@ void Widget::set_focused(bool on) noexcept {
     invalidate(bounds_);
 }
 
-Widget* Widget::focused_widget() noexcept { return find_focused_in(*this); }
+Widget* Widget::focused_widget() noexcept {
+    return find_focused_in(*this);
+}
 
 // NOLINTNEXTLINE(misc-no-recursion) -- same shape and same reason as draw().
 Widget* Widget::find_focused_in(Widget& node) noexcept {

@@ -110,6 +110,13 @@ class Widget {
     /// Paints this widget only; the tree walk around it belongs to draw().
     virtual void on_draw(const Painter& painter) const noexcept = 0;
 
+    /// Replaces the bounding box and reports both boxes as owing repaint: a
+    /// widget that moved or resized leaves pixels standing in the old box and
+    /// claims new ones it never painted. An unchanged box reports nothing.
+    /// Protected because geometry is the layout story's decision (Label
+    /// re-measuring itself is the first user), not a public knob.
+    void set_bounds(base::RectI bounds) noexcept;
+
     /// Reports an area as owing a repaint. State mutators call this as they
     /// change; with no sink wired the report is dropped, which keeps widgets
     /// usable in painter-only tests.

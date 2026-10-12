@@ -6,6 +6,7 @@ int main() {
     run_bit_tests();
     run_canvas_tests();
     run_diff_tests();
+    run_font_tests();
     run_host_tests();
     run_pen_tests();
     run_point_tests();
@@ -15,6 +16,7 @@ int main() {
     run_run_loop_tests();
     run_smoke_tests();
     run_ssd1306_tests();
+    run_utf8_tests();
     run_widget_tests();
     return ::visor::testing::failure_count() == 0 ? 0 : 1;
 }

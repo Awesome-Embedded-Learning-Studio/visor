@@ -1,9 +1,13 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <expected>
 #include <string>
 #include <string_view>
+#include <vector>
 
+#include "font.hpp"
 #include "image.hpp"
 
 namespace visor::fontgen {
@@ -16,6 +20,7 @@ enum class EmitError {
     kInvalidCharacters, ///< Not [A-Za-z_][A-Za-z0-9_]*.
     kKeyword,           ///< A C++ keyword; a namespace of that name breaks compilation.
     kBadStorage,        ///< rows does not hold height * stride() bytes.
+    kNoGlyphs,          ///< A font header with no glyphs has nothing to consume.
 };
 
 /// @brief One-line, user-facing wording for each emit failure.
@@ -46,5 +51,28 @@ enum class EmitError {
  */
 [[nodiscard]] std::expected<std::string, EmitError>
 emit_bitmap_header(std::string_view name, std::string_view source_hint, const MonoImage& image);
+
+/**
+ * @brief   Renders the glyphs as a font header consumable as visor::draw::MonoFont.
+ *
+ * The output exposes kLineHeight, a shared kBits byte array and a
+ * visor::draw::GlyphEntry table in namespace visor::assets::<name>. Glyph
+ * rows append to kBits in order, so byte offsets are a running sum; every
+ * advance is the full cell width and both offsets are zero -- the strip-cut
+ * metrics. The GlyphEntry fields that stay zero here wait for proportional
+ * sources on the font input line.
+ *
+ * Unlike an image header, the output includes visor/draw/mono_font.hpp and
+ * so compiles inside a tree that consumes visor's headers: fonts are
+ * core-facing assets, images are anybody's.
+ *
+ * @param[in] cell_width/cell_height/first_codepoint  The cut the glyphs came
+ *            from; they ride the regenerate comment, and cell_height doubles
+ *            as the line height.
+ */
+[[nodiscard]] std::expected<std::string, EmitError>
+emit_font_header(std::string_view name, std::string_view source_hint,
+                 const std::vector<Glyph>& glyphs, std::size_t cell_width, std::size_t cell_height,
+                 std::uint32_t first_codepoint);
 
 } // namespace visor::fontgen

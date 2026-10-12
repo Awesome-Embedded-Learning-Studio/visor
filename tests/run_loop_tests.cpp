@@ -22,12 +22,15 @@ void run_run_loop_tests() {
     const RectI button_bounds{.pos = PointI{2, 2}, .size = SizeI{.w = 6, .h = 4}};
 
     // Key and movement events over a tree without any handler: they are
-    // consumed, the frame still goes out, nothing breaks.
+    // consumed, the frame still goes out, nothing breaks. The pointer move
+    // is queued first on purpose -- the pump drains pointer events freely but
+    // stops after one key event per round, so ordering the key first would
+    // leave the move for a second round and consume only one.
     {
         visor::ui::Rectangle root(root_bounds);
         visor::host::OffscreenHost screen(20, 20);
-        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = 42}));
         VISOR_CHECK(screen.push_event(visor::host::PointerMove{.pos = PointI{1, 1}}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = 42}));
         const auto host = screen.table();
         Canvas<SizeI{.w = 20, .h = 20}> frame;
         VISOR_CHECK_EQ(visor::ui::run_once(host, root, frame), 2);
@@ -67,9 +70,10 @@ void run_run_loop_tests() {
         VISOR_CHECK_EQ(screen.get(PointI{4, 4}), visor::canvas::Color::Off);
     }
 
-    // Tab arrives as a key event and moves the focus: the first press lands on
-    // the first button in draw order, the second walks on, and the ring pixels
-    // follow the holder.
+    // Tab arrives as a key event and moves the focus, one round per key
+    // event: the first press lands on the first button in draw order, the
+    // second waits in the queue for the next round and then walks on, and
+    // the ring pixels follow the holder.
     {
         visor::ui::Rectangle panel(root_bounds);
         visor::ui::Button one(button_bounds);
@@ -81,7 +85,11 @@ void run_run_loop_tests() {
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
         const auto host = screen.table();
         Canvas<SizeI{.w = 20, .h = 20}> frame;
-        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
+        // Round one takes the first Tab only; the second stays queued.
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1);
+        VISOR_CHECK(one.focused());
+        VISOR_CHECK(!two.focused());
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1);
         VISOR_CHECK(!one.focused());
         VISOR_CHECK(two.focused());
         // The ring is real pixels: two's border went dark inside the lit
@@ -120,7 +128,8 @@ void run_run_loop_tests() {
 
     // Keyboard activation: Tab lands the focus on the checkbox, Enter flips it
     // (the frame carries the solid mark), then Space flips it back while a
-    // code no control claims passes through and changes nothing.
+    // code no control claims passes through and changes nothing. One key per
+    // round, so each of the four keys is its own run.
     {
         visor::ui::Rectangle panel(root_bounds);
         visor::ui::Checkbox box(RectI{.pos = PointI{4, 4}, .size = SizeI{.w = 8, .h = 8}});
@@ -130,16 +139,19 @@ void run_run_loop_tests() {
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
         const auto host = screen.table();
         Canvas<SizeI{.w = 20, .h = 20}> frame;
-        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // Tab only
         VISOR_CHECK(box.focused());
+        VISOR_CHECK(!box.checked());
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // Enter
         VISOR_CHECK(box.checked());
         // (7,7) is the interior the mark fills; (6,6) is the frame both states share.
         VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::Off);
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = 42}));
-        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // Space
         VISOR_CHECK(!box.checked());
         VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // 42, claimed by nobody
     }
 
     // Activation with nobody holding the focus: the key is consumed and
@@ -156,21 +168,81 @@ void run_run_loop_tests() {
         VISOR_CHECK(!box.checked());
     }
 
-    // The button takes no keyboard activation yet, on purpose: a momentary
-    // press needs a frame showing the pressed state between down and up, so
-    // Enter on a focused button is consumed and does nothing. This pins the
-    // deferral until the timing story (key repeat or a tick) arrives.
+    // The timing story, flipped from B6's deferral: one key event per round,
+    // so a press and its release can never share a frame. Enter on the
+    // focused button presses and shows for a whole frame, the release fires
+    // the activation, and the pointer move queued behind them drains freely
+    // once the keys are done.
     {
+        int fired = 0;
         visor::ui::Rectangle panel(root_bounds);
         visor::ui::Button button(button_bounds);
+        button.set_on_activate(
+            [](visor::ui::Button&, void* context) { ++*static_cast<int*>(context); }, &fired);
         VISOR_CHECK(panel.add_child(&button));
         visor::host::OffscreenHost screen(20, 20);
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyUp{.code = visor::host::kKeyEnter}));
+        VISOR_CHECK(screen.push_event(visor::host::PointerMove{.pos = PointI{1, 1}}));
+        const auto host = screen.table();
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // Tab
+        VISOR_CHECK(button.focused());
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // Enter down
+        VISOR_CHECK(button.pressed());
+        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), visor::canvas::Color::Off); // the press frame
+        VISOR_CHECK_EQ(fired, 0);                                            // not yet
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1);          // Enter up
+        VISOR_CHECK(!button.pressed());
+        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(fired, 1); // the release completed the activation
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // the move drains
+    }
+
+    // Release tracking matches codes: Enter presses, a stray key-up releases
+    // nothing, only Enter's own up completes the activation.
+    {
+        int fired = 0;
+        visor::ui::Rectangle panel(root_bounds);
+        visor::ui::Button button(button_bounds);
+        button.set_on_activate(
+            [](visor::ui::Button&, void* context) { ++*static_cast<int*>(context); }, &fired);
+        VISOR_CHECK(panel.add_child(&button));
+        visor::host::OffscreenHost screen(20, 20);
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyUp{.code = 42}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyUp{.code = visor::host::kKeyEnter}));
+        const auto host = screen.table();
+        Canvas<SizeI{.w = 20, .h = 20}> frame;
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // Tab
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // Enter down
+        VISOR_CHECK(button.pressed());
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // 42 up, ignored
+        VISOR_CHECK(button.pressed());
+        VISOR_CHECK_EQ(fired, 0);
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 1); // Enter up
+        VISOR_CHECK(!button.pressed());
+        VISOR_CHECK_EQ(fired, 1);
+    }
+
+    // Pointer clicks activate the same way, and both pointer events drain in
+    // one round: their stream is spatial, the rhythm rule owns keys only.
+    {
+        int fired = 0;
+        visor::ui::Rectangle panel(root_bounds);
+        visor::ui::Button button(button_bounds);
+        button.set_on_activate(
+            [](visor::ui::Button&, void* context) { ++*static_cast<int*>(context); }, &fired);
+        VISOR_CHECK(panel.add_child(&button));
+        visor::host::OffscreenHost screen(20, 20);
+        VISOR_CHECK(screen.push_event(visor::host::PointerDown{.button = 1, .pos = PointI{4, 4}}));
+        VISOR_CHECK(screen.push_event(visor::host::PointerUp{.button = 1, .pos = PointI{4, 4}}));
         const auto host = screen.table();
         Canvas<SizeI{.w = 20, .h = 20}> frame;
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, frame), 2);
-        VISOR_CHECK(button.focused());
         VISOR_CHECK(!button.pressed());
+        VISOR_CHECK_EQ(fired, 1);
     }
 }

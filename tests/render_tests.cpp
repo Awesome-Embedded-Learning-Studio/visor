@@ -345,13 +345,19 @@ void run_render_tests() {
     // rounds of run_dirty where controls report their own debts. The flush
     // count pins the economy -- only the strips a report named go out, an
     // idle round sends nothing, and the collector retires with the rebuild.
+    // The rounds are one key event each: the pump's rhythm rule, so a key
+    // press and its release each own a rebuild of their own.
     {
         // Ground covers the screen; the checkbox lives in strip 0, the
         // button in the tail strip. (5,5) is the checkbox's inner mark,
-        // (2,2) its ring corner, (12,16) the button's ring corner.
+        // (2,2) its ring corner, (12,16) the button's ring corner, (13,17)
+        // the button's press-sensitive interior.
+        int fired = 0;
         visor::ui::Rectangle ground(kWholeScreen);
         visor::ui::Checkbox box(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 6, .h = 6}});
         visor::ui::Button tail_button(RectI{.pos = PointI{12, 16}, .size = SizeI{.w = 4, .h = 4}});
+        tail_button.set_on_activate(
+            [](visor::ui::Button&, void* context) { ++*static_cast<int*>(context); }, &fired);
         VISOR_CHECK(ground.add_child(&box));
         VISOR_CHECK(ground.add_child(&tail_button));
         DirtyRegions debts;
@@ -365,33 +371,54 @@ void run_render_tests() {
         visor::ui::render_strips(ground, strip, kScreenSize, screen.table());
         VISOR_CHECK_EQ(screen.flush_count(), 3); // 8 + 8 + 4
 
-        // Round one: Tab focuses the checkbox, Space checks it. Both state
-        // flips report the same box, the collector merges them, and only
-        // strip 0 rebuilds.
+        // Round one: Tab focuses the checkbox. The ring report names strip 0.
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
-        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
-        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 2);
+        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 4);
         VISOR_CHECK_EQ(debts.count(), std::size_t{0}); // retired with the rebuild
-        VISOR_CHECK(box.checked());
         VISOR_CHECK(box.focused());
-        VISOR_CHECK(screen.get(PointI{5, 5}) == Color::Off); // the solid mark went out
-        VISOR_CHECK(screen.get(PointI{2, 2}) == Color::Off); // and the ring with it
+        VISOR_CHECK(!box.checked());
+        VISOR_CHECK(screen.get(PointI{2, 2}) == Color::Off); // the ring went out
+        // (5,5) sits on this size's 2x2 box frame, Off checked or not; the
+        // state line above is the round's word, the pixel cannot be.
 
-        // Round two: Tab walks to the tail button. The checkbox un-ring
+        // Round two: Space checks the checkbox. The mark report is the same
+        // box the ring used, the collector merges into one strip 0 rebuild.
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
+        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(screen.flush_count(), 5);
+        VISOR_CHECK(box.checked());
+        VISOR_CHECK(screen.get(PointI{2, 2}) == Color::Off); // frame and ring both dark
+
+        // Round three: Tab walks to the tail button. The checkbox un-ring
         // report and the button ring report live in different strips, so
         // strips 0 and 2 rebuild and strip 1 stays home. The mark persists.
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
         VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
-        VISOR_CHECK_EQ(screen.flush_count(), 6);
+        VISOR_CHECK_EQ(screen.flush_count(), 7);
         VISOR_CHECK(tail_button.focused());
         VISOR_CHECK(!box.focused());
         VISOR_CHECK(screen.get(PointI{12, 16}) == Color::Off); // the ring moved to the button
         VISOR_CHECK(screen.get(PointI{2, 2}) == Color::On);    // the box corner is plain again
         VISOR_CHECK(screen.get(PointI{5, 5}) == Color::Off);   // the mark stays put
 
-        // Round three, idle: no events, no debts, nothing submitted.
+        // Rounds four and five: Enter presses the focused button, its up
+        // releases and fires. Each round rebuilds exactly the button's strip.
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
+        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(screen.flush_count(), 8);
+        VISOR_CHECK(tail_button.pressed());
+        VISOR_CHECK(screen.get(PointI{13, 17}) == Color::Off); // the press frame went out
+        VISOR_CHECK_EQ(fired, 0);                              // down never fires
+        VISOR_CHECK(screen.push_event(visor::host::KeyUp{.code = visor::host::kKeyEnter}));
+        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(screen.flush_count(), 9);
+        VISOR_CHECK(!tail_button.pressed());
+        VISOR_CHECK(screen.get(PointI{13, 17}) == Color::On);
+        VISOR_CHECK_EQ(fired, 1); // the release completed the activation
+
+        // Round six, idle: no events, no debts, nothing submitted.
         VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 0);
-        VISOR_CHECK_EQ(screen.flush_count(), 6);
+        VISOR_CHECK_EQ(screen.flush_count(), 9);
     }
 }

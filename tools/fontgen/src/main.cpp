@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "bdf.hpp"
 #include "emit.hpp"
 #include "font.hpp"
 #include "pbm.hpp"
@@ -41,6 +42,12 @@ void print_usage() {
     std::println(stderr, "  a glyph table plus a shared bit block in visor::assets::<name>, ready");
     std::println(stderr, "  to assemble into a visor::draw::MonoFont. --first labels the first");
     std::println(stderr, "  cell; write it as hex (0x20) or decimal (32).");
+    std::println(stderr, "       fontgen bdf <font.bdf> <output.hpp> --range <first:last>");
+    std::println(stderr, "                [--name <identifier>]");
+    std::println(stderr, "  Reads a BDF font and emits the codepoint subset as a font header:");
+    std::println(stderr, "  every glyph keeps its own advance and offsets from the source font.");
+    std::println(stderr, "  A whole-font dump is refused on purpose; subsetting is the embedded");
+    std::println(stderr, "  way. Write the range ends as hex (0x20:0x7e) or decimal.");
 }
 
 // "assets/logo.pbm" -> "logo". The stem keeps whatever characters the
@@ -115,6 +122,21 @@ std::optional<std::uint32_t> parse_codepoint(std::string_view text) {
     return value;
 }
 
+/// "0x20:0x7e" or "32:126": both ends in the codepoint grammar, first not
+/// past last.
+std::optional<std::pair<std::uint32_t, std::uint32_t>> parse_range(std::string_view text) {
+    const std::size_t split = text.find(':');
+    if (split == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const auto first = parse_codepoint(text.substr(0, split));
+    const auto last = parse_codepoint(text.substr(split + 1));
+    if (!first.has_value() || !last.has_value() || *first > *last) {
+        return std::nullopt;
+    }
+    return std::pair{*first, *last};
+}
+
 /// What the option pairs said. Zero cells and a zero codepoint mark "not
 /// given", which is how the font mode notices a missing requirement.
 struct Options {
@@ -125,6 +147,9 @@ struct Options {
     bool has_cell = false;
     std::uint32_t first_codepoint = 0;
     bool has_first = false;
+    std::uint32_t range_first = 0;
+    std::uint32_t range_last = 0;
+    bool has_range = false;
 };
 
 /// Parses "--flag value" pairs after the two positional arguments. False on
@@ -155,6 +180,14 @@ bool parse_options(int argc, char** argv, Options& options) {
             }
             options.first_codepoint = *codepoint;
             options.has_first = true;
+        } else if (flag == "--range") {
+            const auto range = parse_range(value);
+            if (!range.has_value()) {
+                return false;
+            }
+            options.range_first = range->first;
+            options.range_last = range->second;
+            options.has_range = true;
         } else {
             return false;
         }
@@ -184,7 +217,8 @@ int run_image(int argc, char** argv) {
         return kUsageExit;
     }
     Options options;
-    if (!parse_options(argc, argv, options) || options.has_cell || options.has_first) {
+    if (!parse_options(argc, argv, options) || options.has_cell || options.has_first ||
+        options.has_range) {
         return kUsageExit; // image mode owns --name only
     }
     const std::string_view input_path = argv[2];
@@ -271,6 +305,63 @@ int run_font(int argc, char** argv) {
     return 0;
 }
 
+int run_bdf(int argc, char** argv) {
+    if (argc < 4) {
+        return kUsageExit;
+    }
+    Options options;
+    if (!parse_options(argc, argv, options) || !options.has_range || options.has_cell ||
+        options.has_first) {
+        return kUsageExit; // bdf mode owns --range and --name only
+    }
+    const std::string_view input_path = argv[2];
+    const std::string_view output_path = argv[3];
+    const std::string name = options.has_name ? options.name : default_name_from(input_path);
+
+    if (!visor::fontgen::valid_asset_name(name)) {
+        std::println(stderr,
+                     "fontgen: asset name '{}' is not a usable identifier; pass --name <id>", name);
+        return kUsageExit;
+    }
+    const auto bytes = visor::fontgen::read_binary_file(input_path);
+    if (!bytes.has_value()) {
+        std::println(stderr, "fontgen: {}", bytes.error().message);
+        return kFailureExit;
+    }
+    auto font = visor::fontgen::parse_bdf(*bytes);
+    if (!font.has_value()) {
+        std::println(stderr, "fontgen: {}: {}", input_path, font.error().message);
+        return kFailureExit;
+    }
+    std::vector<visor::fontgen::Glyph> subset;
+    for (const auto& glyph : font->glyphs) {
+        if (glyph.codepoint >= options.range_first && glyph.codepoint <= options.range_last) {
+            subset.push_back(glyph);
+        }
+    }
+    if (subset.empty()) {
+        std::println(stderr, "fontgen: {}: the range selects no glyph of this font", input_path);
+        return kFailureExit;
+    }
+    const auto header = visor::fontgen::emit_bdf_font_header(
+        name, input_path, options.range_first, options.range_last, font->line_height, subset);
+    if (!header.has_value()) {
+        std::println(stderr, "fontgen: {}", visor::fontgen::describe(header.error()));
+        return kFailureExit;
+    }
+    if (!write_text_file(output_path, *header)) {
+        std::println(stderr, "fontgen: cannot write '{}'", output_path);
+        return kFailureExit;
+    }
+    std::size_t total_bytes = 0;
+    for (const auto& glyph : subset) {
+        total_bytes += glyph.image.rows.size();
+    }
+    std::println("fontgen: {} glyphs of line height {}, {} bytes -> {} (visor::assets::{})",
+                 subset.size(), font->line_height, total_bytes, output_path, name);
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -286,6 +377,9 @@ int main(int argc, char** argv) {
     }
     if (mode == "font") {
         return run_font(argc, argv);
+    }
+    if (mode == "bdf") {
+        return run_bdf(argc, argv);
     }
     print_usage();
     return kUsageExit;

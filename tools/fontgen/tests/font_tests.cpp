@@ -63,11 +63,12 @@ void cut_rejects_zero_cell() {
 }
 
 /// Two 2x2 glyphs, I and J: the smallest font that still shows per-glyph
-/// offsets, advances and the shared bit block.
+/// offsets, advances and the shared bit block. Strip metrics, as cut would
+/// fill them: advance is the cell width, offsets zero.
 std::vector<Glyph> mini_font() {
     return {
-        Glyph{.codepoint = 0x49, .image = testing::image_from(2, 2, {0x80, 0x40})},
-        Glyph{.codepoint = 0x4a, .image = testing::image_from(2, 2, {0xc0, 0xc0})},
+        Glyph{.codepoint = 0x49, .image = testing::image_from(2, 2, {0x80, 0x40}), .advance = 2},
+        Glyph{.codepoint = 0x4a, .image = testing::image_from(2, 2, {0xc0, 0xc0}), .advance = 2},
     };
 }
 

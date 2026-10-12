@@ -6,6 +6,7 @@
 
 namespace visor::fontgen::testing {
 
+void run_bdf_tests();
 void run_emit_tests();
 void run_font_tests();
 void run_pbm_tests();
@@ -14,6 +15,7 @@ bool run_cli_tests(const std::string& fontgen_path);
 } // namespace visor::fontgen::testing
 
 int main(int argc, char** argv) {
+    ::visor::fontgen::testing::run_bdf_tests();
     ::visor::fontgen::testing::run_emit_tests();
     ::visor::fontgen::testing::run_font_tests();
     ::visor::fontgen::testing::run_pbm_tests();

@@ -108,9 +108,98 @@ bool run_cli_tests(const std::string& fontgen_path) {
     FG_CHECK(read_text("cli_font2.hpp").find("namespace visor::assets::cli_font_asset {") !=
              std::string::npos);
 
+    // The bdf subcommand: a five-glyph BDF (space, A, comma, one unencoded,
+    // one CJK) subset by range.
+    const std::string bdf_fixture =
+        "STARTFONT 2.1\n"
+        "FONT -test-fixed-medium-r-normal--12-120-75-75-c-60-iso10646-1\n"
+        "SIZE 12 75 75\n"
+        "FONTBOUNDINGBOX 6 12 0 -2\n"
+        "STARTPROPERTIES 2\n"
+        "FONT_ASCENT 10\n"
+        "FONT_DESCENT 2\n"
+        "ENDPROPERTIES\n"
+        "CHARS 5\n"
+        "STARTCHAR space\n"
+        "ENCODING 32\n"
+        "DWIDTH 6 0\n"
+        "BBX 0 0 0 0\n"
+        "BITMAP\n"
+        "ENDCHAR\n"
+        "STARTCHAR A\n"
+        "ENCODING 65\n"
+        "DWIDTH 6 0\n"
+        "BBX 5 7 0 0\n"
+        "BITMAP\n"
+        "38\n"
+        "44\n"
+        "44\n"
+        "7c\n"
+        "44\n"
+        "44\n"
+        "44\n"
+        "ENDCHAR\n"
+        "STARTCHAR comma\n"
+        "ENCODING 44\n"
+        "DWIDTH 6 0\n"
+        "BBX 2 3 1 -2\n"
+        "BITMAP\n"
+        "c0\n"
+        "c0\n"
+        "80\n"
+        "ENDCHAR\n"
+        "STARTCHAR unencoded\n"
+        "ENCODING -1\n"
+        "DWIDTH 6 0\n"
+        "BBX 1 1 0 0\n"
+        "BITMAP\n"
+        "80\n"
+        "ENDCHAR\n"
+        "STARTCHAR C20013\n"
+        "ENCODING 20013\n"
+        "DWIDTH 12 0\n"
+        "BBX 8 8 2 0\n"
+        "BITMAP\n"
+        "18\n"
+        "d8\n"
+        "d8\n"
+        "f8\n"
+        "18\n"
+        "3c\n"
+        "d8\n"
+        "18\n"
+        "ENDCHAR\n"
+        "ENDFONT\n";
+    if (!write_bytes("cli_font.bdf", bdf_fixture)) {
+        report(__FILE__, __LINE__, "cannot write the bdf fixture");
+        return false;
+    }
+
+    FG_CHECK_EQ(run_command(quoted + " bdf cli_font.bdf cli_bdf.hpp --range 0x41:0x41"), 0);
+    const std::string bdf_header = read_text("cli_bdf.hpp");
+    FG_CHECK(bdf_header.find("namespace visor::assets::cli_font {") != std::string::npos);
+    FG_CHECK(bdf_header.find("kLineHeight = 12;") != std::string::npos);
+    FG_CHECK(bdf_header.find("{.codepoint = 0x41,") != std::string::npos);
+    FG_CHECK(bdf_header.find(".offset_y = 3},") != std::string::npos); // BDF metrics folded
+    FG_CHECK_EQ(run_command(quoted + " bdf cli_font.bdf cli_bdf2.hpp --range 0x4e2d:0x4e2d"
+                                     " --name cli_cjk"),
+                0);
+    FG_CHECK(read_text("cli_bdf2.hpp").find("{.codepoint = 0x4e2d,") != std::string::npos);
+
     // Usage errors name the command shape: a missing --cell or --first, an
     // unparseable one, an unknown flag, an unknown subcommand, no subcommand.
     FG_CHECK_EQ(run_command(quoted), 2);
+    FG_CHECK_EQ(run_command(quoted + " bdf cli_font.bdf cli_bdf3.hpp"), 2); // no --range
+    FG_CHECK_EQ(run_command(quoted + " bdf cli_font.bdf cli_bdf3.hpp --range 0x7e:0x20"), 2);
+    FG_CHECK_EQ(run_command(quoted + " bdf cli_font.bdf cli_bdf3.hpp --range abc"), 2);
+    FG_CHECK_EQ(run_command(quoted + " bdf cli_font.bdf cli_bdf3.hpp --range 0x41:0x41"
+                                     " --cell 4x4"),
+                2); // bdf mode owns --range and --name only
+    // A range that selects nothing is the file and the range disagreeing.
+    FG_CHECK_EQ(run_command(quoted + " bdf cli_font.bdf cli_bdf3.hpp --range 0x80:0x90"), 1);
+    FG_CHECK_EQ(run_command(quoted + " bdf cli_missing.bdf cli_bdf4.hpp --range 0x41:0x41"), 1);
+    FG_CHECK(!std::filesystem::exists("cli_bdf4.hpp"));
+    FG_CHECK_EQ(run_command(quoted + " watermark cli_sheet.pbm cli_font3.hpp"), 2);
     FG_CHECK_EQ(run_command(quoted + " image only_one_argument.hpp"), 2);
     FG_CHECK_EQ(run_command(quoted + " image cli_chevron.pbm cli_out3.hpp --name not-a-name"), 2);
     FG_CHECK_EQ(run_command(quoted + " font cli_sheet.pbm cli_font3.hpp --cell 4x4"), 2);
@@ -122,7 +211,6 @@ bool run_cli_tests(const std::string& fontgen_path) {
     FG_CHECK_EQ(run_command(quoted + " font cli_sheet.pbm cli_font3.hpp --cell 4x4 --first 0x41"
                                      " --bold"),
                 2);
-    FG_CHECK_EQ(run_command(quoted + " watermark cli_sheet.pbm cli_font3.hpp"), 2);
     // File problems stay on the other exit code: a sheet that does not divide
     // by its cells, a missing file, a broken PBM.
     FG_CHECK_EQ(run_command(quoted + " font cli_odd_sheet.pbm cli_font3.hpp --cell 4x4"
@@ -140,6 +228,11 @@ bool run_cli_tests(const std::string& fontgen_path) {
     remove_quietly("cli_bad.pbm");
     remove_quietly("cli_sheet.pbm");
     remove_quietly("cli_odd_sheet.pbm");
+    remove_quietly("cli_font.bdf");
+    remove_quietly("cli_bdf.hpp");
+    remove_quietly("cli_bdf2.hpp");
+    remove_quietly("cli_bdf3.hpp");
+    remove_quietly("cli_bdf4.hpp");
     remove_quietly("cli_out.hpp");
     remove_quietly("cli_out2.hpp");
     remove_quietly("cli_out3.hpp");

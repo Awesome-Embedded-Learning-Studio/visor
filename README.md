@@ -19,10 +19,10 @@ visor 面向想看一个跨宿主 GUI 框架如何从零搭起来的读者。想
 - 位图与字形。`MonoBitmap` 视图吃 fontgen 生成的点阵头文件，`Painter::draw_bitmap` 以墨水传送语义绘制，整数缩放每位变块，条带重放下与整幅逐像素一致。
 - 文本。UTF-8 解码住 `base`，`MonoFont` 视图组装字模组头文件（码点二分查表、共享位块、每字模自带 advance 与偏移），`TextLayout` 游标是间距规则唯一住处，`measure_text` 与 `draw_text` 同源，换行与缺字跳过都有判例。
 - 渲染管线。绘制发生在场景坐标系的窗口里，缓冲形状由编译期条带 profile 决定，屏幕尺寸只是运行期循环参数。控件状态改变时当场申报欠画区域，`run_dirty` 一轮只重画被申报的条带，区域装不下时折叠成包围盒，保证不漏画。
-- 取模工具 `tools/fontgen` 独立构建：子命令 `image` 把二进制 PBM（P4）图片转成与画布同款打包的 C++ 点阵数组头文件，子命令 `font` 把一张条带图按格子切成字模组头文件（码点连续标号，字距烤进格子），独立测试与命令行界面齐备。汉字线的输入源已拍板 BDF，读入待做。
+- 取模工具 `tools/fontgen` 独立构建：子命令 `image` 把二进制 PBM（P4）图片转成与画布同款打包的 C++ 点阵数组头文件，子命令 `font` 把一张条带图按格子切成字模组头文件（码点连续标号，字距烤进格子），子命令 `bdf` 从 BDF 点阵字体（文泉驿、GNU Unifont 一类授权干净的自由字体）按码点范围切子集，比例字模自带 advance 与偏移，独立测试与命令行界面齐备。
 - 第二站已开工的纯逻辑半边（2026-10-12 拍板 SSD1306、I2C、128x64）：bindings 按宿主分目录（离屏替身与 SSD1306 各立门户），画布行主序到 GDDRAM 页主序的转换在 PC 侧先行验证，I2C 传输与初始化时序等主控板定了再动工。
 
-正在路上的：汉字字模的 BDF 读入、RGB565 彩色光栅、更多控件与布局、桌面窗口宿主、真实 OLED 与 SPI 彩屏开发板（驱动适配另线推进）、Cinux 宿主。路线与每一步的待办见[待办清单](document/todo/README.md)。
+正在路上的：RGB565 彩色光栅、更多控件与布局、桌面窗口宿主、真实 OLED 与 SPI 彩屏开发板（驱动适配另线推进）、Cinux 宿主（挂钩与标准库白名单已拍板，缓行中）。路线与每一步的待办见[待办清单](document/todo/README.md)。
 
 ## 构建与验证
 
@@ -44,7 +44,7 @@ VISOR_CHECK_JOBS=4 scripts/checks/acceptance.sh
 
 ## 文档地图
 
-- [跟跑教程](document/tutorials/01-skeleton.md)：从空仓库到文本测量与 Label 控件的十六章正文，入口导读与逐批推进记录在[教程目录](document/tutorials/README.md)。
+- [跟跑教程](document/tutorials/01-skeleton.md)：从空仓库到 BDF 字模线的十七章正文，入口导读与逐批推进记录在[教程目录](document/tutorials/README.md)。
 - [待办清单](document/todo/README.md)：按验收梯队分站的路线图，含分叉前置条件与留档决定。
 - [验收脚本 README](scripts/checks/README.md)：六道检查各自覆盖什么。
 

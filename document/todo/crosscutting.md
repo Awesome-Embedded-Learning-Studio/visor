@@ -4,12 +4,12 @@
 
 ## 字体与文本
 
-前身 Cinux-GUI 的 P5 地盘，现在 visor 还画不出一个字符。第四站（Cinux 桌面层）开工前必须完成。第二站验收门槛（取模结果显示中文/图片）也压在这组上。
+前身 Cinux-GUI 的 P5 地盘。全组已收尾（B7 至 B11，2026-10-12）：转换核心、图片线、字形渲染、文本测量与 Label、BDF 汉字读入全部落地，第二站门槛（取模结果显示中文/图片）的数据侧齐备。
 
 - [x] fontgen 转换核心与图片线（B7，2026-10-12）：PBM 转画布同款打包的点阵数组头文件，独立构建、测试与 CLI 齐备。
-- [ ] fontgen 汉字线：输入源已拍板 BDF（2026-10-12，教程可指路文泉驿点阵宋体与 GNU Unifont 这类授权干净的自由点阵字体）。字模组头文件的形状已由 B10 定形（`draw::GlyphEntry` 按字模带 advance 与偏移，为比例字体留位），BDF 读入往同一个 emit 里灌，另起一批。
+- [x] fontgen 汉字线（B11，2026-10-12）：输入源 BDF（拍板时否决 HZK16，授权链不干净）。`fontgen bdf` 按码点范围切子集，DWIDTH 与 BBX 折算进 `GlyphEntry` 的 advance 与偏移（`offset_y = ascent - (yoff + height)`），整库导出有意拒绝。真 Unifont 烟雾过（ASCII 95 字与单汉字子集，生成头编译期消费）。
 - [x] 字形渲染进渲染核心（B9，2026-10-12）：`MonoBitmap` 视图（生成头拿来即用）加 `Painter::draw_bitmap`（墨水传送语义，整数缩放位变块），条带重放安全有判例。
-- [x] 文本测量与 Label 控件（B10，2026-10-12）：字模组头文件与 fontgen 字库模式（条带切割），UTF-8 解码进 base，`TextLayout` 游标统一测量与绘制的间距，`draw_text` 自由函数，`Label` 靠测量自己定尺寸（`Widget::set_bounds` 旧新双申报）。字体与文本组至此收尾（汉字线除外）。
+- [x] 文本测量与 Label 控件（B10，2026-10-12）：字模组头文件与 fontgen 字库模式（条带切割），UTF-8 解码进 base，`TextLayout` 游标统一测量与绘制的间距，`draw_text` 自由函数，`Label` 靠测量自己定尺寸（`Widget::set_bounds` 旧新双申报）。
 
 ## 控件与布局
 

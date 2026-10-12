@@ -34,6 +34,8 @@ namespace assets::demo_font {
 inline constexpr std::size_t kLineHeight = 6;
 // NOLINTNEXTLINE(modernize-avoid-c-arrays) -- verbatim fontgen output shape.
 inline constexpr std::uint8_t kBits[] = {
+    0x80, // U+002c ',' row 0
+    0x80, // U+002c ',' row 1
     0x60, // U+0041 'A' row 0
     0x90, // U+0041 'A' row 1
     0xf0, // U+0041 'A' row 2
@@ -52,24 +54,31 @@ inline constexpr std::uint8_t kBits[] = {
 };
 // NOLINTNEXTLINE(modernize-avoid-c-arrays) -- verbatim fontgen output shape.
 inline constexpr visor::draw::GlyphEntry kGlyphs[] = {
+    {.codepoint = 0x2c,
+     .width = 1,
+     .height = 2,
+     .byte_offset = 0,
+     .advance = 2,
+     .offset_x = 1,
+     .offset_y = 4},
     {.codepoint = 0x41,
      .width = 4,
      .height = 5,
-     .byte_offset = 0,
+     .byte_offset = 2,
      .advance = 5,
      .offset_x = 0,
      .offset_y = 0},
     {.codepoint = 0x42,
      .width = 4,
      .height = 5,
-     .byte_offset = 5,
+     .byte_offset = 7,
      .advance = 5,
      .offset_x = 0,
      .offset_y = 0},
     {.codepoint = 0x4e2d,
      .width = 5,
      .height = 5,
-     .byte_offset = 10,
+     .byte_offset = 12,
      .advance = 6,
      .offset_x = 0,
      .offset_y = 0},
@@ -295,6 +304,26 @@ void draw_text_skips_invalid_bytes() {
     VISOR_CHECK(canvas.get(PointI{5, 0}) == Color::Off);
 }
 
+void proportional_offsets_hang_below_the_line_top() {
+    // The comma is the BDF-shaped glyph: one pixel wide, hanging two rows
+    // into the line (offset_y 4 of a 6-row line), pushed a pixel right of
+    // the pen (offset_x 1), advancing its own two pixels. Measurement and
+    // placement both have to honour offsets that are not zero and an advance
+    // that is not the bitmap width.
+    VISOR_CHECK_EQ(measure_text(kDemoFont, ",", 1), (SizeI{.w = 2, .h = 6}));
+    VISOR_CHECK_EQ(measure_text(kDemoFont, "A,", 1), (SizeI{.w = 7, .h = 6}));
+    Canvas<SizeI{.w = 24, .h = 16}> canvas;
+    canvas.set_clear(Color::Off);
+    const visor::ui::CanvasPainter painter{canvas};
+    draw_text(painter, PointI{0, 0}, kDemoFont, "A,", Color::On, 1);
+    // The comma paints at pen 5 plus its offset_x: column 6, rows 4 and 5.
+    VISOR_CHECK(canvas.get(PointI{6, 4}) == Color::On);
+    VISOR_CHECK(canvas.get(PointI{6, 5}) == Color::On);
+    VISOR_CHECK(canvas.get(PointI{5, 4}) == Color::Off); // offset_x pushed it right
+    VISOR_CHECK(canvas.get(PointI{6, 3}) == Color::Off); // offset_y held it down
+    VISOR_CHECK(canvas.get(PointI{7, 4}) == Color::Off); // one pixel wide, no more
+}
+
 } // namespace
 
 // NOLINTNEXTLINE(misc-use-internal-linkage) -- registry entry, called from main.cpp.
@@ -311,4 +340,5 @@ void run_font_tests() {
     draw_text_scales_blocks();
     draw_text_matches_strip_replay();
     draw_text_skips_invalid_bytes();
+    proportional_offsets_hang_below_the_line_top();
 }

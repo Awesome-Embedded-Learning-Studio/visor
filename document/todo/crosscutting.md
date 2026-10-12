@@ -13,8 +13,8 @@
 
 ## 控件与布局
 
-- [ ] Button 的键盘激活：等节奏故事（按键重复或时钟节拍），B6 判例已按住「聚焦不激活」这个推迟行为，故事进场先翻那条判例。
-- [ ] KeyUp 消费者与松开跟踪：键盘版的按压暂态。
+- [x] Button 的键盘激活（B12，2026-10-12）：节奏故事拍板为「一轮一键」（双泵遇键即停、指针免费排空，按压帧由泵的结构担保，宿主重复与时钟两条路都有缺口），Enter/Space 压下、配对抬起完成激活，指针点击同路开火，回调为裸函数加上下文词。
+- [x] KeyUp 消费者与松开跟踪（B12，2026-10-12）：`Widget::on_key_up` 沿 KeyDown 的投递路进焦点持有者，Button 靠它完成激活，Checkbox 刻意不受抬起影响（翻转即按压）。
 - [ ] 手势批次：PointerMove 消费、按住滑出去松手的语义、点击合成的取舍，第九与第十二章留的口子。
 - [ ] Slider、Container 与布局系统（HBox/VBox/flex）。Label 已随 B10 进场（自动尺寸，见字体与文本组）。
 - [ ] TextBox、Radio、Dropdown：前身 P6/P7 半途停下的地方。
@@ -28,7 +28,7 @@
 ## 结构决定（拍板过的原则与挂起项）
 
 - [ ] events.hpp 分文件之问：作者未拍板（B6 收尾的 CR 答疑），AI 建议维持一个文件，词表撑大再分。
-- [ ] widget_tests 拆文件：B4 起挂着，判例再多就分。
+- [x] widget_tests 拆文件（B12，2026-10-12）：tidy 的函数体量线逼的，控件域判例（Label、按钮激活、复选框抬起免疫）分进 control_tests，树与框架留在 widget_tests，替身画笔两边各持一份。
 - [ ] 构建保持普通 `cmake -S -B`，不用 presets 文件：从零定位的一部分，任何一站都适用。
 - [x] Cinux 挂钩方式拍板（2026-10-12）：CinuxOS 侧构建脚本把 visor/include 挂进 `-I`（`VISOR_ROOT` 可配），不 submodule、不复制同步。Cinux 线同日缓行（作者定），B12 真接线的时机另定。
 - [x] 标准库白名单按层守严（2026-10-12）：进 Cinux 链接的层（base、canvas、draw、ui 与 bindings/cinux）只用 header-only 词汇（span、string_view、optional、variant、array、expected、algorithm 一族），禁 string、vector、filesystem、fstream、format、print；offscreen 与 tests 放宽（PC 专属）。动机：CinuxOS 用户态是 musl libc.a 单枪匹马、无 libstdc++，前身核心零 STL 容器的纪律 visor 同样要守。清零动作（Label 文本改存 string_view、point_format 从 base 搬回 tests）随 Cinux 准备批落地，作者已拍板改法。

@@ -42,6 +42,13 @@ inline std::string to_text(int value) {
 inline std::string to_text(bool value) {
     return value ? "true" : "false";
 }
+// Code points read best in hex with their U+ shape on hand.
+inline std::string to_text(std::uint32_t value) {
+    return std::format("U+{:X}", value);
+}
+inline std::string to_text(CutError value) {
+    return describe(value);
+}
 inline std::string to_text(std::string_view value) {
     return "'" + std::string{value} + "'";
 }

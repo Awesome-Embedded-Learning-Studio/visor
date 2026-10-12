@@ -5,7 +5,7 @@
 | 站                    | 文件                                               | 状态                           |
 | --------------------- | -------------------------------------------------- | ------------------------------ |
 | 第一站 PC 离屏        | [stage-1-pc-offscreen.md](stage-1-pc-offscreen.md) | 已完成（B1 至 B6，2026-10-11） |
-| 第二站 真单色 OLED    | [stage-2-mono-oled.md](stage-2-mono-oled.md)       | 未开始                         |
+| 第二站 真单色 OLED    | [stage-2-mono-oled.md](stage-2-mono-oled.md)       | 进行中（B8 纯逻辑两批项，2026-10-12） |
 | 第三站 真 SPI 彩屏    | [stage-3-spi-color.md](stage-3-spi-color.md)       | 未开始                         |
 | 第四站 Cinux 与桌面层 | [stage-4-cinux.md](stage-4-cinux.md)               | 未开始                         |
 | 梯队外 PC 窗口宿主    | [stage-x-pc-window.md](stage-x-pc-window.md)       | 未开始，站位待定               |

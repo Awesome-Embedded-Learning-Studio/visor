@@ -175,6 +175,89 @@ void append_hex_bytes(std::string& out, const MonoImage& image) {
     }
 }
 
+/// The shared checks every font header runs before any text is built.
+std::optional<EmitError> classify_font_header(std::string_view name,
+                                              const std::vector<Glyph>& glyphs) noexcept {
+    if (const auto name_error = classify_name(name)) {
+        return name_error;
+    }
+    if (glyphs.empty()) {
+        return EmitError::kNoGlyphs;
+    }
+    for (const Glyph& glyph : glyphs) {
+        if (glyph.image.rows.size() != glyph.image.height * glyph.image.stride()) {
+            return EmitError::kBadStorage;
+        }
+    }
+    return std::nullopt;
+}
+
+/// Everything from kLineHeight through the kGlyphs table. Identical for the
+/// strip and BDF modes because the metrics ride the Glyphs themselves: rows
+/// append to one kBits block (wrapping at the same eight bytes as an image
+/// header's, the glyph's name on each row's first chunk), and every table
+/// entry spells out its own advance and offsets.
+void append_font_body(std::string& out, std::size_t line_height, const std::vector<Glyph>& glyphs) {
+    out += "inline constexpr std::size_t kLineHeight = ";
+    out += std::to_string(line_height);
+    out += ";\n\ninline constexpr std::uint8_t kBits[] = {\n";
+    for (const Glyph& glyph : glyphs) {
+        const std::size_t stride = glyph.image.stride();
+        for (std::size_t row = 0; row < glyph.image.height; ++row) {
+            for (std::size_t chunk_start = 0; chunk_start < stride; chunk_start += kBytesPerLine) {
+                const std::size_t chunk_end = std::min(stride, chunk_start + kBytesPerLine);
+                out += "    ";
+                for (std::size_t column = chunk_start; column < chunk_end; ++column) {
+                    append_hex_byte(out, glyph.image.rows[(row * stride) + column]);
+                }
+                if (chunk_start == 0) {
+                    append_glyph_tag(out, glyph.codepoint);
+                    out += " row ";
+                    out += std::to_string(row);
+                }
+                out += '\n';
+            }
+        }
+    }
+    out += "};\n\ninline constexpr visor::draw::GlyphEntry kGlyphs[] = {\n";
+    std::size_t byte_offset = 0;
+    for (const Glyph& glyph : glyphs) {
+        out += "    {.codepoint = 0x";
+        append_lower_hex(out, glyph.codepoint);
+        out += ", .width = ";
+        out += std::to_string(glyph.image.width);
+        out += ", .height = ";
+        out += std::to_string(glyph.image.height);
+        out += ", .byte_offset = ";
+        out += std::to_string(byte_offset);
+        out += ", .advance = ";
+        out += std::to_string(glyph.advance);
+        out += ", .offset_x = ";
+        out += std::to_string(glyph.offset_x);
+        out += ", .offset_y = ";
+        out += std::to_string(glyph.offset_y);
+        out += "}, ";
+        append_glyph_tag(out, glyph.codepoint);
+        out += '\n';
+        byte_offset += glyph.image.rows.size();
+    }
+    out += "};\n";
+}
+
+/// The pragma, includes and namespace open every font header shares.
+void append_font_open(std::string& out, std::string_view name) {
+    out += "#pragma once\n\n#include <cstddef>\n#include <cstdint>\n\n#include"
+           " \"visor/draw/mono_font.hpp\"\n\nnamespace visor::assets::";
+    out += name;
+    out += " {\n\n";
+}
+
+void append_font_close(std::string& out, std::string_view name) {
+    out += "\n} // namespace visor::assets::";
+    out += name;
+    out += "\n";
+}
+
 } // namespace
 
 const char* describe(EmitError error) noexcept {
@@ -260,16 +343,8 @@ std::expected<std::string, EmitError>
 emit_font_header(std::string_view name, std::string_view source_hint,
                  const std::vector<Glyph>& glyphs, std::size_t cell_width, std::size_t cell_height,
                  std::uint32_t first_codepoint) {
-    if (const auto name_error = classify_name(name)) {
-        return std::unexpected{*name_error};
-    }
-    if (glyphs.empty()) {
-        return std::unexpected{EmitError::kNoGlyphs};
-    }
-    for (const Glyph& glyph : glyphs) {
-        if (glyph.image.rows.size() != glyph.image.height * glyph.image.stride()) {
-            return std::unexpected{EmitError::kBadStorage};
-        }
+    if (const auto error = classify_font_header(name, glyphs)) {
+        return std::unexpected{*error};
     }
 
     std::size_t total_bytes = 0;
@@ -291,10 +366,9 @@ emit_font_header(std::string_view name, std::string_view source_hint,
     append_lower_hex(out, first_codepoint);
     out += " --name ";
     out += name;
-    out += "\n#pragma once\n\n#include <cstddef>\n#include <cstdint>\n\n#include"
-           " \"visor/draw/mono_font.hpp\"\n\nnamespace visor::assets::";
-    out += name;
-    out += " {\n\n// ";
+    out += "\n";
+    append_font_open(out, name);
+    out += "// ";
     out += std::to_string(glyphs.size());
     out += " glyphs cut from a ";
     out += std::to_string(cell_width);
@@ -304,53 +378,48 @@ emit_font_header(std::string_view name, std::string_view source_hint,
     out += std::to_string(cell_height);
     out += ". Every glyph's advance is the\n// full cell width and both offsets are zero"
            " (a strip cut); the fields wait\n// for proportional sources. Glyph rows share"
-           " kBits, each at its byte_offset,\n// packed like visor::canvas::Canvas rows.\n"
-           "inline constexpr std::size_t kLineHeight = ";
-    out += std::to_string(cell_height);
-    out += ";\n\ninline constexpr std::uint8_t kBits[] = {\n";
+           " kBits, each at its byte_offset,\n// packed like visor::canvas::Canvas rows.\n";
+    append_font_body(out, cell_height, glyphs);
+    append_font_close(out, name);
+    return out;
+}
 
-    // All glyph rows append to one block; each row wraps at the same eight
-    // bytes as an image header's, with the glyph's name on its first chunk.
-    for (const Glyph& glyph : glyphs) {
-        const std::size_t stride = glyph.image.stride();
-        for (std::size_t row = 0; row < glyph.image.height; ++row) {
-            for (std::size_t chunk_start = 0; chunk_start < stride; chunk_start += kBytesPerLine) {
-                const std::size_t chunk_end = std::min(stride, chunk_start + kBytesPerLine);
-                out += "    ";
-                for (std::size_t column = chunk_start; column < chunk_end; ++column) {
-                    append_hex_byte(out, glyph.image.rows[(row * stride) + column]);
-                }
-                if (chunk_start == 0) {
-                    append_glyph_tag(out, glyph.codepoint);
-                    out += " row ";
-                    out += std::to_string(row);
-                }
-                out += '\n';
-            }
-        }
+std::expected<std::string, EmitError>
+emit_bdf_font_header(std::string_view name, std::string_view source_hint, std::uint32_t range_first,
+                     std::uint32_t range_last, std::size_t line_height,
+                     const std::vector<Glyph>& glyphs) {
+    if (const auto error = classify_font_header(name, glyphs)) {
+        return std::unexpected{*error};
     }
 
-    out += "};\n\ninline constexpr visor::draw::GlyphEntry kGlyphs[] = {\n";
-    std::size_t byte_offset = 0;
+    std::size_t total_bytes = 0;
     for (const Glyph& glyph : glyphs) {
-        out += "    {.codepoint = 0x";
-        append_lower_hex(out, glyph.codepoint);
-        out += ", .width = ";
-        out += std::to_string(glyph.image.width);
-        out += ", .height = ";
-        out += std::to_string(glyph.image.height);
-        out += ", .byte_offset = ";
-        out += std::to_string(byte_offset);
-        out += ", .advance = ";
-        out += std::to_string(cell_width);
-        out += ", .offset_x = 0, .offset_y = 0}, ";
-        append_glyph_tag(out, glyph.codepoint);
-        out += '\n';
-        byte_offset += glyph.image.rows.size();
+        total_bytes += glyph.image.rows.size();
     }
-    out += "};\n\n} // namespace visor::assets::";
+    std::string out;
+    out.reserve(512 + (total_bytes * 8) + (glyphs.size() * 128));
+
+    out += "// Generated by visor.fontgen from ";
+    out += source_hint;
+    out += ". Do not hand-edit.\n// Regenerate with\n//   fontgen bdf ";
+    out += source_hint;
+    out += " <output header> --range 0x";
+    append_lower_hex(out, range_first);
+    out += ":0x";
+    append_lower_hex(out, range_last);
+    out += " --name ";
     out += name;
     out += "\n";
+    append_font_open(out, name);
+    out += "// ";
+    out += std::to_string(glyphs.size());
+    out += " glyphs from a BDF font, line height ";
+    out += std::to_string(line_height);
+    out += ". Every glyph carries its own\n// advance and offsets from the source font; the"
+           " bits share kBits, each at\n// its byte_offset, packed like visor::canvas::Canvas"
+           " rows.\n";
+    append_font_body(out, line_height, glyphs);
+    append_font_close(out, name);
     return out;
 }
 

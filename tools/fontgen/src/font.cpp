@@ -45,6 +45,7 @@ std::expected<std::vector<Glyph>, CutError> cut_glyph_sheet(const MonoImage& she
             glyph.codepoint =
                 first_codepoint + static_cast<std::uint32_t>((cell_row * columns) + column);
             glyph.image = make_mono_image(cell_width, cell_height);
+            glyph.advance = cell_width; // strip metrics: the gap lives in the cells
             for (std::size_t y = 0; y < cell_height; ++y) {
                 const std::size_t sheet_row = (cell_row * cell_height) + y;
                 for (std::size_t x = 0; x < cell_width; ++x) {

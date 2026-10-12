@@ -9,11 +9,17 @@
 
 namespace visor::fontgen {
 
-/// One glyph cut loose from a sheet: which character it renders, and its
-/// pixels in the canvas packing.
+/// One glyph with its layout metrics: which character it renders, its pixels
+/// in the canvas packing, and how the pen walks past it. A strip cut fills
+/// advance with the cell width and both offsets with zero (the gap is baked
+/// into the cells); a BDF glyph brings its own -- advance from DWIDTH,
+/// offsets folded from BBX into the GlyphEntry frame.
 struct Glyph {
     std::uint32_t codepoint = 0;
     MonoImage image;
+    std::size_t advance = 0;   ///< How far the pen moves after this glyph, pixels.
+    std::int16_t offset_x = 0; ///< Bitmap left edge relative to the pen, pixels.
+    std::int16_t offset_y = 0; ///< Bitmap top edge relative to its line's top, pixels.
 };
 
 /// Why a sheet could not be cut into glyphs. Recoverable: the caller reports

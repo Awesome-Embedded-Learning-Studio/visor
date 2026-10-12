@@ -14,6 +14,8 @@
 
 ## 留档备忘
 
+挂钩方式已拍板（2026-10-12）：CinuxOS 侧构建脚本把 visor/include 挂进 `-I`（`VISOR_ROOT` 可配）。标准库白名单按层守严、Label 文本改存 string_view 同日拍板，详见[交叉清单](crosscutting.md)的结构决定一节。Cinux 线缓行（作者 2026-10-12），先做字体与文本组的 BDF 读入批。
+
 GPU 纹理合成与多进程 Surface 协议是前身仓的远期设想（它的 P8/P9，从未开工），visor 未立项，记在这里防遗忘，不进排期。
 
 ## 开放问题

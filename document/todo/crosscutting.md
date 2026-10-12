@@ -30,3 +30,5 @@
 - [ ] events.hpp 分文件之问：作者未拍板（B6 收尾的 CR 答疑），AI 建议维持一个文件，词表撑大再分。
 - [ ] widget_tests 拆文件：B4 起挂着，判例再多就分。
 - [ ] 构建保持普通 `cmake -S -B`，不用 presets 文件：从零定位的一部分，任何一站都适用。
+- [x] Cinux 挂钩方式拍板（2026-10-12）：CinuxOS 侧构建脚本把 visor/include 挂进 `-I`（`VISOR_ROOT` 可配），不 submodule、不复制同步。Cinux 线同日缓行（作者定），B12 真接线的时机另定。
+- [x] 标准库白名单按层守严（2026-10-12）：进 Cinux 链接的层（base、canvas、draw、ui 与 bindings/cinux）只用 header-only 词汇（span、string_view、optional、variant、array、expected、algorithm 一族），禁 string、vector、filesystem、fstream、format、print；offscreen 与 tests 放宽（PC 专属）。动机：CinuxOS 用户态是 musl libc.a 单枪匹马、无 libstdc++，前身核心零 STL 容器的纪律 visor 同样要守。清零动作（Label 文本改存 string_view、point_format 从 base 搬回 tests）随 Cinux 准备批落地，作者已拍板改法。

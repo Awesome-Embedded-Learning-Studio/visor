@@ -5,6 +5,7 @@ int main() {
     run_bitmap_tests();
     run_bit_tests();
     run_canvas_tests();
+    run_control_tests();
     run_diff_tests();
     run_font_tests();
     run_host_tests();

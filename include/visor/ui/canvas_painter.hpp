@@ -5,8 +5,11 @@
 #include "visor/base/geometry/size.hpp"
 #include "visor/base/helpers/rect_helper.hpp"
 #include "visor/canvas/color.hpp"
+#include "visor/draw/mono_bitmap.hpp"
 #include "visor/draw/pen.hpp"
 #include "visor/ui/painter.hpp"
+
+#include <cstddef>
 
 namespace visor::ui {
 
@@ -49,6 +52,32 @@ class CanvasPainter final : public Painter {
         }
         const draw::Pen<CanvasT, canvas::Color> pen{canvas_, ink};
         pen.fill(shift_to_buffer(visible));
+    }
+
+    void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::Color ink,
+                     int scale) const noexcept override {
+        // One lit source pixel is one scale x scale block, at the source
+        // coordinate times the factor. Neighbour blocks never overlap (their
+        // origins are scale apart), so any order of painting lands the same
+        // pixels — which is what makes strip replays safe here too.
+        const int factor = scale < 1 ? 1 : scale;
+        const draw::Pen<CanvasT, canvas::Color> pen{canvas_, ink};
+        for (std::size_t row = 0; row < source.height; ++row) {
+            for (std::size_t column = 0; column < source.width; ++column) {
+                if (!source.pixel(column, row)) {
+                    continue;
+                }
+                const base::RectI block{.pos =
+                                            base::PointI{at.x + (static_cast<int>(column) * factor),
+                                                         at.y + (static_cast<int>(row) * factor)},
+                                        .size = base::SizeI{.w = factor, .h = factor}};
+                const base::RectI visible = base::intersect(block, window_);
+                if (visible.is_empty()) {
+                    continue;
+                }
+                pen.fill(shift_to_buffer(visible));
+            }
+        }
     }
 
     void plot(base::PointI at, canvas::Color ink) const noexcept override {

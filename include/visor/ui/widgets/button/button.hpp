@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "visor/base/geometry/point.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {
@@ -48,7 +49,7 @@ class Button : public Widget {
     [[nodiscard]] bool pressed() const noexcept;
 
     void on_pointer_down() noexcept override;
-    void on_pointer_up() noexcept override;
+    void on_pointer_up(base::PointI at) noexcept override;
     void on_key_down(std::uint32_t code) noexcept override;
     void on_key_up(std::uint32_t code) noexcept override;
 

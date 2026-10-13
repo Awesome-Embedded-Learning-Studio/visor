@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "visor/base/geometry/point.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/ui/painter.hpp"
@@ -22,12 +23,16 @@ void Button::on_pointer_down() noexcept {
     invalidate(bounds());
 }
 
-void Button::on_pointer_up() noexcept {
-    // A release that lands elsewhere never reaches here (hit testing routed
-    // it to whoever it landed on), so a present pointer press always closes.
+void Button::on_pointer_up(base::PointI at) noexcept {
+    // Capture routes the release here wherever it landed; the click
+    // synthesis is the judgment of where. A release back inside the bounds
+    // completes the press as an activation, a release outside cancels it --
+    // the visual goes either way.
     pointer_pressed_ = false;
     invalidate(bounds());
-    activate();
+    if (bounds().contains(at)) {
+        activate();
+    }
 }
 
 void Button::on_key_down(std::uint32_t code) noexcept {

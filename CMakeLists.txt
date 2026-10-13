@@ -57,6 +57,7 @@ add_library(
     src/ui/widgets/label/label.cpp
     src/ui/widgets/box/box.cpp
     src/ui/widgets/slider/slider.cpp
+    src/ui/widgets/textbox/textbox.cpp
     src/ui/dirty_regions.cpp
     src/ui/input_router.cpp
     src/ui/text.cpp)

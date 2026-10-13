@@ -18,6 +18,7 @@ int main() {
     run_ring_queue_tests();
     run_run_loop_tests();
     run_smoke_tests();
+    run_text_tests();
     run_ssd1306_tests();
     run_utf8_tests();
     run_widget_tests();

@@ -51,25 +51,68 @@ void OffscreenHost::handle_flush(const FlushRegion& region) noexcept {
         ++rejected_count_;
         return;
     }
-    // Bit-true copy one pixel at a time: region pixels may sit on any bit
-    // offset, the frame packing never changes. The same pixel_bit_position the
-    // canvas packs with unpacks here, the formula's one home paying off.
     const std::size_t stride = (static_cast<std::size_t>(width_) + 7) / 8;
-    for (int row = 0; row < region.rect.size.h; ++row) {
-        const std::uint8_t* src_row =
-            region.pixels + (static_cast<std::size_t>(row) * region.stride_bytes);
-        const std::size_t dst_base =
-            (static_cast<std::size_t>(region.rect.pos.y) + static_cast<std::size_t>(row)) * stride;
-        for (int col = 0; col < region.rect.size.w; ++col) {
-            const auto src_x = static_cast<std::size_t>(col);
-            const auto dst_x = static_cast<std::size_t>(region.rect.pos.x) + src_x;
-            const base::bit::BitMask<std::uint8_t> src_word{src_row[src_x / 8]};
-            const bool on =
-                src_word.has(base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(src_x)));
-            const std::size_t dst_index = dst_base + (dst_x / 8);
-            base::bit::BitMask<std::uint8_t> dst_word{frame_[dst_index]};
-            dst_word.deposit(base::bit::bit_at(canvas::pixel_bit_position(dst_x)), on ? 1 : 0);
-            frame_[dst_index] = dst_word.raw;
+    if (region.rect.pos.x % 8 == 0) {
+        // The fast path: a byte-aligned destination column means whole source
+        // bytes land on whole destination bytes (both rows are canvas-packed,
+        // so a region pixel and its destination pixel sit at the same in-byte
+        // position). A width ending mid-byte keeps the bit path's promise for
+        // the tail byte's live bits -- and the source's zero padding never
+        // touches the neighbor pixels sharing that byte.
+        const std::size_t dst_column = static_cast<std::size_t>(region.rect.pos.x) / 8;
+        const std::size_t whole_bytes = static_cast<std::size_t>(region.rect.size.w) / 8;
+        const int tail_bits = region.rect.size.w % 8;
+        // The tail's live bits, one mask built from positions only: pixel j of
+        // the tail sits at pixel_bit_position(j), same slot source and target.
+        base::bit::BitMask<std::uint8_t> live{};
+        for (int bit = 0; bit < tail_bits; ++bit) {
+            live.raw = static_cast<std::uint8_t>(
+                live.raw | base::bit::mask_bit<std::uint8_t>(
+                               canvas::pixel_bit_position(static_cast<std::size_t>(bit)))
+                               .raw);
+        }
+        for (int row = 0; row < region.rect.size.h; ++row) {
+            const std::uint8_t* src_row =
+                region.pixels + (static_cast<std::size_t>(row) * region.stride_bytes);
+            std::uint8_t* dst_row =
+                frame_.data() +
+                ((static_cast<std::size_t>(region.rect.pos.y) + static_cast<std::size_t>(row)) *
+                 stride) +
+                dst_column;
+            for (std::size_t byte = 0; byte < whole_bytes; ++byte) {
+                dst_row[byte] = src_row[byte];
+            }
+            if (tail_bits != 0) {
+                const base::bit::BitMask<std::uint8_t> dst_word{dst_row[whole_bytes]};
+                const base::bit::BitMask<std::uint8_t> src_word{src_row[whole_bytes]};
+                // Blend, not overwrite: bits outside the region keep the
+                // frame's ink, live bits take the region's.
+                dst_row[whole_bytes] = static_cast<std::uint8_t>((dst_word.raw & ~live.raw) |
+                                                                 (src_word.raw & live.raw));
+            }
+        }
+    } else {
+        // Bit-true copy one pixel at a time, the correctness floor for any
+        // bit offset: region pixels may sit anywhere, the frame packing never
+        // changes. The same pixel_bit_position the canvas packs with unpacks
+        // here, the formula's one home paying off.
+        for (int row = 0; row < region.rect.size.h; ++row) {
+            const std::uint8_t* src_row =
+                region.pixels + (static_cast<std::size_t>(row) * region.stride_bytes);
+            const std::size_t dst_base =
+                (static_cast<std::size_t>(region.rect.pos.y) + static_cast<std::size_t>(row)) *
+                stride;
+            for (int col = 0; col < region.rect.size.w; ++col) {
+                const auto src_x = static_cast<std::size_t>(col);
+                const auto dst_x = static_cast<std::size_t>(region.rect.pos.x) + src_x;
+                const base::bit::BitMask<std::uint8_t> src_word{src_row[src_x / 8]};
+                const bool on = src_word.has(
+                    base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(src_x)));
+                const std::size_t dst_index = dst_base + (dst_x / 8);
+                base::bit::BitMask<std::uint8_t> dst_word{frame_[dst_index]};
+                dst_word.deposit(base::bit::bit_at(canvas::pixel_bit_position(dst_x)), on ? 1 : 0);
+                frame_[dst_index] = dst_word.raw;
+            }
         }
     }
     ++flush_count_;

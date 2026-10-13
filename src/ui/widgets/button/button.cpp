@@ -18,7 +18,7 @@ bool Button::pressed() const noexcept {
     return pointer_pressed_ || key_pressed_;
 }
 
-void Button::on_pointer_down() noexcept {
+void Button::on_pointer_down([[maybe_unused]] base::PointI at) noexcept {
     pointer_pressed_ = true;
     invalidate(bounds());
 }

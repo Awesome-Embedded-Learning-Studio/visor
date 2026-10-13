@@ -86,6 +86,13 @@ std::size_t Widget::child_count() const noexcept {
     return child_count_;
 }
 
+Widget* Widget::child(std::size_t index) noexcept {
+    if (index >= child_count_) {
+        return nullptr;
+    }
+    return children_[index];
+}
+
 // The recursive walk is the tree's honest shape: a real scene nests only a few
 // levels deep (a screen, a panel, a control), and an explicit stack would buy a
 // depth constant the spec never asked for. The focus walks further down share

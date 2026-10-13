@@ -20,7 +20,7 @@ namespace {
 void deliver(Widget& root, Widget*& press_owner, const host::PointerDown& word) noexcept {
     press_owner = root.hit_test(word.pos);
     if (press_owner != nullptr) {
-        press_owner->on_pointer_down();
+        press_owner->on_pointer_down(word.pos);
     }
 }
 

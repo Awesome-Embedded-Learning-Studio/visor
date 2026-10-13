@@ -20,7 +20,7 @@ class Checkbox : public Widget {
     [[nodiscard]] bool focusable() const noexcept override { return true; }
 
     [[nodiscard]] bool checked() const noexcept;
-    void on_pointer_down() noexcept override;
+    void on_pointer_down([[maybe_unused]] base::PointI at) noexcept override;
     /// Enter and Space flip the box, the keyboard's press; other codes pass.
     void on_key_down(std::uint32_t code) noexcept override;
 

@@ -63,6 +63,18 @@ class Widget {
     [[nodiscard]] bool add_child(Widget* child) noexcept;
     [[nodiscard]] std::size_t child_count() const noexcept;
 
+    /// The child at index, null past the count. The layout walks read their
+    /// children through this door; ownership and order belong to add_child.
+    [[nodiscard]] Widget* child(std::size_t index) noexcept;
+
+    /// Replaces the bounding box and reports both boxes as owing repaint: a
+    /// widget that moved or resized leaves pixels standing in the old box and
+    /// claims new ones it never painted. An unchanged box reports nothing.
+    /// Public since the layout story arrived (B15): a box arranging its
+    /// children and a label re-measuring itself are the same right, and the
+    /// reports fire either way so no move is ever silent.
+    void set_bounds(base::RectI bounds) noexcept;
+
     /// Wires the repaint reporter for this whole subtree. Called once at tree
     /// assembly, usually on the root; late-added children inherit it too.
     void set_dirty_sink(DirtyRegions* sink) noexcept;
@@ -75,11 +87,13 @@ class Widget {
     /// on an invisible branch.
     [[nodiscard]] Widget* hit_test(base::PointI at) noexcept;
 
-    /// Receives a pointer press after hit testing picked this widget. The
-    /// default control takes no input, so doing nothing here is the honest base.
-    /// The handler carries no position on purpose: hit testing already decided
-    /// the point was inside this widget.
-    virtual void on_pointer_down() noexcept {}
+    /// Receives a pointer press at the position it landed (inside this
+    /// widget's bounds, since hit testing routed it). Every pointer handler
+    /// carries its position: in the capture world a control tracks the
+    /// pointer it owns wherever it goes, and the press is where tracking
+    /// starts (a slider grabs at the press). The default control takes no
+    /// input, so an empty body is the honest base.
+    virtual void on_pointer_down([[maybe_unused]] base::PointI at) noexcept {}
     /// Receives the matching release at the position it landed. Capture routes
     /// the release to the press's owner wherever that is, so unlike the press
     /// the position is the receiver's to judge (a button calls it a click only
@@ -125,13 +139,6 @@ class Widget {
   protected:
     /// Paints this widget only; the tree walk around it belongs to draw().
     virtual void on_draw(const Painter& painter) const noexcept = 0;
-
-    /// Replaces the bounding box and reports both boxes as owing repaint: a
-    /// widget that moved or resized leaves pixels standing in the old box and
-    /// claims new ones it never painted. An unchanged box reports nothing.
-    /// Protected because geometry is the layout story's decision (Label
-    /// re-measuring itself is the first user), not a public knob.
-    void set_bounds(base::RectI bounds) noexcept;
 
     /// Reports an area as owing a repaint. State mutators call this as they
     /// change; with no sink wired the report is dropped, which keeps widgets

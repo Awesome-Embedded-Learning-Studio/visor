@@ -15,7 +15,7 @@ bool Checkbox::checked() const noexcept {
     return checked_;
 }
 
-void Checkbox::on_pointer_down() noexcept {
+void Checkbox::on_pointer_down([[maybe_unused]] base::PointI at) noexcept {
     checked_ = !checked_;
     invalidate(bounds());
 }
@@ -38,9 +38,8 @@ void Checkbox::on_draw(const Painter& painter) const noexcept {
                           .size = base::SizeI{.w = bounds().size.w - 4, .h = bounds().size.h - 4}};
     painter.fill(box, canvas::Color::Off);
     if (!checked_) {
-        const base::RectI inner{
-            .pos = base::PointI{box.pos.x + 1, box.pos.y + 1},
-            .size = base::SizeI{.w = box.size.w - 2, .h = box.size.h - 2}};
+        const base::RectI inner{.pos = base::PointI{box.pos.x + 1, box.pos.y + 1},
+                                .size = base::SizeI{.w = box.size.w - 2, .h = box.size.h - 2}};
         painter.fill(inner, canvas::Color::On);
     }
 }

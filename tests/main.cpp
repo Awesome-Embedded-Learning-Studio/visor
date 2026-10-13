@@ -10,6 +10,7 @@ int main() {
     run_font_tests();
     run_gesture_tests();
     run_host_tests();
+    run_layout_tests();
     run_pen_tests();
     run_point_tests();
     run_rect_tests();

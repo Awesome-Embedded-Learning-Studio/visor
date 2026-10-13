@@ -164,7 +164,7 @@ void run_control_tests() {
     // and the visual stays dark while either source still holds.
     visor::ui::Button both(left_bounds);
     both.set_on_activate(count_it, &activations);
-    both.on_pointer_down();
+    both.on_pointer_down(PointI{5, 5});
     both.on_key_down(visor::host::kKeyEnter);
     VISOR_CHECK(both.pressed());
     both.on_pointer_up(PointI{5, 5});

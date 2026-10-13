@@ -55,6 +55,8 @@ add_library(
     src/ui/widgets/button/button.cpp
     src/ui/widgets/checkbox/checkbox.cpp
     src/ui/widgets/label/label.cpp
+    src/ui/widgets/box/box.cpp
+    src/ui/widgets/slider/slider.cpp
     src/ui/dirty_regions.cpp
     src/ui/input_router.cpp
     src/ui/text.cpp)

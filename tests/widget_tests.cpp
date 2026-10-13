@@ -163,7 +163,7 @@ void run_widget_tests() {
     button.draw(painter);
     VISOR_CHECK_EQ(painter.fills().size(), 2U);
     VISOR_CHECK_EQ(painter.fills()[1].ink, visor::canvas::Color::On);
-    button.on_pointer_down();
+    button.on_pointer_down(PointI{5, 5});
     VISOR_CHECK(button.pressed());
     button.draw(painter);
     VISOR_CHECK_EQ(painter.fills().size(), 3U);
@@ -181,7 +181,7 @@ void run_widget_tests() {
     frame.set_clear(visor::canvas::Color::Off);
     button.draw(frame_painter);
     VISOR_CHECK(frame.get(PointI{4, 4}) == visor::canvas::Color::On);
-    button.on_pointer_down();
+    button.on_pointer_down(PointI{5, 5});
     frame.set_clear(visor::canvas::Color::Off);
     button.draw(frame_painter);
     VISOR_CHECK(frame.get(PointI{4, 4}) == visor::canvas::Color::Off);
@@ -191,7 +191,7 @@ void run_widget_tests() {
     visor::ui::Rectangle panel(root_bounds);
     visor::ui::Button redial(left_bounds);
     VISOR_CHECK(panel.add_child(&redial));
-    redial.on_pointer_down();
+    redial.on_pointer_down(PointI{5, 5});
     visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> replay_first;
     visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> replay_second;
     replay_first.set_clear(visor::canvas::Color::Off);
@@ -256,11 +256,11 @@ void run_widget_tests() {
     // lit rows for ring and margin.
     visor::ui::Checkbox toggle(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 8, .h = 8}});
     VISOR_CHECK(!toggle.checked());
-    toggle.on_pointer_down();
+    toggle.on_pointer_down(PointI{5, 5});
     VISOR_CHECK(toggle.checked());
-    toggle.on_pointer_down();
+    toggle.on_pointer_down(PointI{5, 5});
     VISOR_CHECK(!toggle.checked());
-    toggle.on_pointer_down(); // stays checked for the pixel assertions
+    toggle.on_pointer_down(PointI{5, 5}); // stays checked for the pixel assertions
     // The background belongs to the scene, not the control: the checkbox only
     // paints its box, so the lit margins here come from the clear color.
     ring_frame.set_clear(visor::canvas::Color::On);
@@ -268,13 +268,13 @@ void run_widget_tests() {
     VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On);  // no focus, no ring
     VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // box frame
     VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // solid mark
-    toggle.on_pointer_down();
+    toggle.on_pointer_down(PointI{5, 5});
     ring_frame.set_clear(visor::canvas::Color::On);
     toggle.draw(ring_painter);
     VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // frame stays
     VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On);  // hollow interior
     // Focused and checked: ring, lit margin, box frame, mark, each on its own row.
-    toggle.on_pointer_down();
+    toggle.on_pointer_down(PointI{5, 5});
     toggle.set_focused(true);
     ring_frame.set_clear(visor::canvas::Color::On);
     toggle.draw(ring_painter);
@@ -288,7 +288,7 @@ void run_widget_tests() {
     // still leaves identical bytes.
     visor::ui::Checkbox replay_toggle(left_bounds);
     VISOR_CHECK(panel.add_child(&replay_toggle));
-    replay_toggle.on_pointer_down();
+    replay_toggle.on_pointer_down(PointI{5, 5});
     replay_toggle.set_focused(true);
     panel.draw(visor::ui::CanvasPainter{replay_first});
     panel.draw(visor::ui::CanvasPainter{replay_second});
@@ -303,7 +303,7 @@ void run_widget_tests() {
     visor::ui::Button wired_one(left_bounds);
     VISOR_CHECK(wired_panel.add_child(&wired_one));
     wired_panel.set_dirty_sink(&reports);
-    wired_one.on_pointer_down(); // a control reports its own bounds
+    wired_one.on_pointer_down(PointI{5, 5}); // a control reports its own bounds
     VISOR_CHECK_EQ(reports.count(), std::size_t{1});
     VISOR_CHECK_EQ(reports.at(0), left_bounds);
     reports.clear();
@@ -318,7 +318,7 @@ void run_widget_tests() {
     reports.clear();
     visor::ui::Button late(RectI{.pos = PointI{12, 12}, .size = SizeI{.w = 4, .h = 4}});
     VISOR_CHECK(wired_panel.add_child(&late)); // the adoptee inherits the sink
-    late.on_pointer_down();
+    late.on_pointer_down(PointI{5, 5});
     VISOR_CHECK_EQ(reports.count(), std::size_t{1});
     VISOR_CHECK_EQ(reports.at(0), late.bounds());
     reports.clear();

@@ -6,6 +6,7 @@ void run_bitmap_tests();
 void run_bit_tests();
 void run_canvas_tests();
 void run_cinux_tests();
+void run_choice_tests();
 void run_control_tests();
 void run_diff_tests();
 void run_font_tests();

@@ -6,6 +6,7 @@ int main() {
     run_bit_tests();
     run_canvas_tests();
     run_cinux_tests();
+    run_choice_tests();
     run_control_tests();
     run_diff_tests();
     run_font_tests();

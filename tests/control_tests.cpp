@@ -167,7 +167,7 @@ void run_control_tests() {
     both.on_pointer_down();
     both.on_key_down(visor::host::kKeyEnter);
     VISOR_CHECK(both.pressed());
-    both.on_pointer_up();
+    both.on_pointer_up(PointI{5, 5});
     VISOR_CHECK(both.pressed());    // the key still holds the visual
     VISOR_CHECK_EQ(activations, 2); // the pointer press fired its own release
     both.on_key_up(visor::host::kKeyEnter);

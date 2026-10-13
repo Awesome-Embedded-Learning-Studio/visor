@@ -8,6 +8,7 @@ int main() {
     run_control_tests();
     run_diff_tests();
     run_font_tests();
+    run_gesture_tests();
     run_host_tests();
     run_pen_tests();
     run_point_tests();

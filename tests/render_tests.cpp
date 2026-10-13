@@ -12,6 +12,7 @@
 #include "visor/canvas/mono_canvas.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
+#include "visor/ui/input_router.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/run_loop.hpp"
 #include "visor/ui/widgets/button/button.hpp"
@@ -362,6 +363,7 @@ void run_render_tests() {
         VISOR_CHECK(ground.add_child(&tail_button));
         DirtyRegions debts;
         ground.set_dirty_sink(&debts);
+        visor::ui::InputRouter input;
 
         visor::host::OffscreenHost screen(20, 20);
         Canvas<SizeI{.w = 20, .h = 8}> strip;
@@ -373,7 +375,8 @@ void run_render_tests() {
 
         // Round one: Tab focuses the checkbox. The ring report names strip 0.
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
-        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(
+            visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 4);
         VISOR_CHECK_EQ(debts.count(), std::size_t{0}); // retired with the rebuild
         VISOR_CHECK(box.focused());
@@ -385,7 +388,8 @@ void run_render_tests() {
         // Round two: Space checks the checkbox. The mark report is the same
         // box the ring used, the collector merges into one strip 0 rebuild.
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
-        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(
+            visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 5);
         VISOR_CHECK(box.checked());
         VISOR_CHECK(screen.get(PointI{2, 2}) == Color::Off); // frame and ring both dark
@@ -394,7 +398,8 @@ void run_render_tests() {
         // report and the button ring report live in different strips, so
         // strips 0 and 2 rebuild and strip 1 stays home. The mark persists.
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
-        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(
+            visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 7);
         VISOR_CHECK(tail_button.focused());
         VISOR_CHECK(!box.focused());
@@ -405,20 +410,23 @@ void run_render_tests() {
         // Rounds four and five: Enter presses the focused button, its up
         // releases and fires. Each round rebuilds exactly the button's strip.
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
-        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(
+            visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 8);
         VISOR_CHECK(tail_button.pressed());
         VISOR_CHECK(screen.get(PointI{13, 17}) == Color::Off); // the press frame went out
         VISOR_CHECK_EQ(fired, 0);                              // down never fires
         VISOR_CHECK(screen.push_event(visor::host::KeyUp{.code = visor::host::kKeyEnter}));
-        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 1);
+        VISOR_CHECK_EQ(
+            visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 9);
         VISOR_CHECK(!tail_button.pressed());
         VISOR_CHECK(screen.get(PointI{13, 17}) == Color::On);
         VISOR_CHECK_EQ(fired, 1); // the release completed the activation
 
         // Round six, idle: no events, no debts, nothing submitted.
-        VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, strip, kScreenSize, debts), 0);
+        VISOR_CHECK_EQ(
+            visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 0);
         VISOR_CHECK_EQ(screen.flush_count(), 9);
     }
 }

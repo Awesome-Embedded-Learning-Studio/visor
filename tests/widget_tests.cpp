@@ -168,7 +168,7 @@ void run_widget_tests() {
     button.draw(painter);
     VISOR_CHECK_EQ(painter.fills().size(), 3U);
     VISOR_CHECK_EQ(painter.fills()[2].ink, visor::canvas::Color::Off);
-    button.on_pointer_up();
+    button.on_pointer_up(PointI{5, 5});
     VISOR_CHECK(!button.pressed());
     button.draw(painter);
     VISOR_CHECK_EQ(painter.fills().size(), 4U);

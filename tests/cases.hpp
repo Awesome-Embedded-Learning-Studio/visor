@@ -8,6 +8,7 @@ void run_canvas_tests();
 void run_control_tests();
 void run_diff_tests();
 void run_font_tests();
+void run_gesture_tests();
 void run_host_tests();
 void run_pen_tests();
 void run_point_tests();

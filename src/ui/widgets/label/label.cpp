@@ -27,7 +27,7 @@ void Label::set_text(std::string_view text) noexcept {
     set_bounds(measured_bounds(bounds().pos));
 }
 
-const std::string& Label::text() const noexcept {
+std::string_view Label::text() const noexcept {
     return text_;
 }
 

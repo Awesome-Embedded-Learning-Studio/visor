@@ -1,6 +1,5 @@
 #pragma once
 
-#include <string>
 #include <string_view>
 
 #include "visor/base/geometry/point.hpp"
@@ -19,15 +18,15 @@ namespace visor::ui {
  * re-measures at the same origin and resizes the box, reporting both the
  * old and the new area as owed repaint.
  *
- * The text is stored by value -- it is the label's state, and mutators may
- * hand in temporaries -- while the font is a view over storage the caller
- * owns (usually a generated header, whose lifetime is the program's). Not
- * focusable: a label states things, it takes no input.
+ * Both the text and the font are views over storage the caller owns (the
+ * static storage of a literal, or a generated header whose lifetime is the
+ * program's) -- the whitelist discipline for every Cinux-linked layer: no
+ * std::string, no heap, the control states what it is shown. A mutator may
+ * hand in temporaries only if the storage they point at outlives the label.
+ * Not focusable: a label states things, it takes no input.
  */
 class Label : public Widget {
   public:
-    /// Measured bounds at the origin. Allocation failure terminates (the
-    /// tree runs with exceptions off); the same stance the tool takes.
     Label(base::PointI origin, std::string_view text, const draw::MonoFont& font, canvas::Color ink,
           int scale = 1) noexcept;
 
@@ -35,7 +34,7 @@ class Label : public Widget {
     /// reports nothing, matching set_visible's stance on no-op calls.
     void set_text(std::string_view text) noexcept;
 
-    [[nodiscard]] const std::string& text() const noexcept;
+    [[nodiscard]] std::string_view text() const noexcept;
 
   protected:
     void on_draw(const Painter& painter) const noexcept override;
@@ -43,7 +42,7 @@ class Label : public Widget {
   private:
     [[nodiscard]] base::RectI measured_bounds(base::PointI origin) const noexcept;
 
-    std::string text_;
+    std::string_view text_;
     draw::MonoFont font_;
     canvas::Color ink_;
     int scale_;

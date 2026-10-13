@@ -3,8 +3,8 @@
 // point_format.hpp contributes the std::formatter specialization for Point: no named symbol
 // comes out of it, so the keep pragma tells include-cleaner the include is intentional.
 #include "cases.hpp"
+#include "point_format.hpp" // IWYU pragma: keep -- formatter specialization, no named symbol
 #include "testing.hpp"
-#include "visor/base/debugging/point_format.hpp" // IWYU pragma: keep
 #include "visor/base/geometry/point.hpp"
 
 void run_point_tests() {

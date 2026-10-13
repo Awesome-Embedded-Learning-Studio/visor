@@ -48,8 +48,14 @@ void Widget::set_bounds(base::RectI bounds) noexcept {
     if (bounds == bounds_) {
         return; // Same box, same pixels, no debt.
     }
-    invalidate(bounds_);
+    // Both boxes owe repaint: the old one holds pixels the widget no longer
+    // claims (what is underneath shows through), the new one claims pixels
+    // it never painted. A named local makes each report's box visible where
+    // the report is made, instead of two identical reads of the member
+    // whose meaning depends on which side of the assignment they sit.
+    const base::RectI old_bounds = bounds_;
     bounds_ = bounds;
+    invalidate(old_bounds);
     invalidate(bounds_);
 }
 

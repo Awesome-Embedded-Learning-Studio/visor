@@ -48,6 +48,12 @@ add_library(visor.host STATIC src/bindings/host.cpp)
 target_link_libraries(visor.host PUBLIC visor.core)
 add_library(visor.host.offscreen STATIC src/bindings/offscreen/offscreen_host.cpp)
 target_link_libraries(visor.host.offscreen PUBLIC visor.host)
+# The Cinux binding's pure half: frame expansion and event translation, free
+# of mmap and ioctl so PC judgments drive them. The adapter that reads
+# /dev/fb0 and /dev/event0 lives in the CinuxOS tree and links this in.
+add_library(visor.host.cinux STATIC src/bindings/cinux/frame_expand.cpp
+                                    src/bindings/cinux/event_wire.cpp)
+target_link_libraries(visor.host.cinux PUBLIC visor.core)
 add_library(
     visor.ui STATIC
     src/ui/widgets/widget.cpp

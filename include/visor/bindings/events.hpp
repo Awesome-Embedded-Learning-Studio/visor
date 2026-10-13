@@ -23,15 +23,32 @@ struct KeyUp {
 /// @brief The key codes the core names itself. Tab is the tree's own traversal
 ///        semantic, so the dispatcher must recognize it. Enter and Space are
 ///        activation, the keyboard's press, named so a control can recognize
-///        them without host knowledge. Every other code stays host-defined and
-///        opaque: controls may receive it and ignore it, never decode it. The
-///        values follow the evdev table so a Linux host passes its codes
-///        through untouched. Any other host maps its own keys onto these
-///        constants, and that mapping is the host's business, the same stance
-///        KeyDown takes above.
+///        them without host knowledge. Backspace and the four arrows are the
+///        editing keys, named for the same reason (B16): a text control moves
+///        its caret and deletes with them, without guessing at host codes.
+///        Every other code stays host-defined and opaque: controls may
+///        receive it and ignore it, never decode it.
+///
+///        Backspace, Tab and Enter follow the evdev table so a Linux host
+///        passes them through untouched. The arrows deliberately do not:
+///        evdev's arrow numbers (103 through 108) sit inside printable
+///        ASCII, colliding head-on with the text convention (a host that
+///        produces text maps printable keys to code points -- under evdev
+///        numbering, 'i' and Left are the same wire value). The arrows take
+///        values outside the printable band instead, and every host maps its
+///        own arrows onto them, the same as any non-Linux key. Space keeps
+///        its evdev value for activation consumers; a text-producing host
+///        sends the space character as its code point (32), where '9' and
+///        kKeySpace share 57 by the convention and each consumer reads its
+///        own meaning.
+inline constexpr std::uint32_t kKeyBackspace = 14;
 inline constexpr std::uint32_t kKeyTab = 15;
 inline constexpr std::uint32_t kKeyEnter = 28;
 inline constexpr std::uint32_t kKeySpace = 57;
+inline constexpr std::uint32_t kKeyUp = 0x110;
+inline constexpr std::uint32_t kKeyLeft = 0x112;
+inline constexpr std::uint32_t kKeyRight = 0x113;
+inline constexpr std::uint32_t kKeyDown = 0x111;
 
 /// @brief The pointer moved. pos is in canvas coordinates.
 struct PointerMove {
@@ -54,7 +71,10 @@ struct PointerUp {
 /**
  * @brief One input fact travelling from the host into the core, carried as a
  *        variant over the five ch2 events. Gestures, text input and key
- *        repeat are later layers grown from these five, not new table entries.
+ *        repeat are later layers grown from these five, not new table entries
+ *        -- text input in particular is a KeyDown convention: a host that
+ *        produces text maps each printable key to its code point, and the
+ *        core's named codes carry the editing semantics around it.
  */
 using Event = std::variant<KeyDown, KeyUp, PointerMove, PointerDown, PointerUp>;
 

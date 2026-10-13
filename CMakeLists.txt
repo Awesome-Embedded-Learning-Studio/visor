@@ -56,7 +56,7 @@ add_library(
     src/ui/widgets/checkbox/checkbox.cpp
     src/ui/widgets/label/label.cpp
     src/ui/dirty_regions.cpp
-    src/ui/run_loop.cpp
+    src/ui/input_router.cpp
     src/ui/text.cpp)
 target_link_libraries(visor.ui PUBLIC visor.core)
 

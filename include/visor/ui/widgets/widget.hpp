@@ -77,10 +77,19 @@ class Widget {
 
     /// Receives a pointer press after hit testing picked this widget. The
     /// default control takes no input, so doing nothing here is the honest base.
+    /// The handler carries no position on purpose: hit testing already decided
+    /// the point was inside this widget.
     virtual void on_pointer_down() noexcept {}
-    /// Receives the matching release. Press and release pair per widget: a
-    /// release that hits nobody leaves every press standing.
-    virtual void on_pointer_up() noexcept {}
+    /// Receives the matching release at the position it landed. Capture routes
+    /// the release to the press's owner wherever that is, so unlike the press
+    /// the position is the receiver's to judge (a button calls it a click only
+    /// inside its bounds). The default control takes no input.
+    virtual void on_pointer_up([[maybe_unused]] base::PointI at) noexcept {}
+    /// Receives a pointer movement. While a press is held the owner hears
+    /// every move (drag's foundation); otherwise hit testing's topmost widget
+    /// does (hover's foundation), and a move that finds nobody reaches nobody.
+    /// The default control ignores movement.
+    virtual void on_pointer_move([[maybe_unused]] base::PointI at) noexcept {}
 
     /// Receives a key code while this widget holds the focus. The dispatcher
     /// routes every code except Tab here; a control compares against the codes

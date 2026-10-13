@@ -9,20 +9,10 @@
 #include "visor/bindings/host.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
+#include "visor/ui/input_router.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {
-
-/**
- * @brief Delivers one event to the tree. Declared here, defined in the source:
- *        the dispatcher knows every event word, the widgets know none of them.
- *
- * Pointer presses and releases go to whoever hit testing picks; the point that
- * finds no widget delivers to nobody. Tab (the one named key code) moves the
- * focus along the tree; every other key code and the pointer movement end the
- * round unconsumed beyond the count until their consumers arrive.
- */
-void dispatch_event(Widget& root, const host::Event& event) noexcept;
 
 /**
  * @brief Draws the whole tree through one scene window into a buffer that
@@ -106,17 +96,20 @@ void render_strips(const Widget& root, CanvasT& strip, base::SizeI screen,
  * host's repeat behavior nor a clock. Pointer streams pay no such toll:
  * their events are samples of position, not beats of time.
  *
+ * @param[in] input The router carrying pointer press ownership; caller-owned
+ *                  state beside the tree, the same stance as the collector.
+ *
  * @return Events consumed this round, drained events included even when no
  *         widget wanted them.
  */
 template <typename CanvasT>
-[[nodiscard]] int run_dirty(const host::HostTable& host, Widget& root, CanvasT& strip,
-                            base::SizeI screen, DirtyRegions& dirty) noexcept {
+[[nodiscard]] int run_dirty(const host::HostTable& host, Widget& root, InputRouter& input,
+                            CanvasT& strip, base::SizeI screen, DirtyRegions& dirty) noexcept {
     int consumed = 0;
     host::Event event;
     while (host::try_poll_event(host, event)) {
         ++consumed;
-        dispatch_event(root, event);
+        dispatch_event(root, input, event);
         if (std::holds_alternative<host::KeyDown>(event) ||
             std::holds_alternative<host::KeyUp>(event)) {
             break; // one key event per round: the rhythm rule above
@@ -144,12 +137,13 @@ template <typename CanvasT>
  *         widget wanted them.
  */
 template <typename CanvasT>
-[[nodiscard]] int run_once(const host::HostTable& host, Widget& root, CanvasT& frame) noexcept {
+[[nodiscard]] int run_once(const host::HostTable& host, Widget& root, InputRouter& input,
+                           CanvasT& frame) noexcept {
     int consumed = 0;
     host::Event event;
     while (host::try_poll_event(host, event)) {
         ++consumed;
-        dispatch_event(root, event);
+        dispatch_event(root, input, event);
         if (std::holds_alternative<host::KeyDown>(event) ||
             std::holds_alternative<host::KeyUp>(event)) {
             break; // one key event per round: the rhythm rule

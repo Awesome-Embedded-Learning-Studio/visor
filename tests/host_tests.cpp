@@ -151,4 +151,87 @@ void run_host_tests() {
         VISOR_CHECK_EQ(std::get<visor::host::KeyDown>(polled).code, i);
     }
     VISOR_CHECK(!visor::host::try_poll_event(busy, polled));
+
+    // The byte-aligned fast path: a region starting on a byte boundary lands
+    // byte for byte. The source is a canvas of the region's own shape, and a
+    // misaligned comparison (region pixels vs host pixels, every one read
+    // back) is exactly the bit path's answer -- the fast road and the honest
+    // road must agree on every pixel.
+    {
+        using Patch = Canvas<SizeI{.w = 12, .h = 2}>;
+        Patch patch;
+        const Pen patch_brush{patch, Color::On};
+        patch_brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 12, .h = 1}});
+        patch_brush.plot(PointI{5, 1});
+        OffscreenHost wide(24, 4);
+        VISOR_CHECK(visor::host::submit_region(
+            wide.table(), RectI{.pos = PointI{8, 1}, .size = SizeI{.w = 12, .h = 2}},
+            patch.pixels().data(), Patch::kStrideBytes));
+        VISOR_CHECK_EQ(wide.flush_count(), 1);
+        for (int y = 0; y < 2; ++y) {
+            for (int x = 0; x < 12; ++x) {
+                VISOR_CHECK_EQ(wide.get(PointI{8 + x, 1 + y}), patch.get(PointI{x, y}));
+            }
+        }
+        // Outside the region stays dark: the copy stopped at its own width.
+        VISOR_CHECK_EQ(wide.get(PointI{7, 1}), Color::Off);
+        VISOR_CHECK_EQ(wide.get(PointI{20, 1}), Color::Off);
+    }
+
+    // The fast path's tail: a width that ends mid-byte copies only its live
+    // bits. The source's padding bits are zero by the canvas contract, and
+    // the neighbor pixels in the same destination byte are NOT part of the
+    // region -- the padding must not paint them dark.
+    {
+        using Half = Canvas<SizeI{.w = 10, .h = 1}>;
+        Half bar;
+        const Pen bar_brush{bar, Color::On};
+        bar_brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}});
+        OffscreenHost lit(16, 1);
+        using Full = Canvas<SizeI{.w = 16, .h = 1}>;
+        Full ground;
+        const Pen ground_brush{ground, Color::On};
+        ground_brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 16, .h = 1}});
+        VISOR_CHECK(visor::host::submit_frame(lit.table(), ground)); // all lit
+        VISOR_CHECK(visor::host::submit_region(
+            lit.table(), RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}},
+            bar.pixels().data(), Half::kStrideBytes));
+        // The bar is all lit too, so every pixel stays lit: the assertion is
+        // not about ink, it is about the tail bits at x 10..15 surviving an
+        // overwrite whose source byte is zero there.
+        for (int x = 0; x < 16; ++x) {
+            VISOR_CHECK_EQ(lit.get(PointI{x, 0}), Color::On);
+        }
+        // And a dark bar proves the live bits did land: same submit, dark
+        // source, only x 0..9 may change.
+        Half dark;
+        OffscreenHost second(16, 1);
+        VISOR_CHECK(visor::host::submit_frame(second.table(), ground));
+        VISOR_CHECK(visor::host::submit_region(
+            second.table(), RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}},
+            dark.pixels().data(), Half::kStrideBytes));
+        for (int x = 0; x < 10; ++x) {
+            VISOR_CHECK_EQ(second.get(PointI{x, 0}), Color::Off);
+        }
+        for (int x = 10; x < 16; ++x) {
+            VISOR_CHECK_EQ(second.get(PointI{x, 0}), Color::On);
+        }
+    }
+
+    // Odd x keeps the bit path: any bit offset, pixel-true.
+    {
+        using Sliver = Canvas<SizeI{.w = 5, .h = 2}>;
+        Sliver mark;
+        const Pen mark_brush{mark, Color::On};
+        mark_brush.plot(PointI{0, 0});
+        mark_brush.plot(PointI{4, 1});
+        OffscreenHost odd(13, 5);
+        VISOR_CHECK(visor::host::submit_region(
+            odd.table(), RectI{.pos = PointI{3, 2}, .size = SizeI{.w = 5, .h = 2}},
+            mark.pixels().data(), Sliver::kStrideBytes));
+        VISOR_CHECK(odd.get(PointI{3, 2}) == Color::On);
+        VISOR_CHECK(odd.get(PointI{7, 3}) == Color::On);
+        VISOR_CHECK(odd.get(PointI{4, 2}) == Color::Off);
+        VISOR_CHECK(odd.get(PointI{3, 3}) == Color::Off);
+    }
 }

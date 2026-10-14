@@ -39,8 +39,10 @@ class Canvas {
         bits_.fill(state == Color::On ? base::bit::ones<std::uint8_t>(8) : std::uint8_t{0});
         if constexpr (kWidth % 8 != 0) {
             // The tail byte's padding field: the bits below the last pixel stay zero.
-            const base::bit::BitRange padding{.low = 0,
-                                              .width = static_cast<std::uint8_t>(8 - (kWidth % 8))};
+            const base::bit::BitRange padding{
+                .low = 0,
+                .width = static_cast<std::uint8_t>(8 - (kWidth % 8)),
+            };
             for (std::size_t row = 0; row < kHeight; ++row) {
                 const std::size_t index = (row * kStrideBytes) + (kStrideBytes - 1);
                 base::bit::BitMask<std::uint8_t> word{bits_[index]};

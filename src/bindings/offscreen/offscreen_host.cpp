@@ -27,10 +27,12 @@ OffscreenHost::OffscreenHost(int width, int height)
       frame_(((static_cast<std::size_t>(width) + 7) / 8) * static_cast<std::size_t>(height), 0) {}
 
 HostTable OffscreenHost::table() noexcept {
-    return HostTable{.flush = &OffscreenHost::flush_thunk,
-                     .poll_event = &OffscreenHost::poll_event_thunk,
-                     .clock_ms = &OffscreenHost::clock_thunk,
-                     .context = this};
+    return HostTable{
+        .flush = &OffscreenHost::flush_thunk,
+        .poll_event = &OffscreenHost::poll_event_thunk,
+        .clock_ms = &OffscreenHost::clock_thunk,
+        .context = this,
+    };
 }
 
 void OffscreenHost::flush_thunk(void* context, const FlushRegion& region) noexcept {
@@ -86,9 +88,14 @@ void OffscreenHost::handle_flush(const FlushRegion& region) noexcept {
                 const base::bit::BitMask<std::uint8_t> dst_word{dst_row[whole_bytes]};
                 const base::bit::BitMask<std::uint8_t> src_word{src_row[whole_bytes]};
                 // Blend, not overwrite: bits outside the region keep the
-                // frame's ink, live bits take the region's.
-                dst_row[whole_bytes] = static_cast<std::uint8_t>((dst_word.raw & ~live.raw) |
-                                                                 (src_word.raw & live.raw));
+                // frame's ink, live bits take the region's. The blend rides
+                // unsigned: a bare uint8_t word would promote back to a
+                // signed int under the bitwise NOT.
+                const unsigned dst_bits = dst_word.raw;
+                const unsigned src_bits = src_word.raw;
+                const unsigned live_bits = live.raw;
+                dst_row[whole_bytes] =
+                    static_cast<std::uint8_t>((dst_bits & ~live_bits) | (src_bits & live_bits));
             }
         }
     } else {

@@ -146,7 +146,7 @@ void run_render_tests() {
 
     // The collector: overlapping pushes merge, disjoint ones stay separate.
     // Region order on file is not part of the contract, only coverage is.
-    auto has_region = [](const DirtyRegions& regions, RectI wanted) {
+    auto const has_region = [](const DirtyRegions& regions, RectI wanted) {
         for (std::size_t i = 0; i < regions.count(); ++i) {
             if (regions.at(i) == wanted) {
                 return true;

@@ -22,8 +22,10 @@ void HBox::layout() noexcept {
         const int width = widget->bounds().size.w;
         // Keep the main extent, take the cross extent from the box: a row of
         // controls shares one height, the row does not guess at theirs.
-        widget->set_bounds(base::RectI{.pos = base::PointI{cursor, bounds().pos.y},
-                                       .size = base::SizeI{.w = width, .h = bounds().size.h}});
+        widget->set_bounds(base::RectI{
+            .pos = base::PointI{cursor, bounds().pos.y},
+            .size = base::SizeI{.w = width, .h = bounds().size.h},
+        });
         cursor += width + spacing_;
     }
 }
@@ -39,8 +41,10 @@ void VBox::layout() noexcept {
     for (std::size_t i = 0; i < child_count(); ++i) {
         Widget* widget = child(i);
         const int height = widget->bounds().size.h;
-        widget->set_bounds(base::RectI{.pos = base::PointI{bounds().pos.x, cursor},
-                                       .size = base::SizeI{.w = bounds().size.w, .h = height}});
+        widget->set_bounds(base::RectI{
+            .pos = base::PointI{bounds().pos.x, cursor},
+            .size = base::SizeI{.w = bounds().size.w, .h = height},
+        });
         cursor += height + spacing_;
     }
 }

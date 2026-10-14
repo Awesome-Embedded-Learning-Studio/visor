@@ -19,13 +19,15 @@ namespace {
 // The five areas of the gate scene, exactly as the plan spells them: one plain,
 // one overlapping the first, one clipped at the bottom-right, one clipped at the
 // negative origin, one fully outside the canvas.
-constexpr std::array<visor::base::RectI, 5> kScene{{
-    {.pos = visor::base::PointI{8, 4}, .size = visor::base::SizeI{.w = 40, .h = 20}},
-    {.pos = visor::base::PointI{30, 10}, .size = visor::base::SizeI{.w = 60, .h = 30}},
-    {.pos = visor::base::PointI{100, 50}, .size = visor::base::SizeI{.w = 60, .h = 30}},
-    {.pos = visor::base::PointI{-10, -10}, .size = visor::base::SizeI{.w = 30, .h = 30}},
-    {.pos = visor::base::PointI{130, 10}, .size = visor::base::SizeI{.w = 5, .h = 5}},
-}};
+constexpr std::array<visor::base::RectI, 5> kScene{
+    {
+        {.pos = visor::base::PointI{8, 4}, .size = visor::base::SizeI{.w = 40, .h = 20}},
+        {.pos = visor::base::PointI{30, 10}, .size = visor::base::SizeI{.w = 60, .h = 30}},
+        {.pos = visor::base::PointI{100, 50}, .size = visor::base::SizeI{.w = 60, .h = 30}},
+        {.pos = visor::base::PointI{-10, -10}, .size = visor::base::SizeI{.w = 30, .h = 30}},
+        {.pos = visor::base::PointI{130, 10}, .size = visor::base::SizeI{.w = 5, .h = 5}},
+    },
+};
 
 /// The pure coordinate reference: no drawing involved, just containment checks.
 /// Clipped areas need no special casing, a point outside the canvas is outside

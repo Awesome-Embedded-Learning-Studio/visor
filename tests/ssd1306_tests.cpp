@@ -21,10 +21,12 @@ using visor::host::ssd1306::PageBuffer;
 /// Builds a FlushRegion over packed rows the way a canvas submit would:
 /// rect in screen coordinates, pixels at the top row, stride hop per row.
 FlushRegion region_of(RectI rect, const std::uint8_t* pixels, std::size_t stride) noexcept {
-    return FlushRegion{.rect = rect,
-                       .pixels = pixels,
-                       .stride_bytes = stride,
-                       .format = visor::host::PixelFormat::Mono1};
+    return FlushRegion{
+        .rect = rect,
+        .pixels = pixels,
+        .stride_bytes = stride,
+        .format = visor::host::PixelFormat::Mono1,
+    };
 }
 
 void origin_pixel_lands_in_page0_bit0() {

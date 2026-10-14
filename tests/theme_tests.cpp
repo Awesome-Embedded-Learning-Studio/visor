@@ -28,7 +28,11 @@ void run_theme_tests() {
         canvas.set_clear(Color::Off);
         const visor::ui::CanvasPainter painter{canvas};
         const visor::ui::CornerRadius all{
-            .top_left = 2, .top_right = 2, .bottom_right = 2, .bottom_left = 2};
+            .top_left = 2,
+            .top_right = 2,
+            .bottom_right = 2,
+            .bottom_left = 2,
+        };
         painter.fill_rounded(RectI{.pos = PointI{1, 1}, .size = SizeI{.w = 7, .h = 5}}, Color::On,
                              all);
         // Row 0 (y=1): span x 3..5 -- the corners' whole zone rows are dark.
@@ -58,7 +62,11 @@ void run_theme_tests() {
         canvas.set_clear(Color::Off);
         const visor::ui::CanvasPainter painter{canvas};
         const visor::ui::CornerRadius one{
-            .top_left = 3, .top_right = 0, .bottom_right = 0, .bottom_left = 0};
+            .top_left = 3,
+            .top_right = 0,
+            .bottom_right = 0,
+            .bottom_left = 0,
+        };
         painter.fill_rounded(RectI{.pos = PointI{1, 1}, .size = SizeI{.w = 7, .h = 5}}, Color::On,
                              one);
         // The 5-tall rect clamps the radius to 2, so the zone table is the
@@ -90,9 +98,17 @@ void run_theme_tests() {
             }
         }
         const visor::ui::CornerRadius huge{
-            .top_left = 9, .top_right = 9, .bottom_right = 9, .bottom_left = 9};
+            .top_left = 9,
+            .top_right = 9,
+            .bottom_right = 9,
+            .bottom_left = 9,
+        };
         const visor::ui::CornerRadius two{
-            .top_left = 2, .top_right = 2, .bottom_right = 2, .bottom_left = 2};
+            .top_left = 2,
+            .top_right = 2,
+            .bottom_right = 2,
+            .bottom_left = 2,
+        };
         square.set_clear(Color::Off);
         rounded.set_clear(Color::Off);
         square_painter.fill_rounded(area, Color::On, huge);

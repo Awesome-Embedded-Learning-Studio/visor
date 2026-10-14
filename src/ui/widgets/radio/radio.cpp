@@ -96,18 +96,27 @@ void RadioGroup::on_draw(const Painter& painter) const noexcept {
         // The ring: a five-pixel square outline, four one-pixel fills.
         const base::PointI ring_pos{bounds().pos.x, y + (row_height() / 2) - 2};
         painter.fill(base::RectI{.pos = ring_pos, .size = base::SizeI{.w = 5, .h = 1}}, ink_);
-        painter.fill(base::RectI{.pos = base::PointI{ring_pos.x, ring_pos.y + 4},
-                                 .size = base::SizeI{.w = 5, .h = 1}},
-                     ink_);
+        painter.fill(
+            base::RectI{
+                .pos = base::PointI{ring_pos.x, ring_pos.y + 4},
+                .size = base::SizeI{.w = 5, .h = 1},
+            },
+            ink_);
         painter.fill(base::RectI{.pos = ring_pos, .size = base::SizeI{.w = 1, .h = 5}}, ink_);
-        painter.fill(base::RectI{.pos = base::PointI{ring_pos.x + 4, ring_pos.y},
-                                 .size = base::SizeI{.w = 1, .h = 5}},
-                     ink_);
+        painter.fill(
+            base::RectI{
+                .pos = base::PointI{ring_pos.x + 4, ring_pos.y},
+                .size = base::SizeI{.w = 1, .h = 5},
+            },
+            ink_);
         // The dot on the chosen option: a two-pixel core inside the ring.
         if (std::cmp_equal(i, selected_)) {
-            painter.fill(base::RectI{.pos = base::PointI{ring_pos.x + 2, ring_pos.y + 2},
-                                     .size = base::SizeI{.w = 2, .h = 2}},
-                         ink_);
+            painter.fill(
+                base::RectI{
+                    .pos = base::PointI{ring_pos.x + 2, ring_pos.y + 2},
+                    .size = base::SizeI{.w = 2, .h = 2},
+                },
+                ink_);
         }
         // The label rides beside the ring, vertically centered on the row.
         const base::PointI label_pos{

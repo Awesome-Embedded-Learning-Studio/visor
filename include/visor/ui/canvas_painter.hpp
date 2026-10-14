@@ -34,9 +34,14 @@ class CanvasPainter final : public Painter {
     /// Whole-canvas window: the canvas is the entire scene, scene pixel (0, 0)
     /// is the canvas corner.
     explicit CanvasPainter(CanvasT& canvas) noexcept
-        : canvas_{canvas}, window_{.pos = base::PointI{0, 0},
-                                   .size = base::SizeI{.w = static_cast<int>(CanvasT::kWidth),
-                                                       .h = static_cast<int>(CanvasT::kHeight)}} {}
+        : canvas_{canvas}, window_{
+                               .pos = base::PointI{0, 0},
+                               .size =
+                                   base::SizeI{
+                                       .w = static_cast<int>(CanvasT::kWidth),
+                                       .h = static_cast<int>(CanvasT::kHeight),
+                                   },
+                           } {}
 
     /// Sub-window: the canvas stores exactly this scene rectangle, its pixel
     /// (0, 0) holds the window's top-left corner. A window may be smaller than
@@ -97,7 +102,8 @@ class CanvasPainter final : public Painter {
             }
             const base::RectI span{
                 .pos = base::PointI{area.pos.x + inset_left, area.pos.y + row},
-                .size = base::SizeI{.w = area.size.w - inset_left - inset_right, .h = 1}};
+                .size = base::SizeI{.w = area.size.w - inset_left - inset_right, .h = 1},
+            };
             fill(span, ink);
         }
     }
@@ -115,10 +121,11 @@ class CanvasPainter final : public Painter {
                 if (!source.pixel(column, row)) {
                     continue;
                 }
-                const base::RectI block{.pos =
-                                            base::PointI{at.x + (static_cast<int>(column) * factor),
-                                                         at.y + (static_cast<int>(row) * factor)},
-                                        .size = base::SizeI{.w = factor, .h = factor}};
+                const base::RectI block{
+                    .pos = base::PointI{at.x + (static_cast<int>(column) * factor),
+                                        at.y + (static_cast<int>(row) * factor)},
+                    .size = base::SizeI{.w = factor, .h = factor},
+                };
                 const base::RectI visible = base::intersect(block, window_);
                 if (visible.is_empty()) {
                     continue;
@@ -140,9 +147,10 @@ class CanvasPainter final : public Painter {
 
   private:
     [[nodiscard]] base::RectI shift_to_buffer(base::RectI area) const noexcept {
-        return base::RectI{.pos =
-                               base::PointI{area.pos.x - window_.pos.x, area.pos.y - window_.pos.y},
-                           .size = area.size};
+        return base::RectI{
+            .pos = base::PointI{area.pos.x - window_.pos.x, area.pos.y - window_.pos.y},
+            .size = area.size,
+        };
     }
 
     CanvasT& canvas_;

@@ -24,12 +24,17 @@ void run_cinux_tests() {
     {
         // An 11-wide mono strip, the chapter-four chevron bytes: MSB-first,
         // tail padding zero. Expanded into a 16-wide frame at x = 2.
-        const std::array<std::uint8_t, 10> chevron{0xf8, 0x00, 0x04, 0x00, 0x02,
-                                                   0x00, 0x01, 0xe0, 0x00, 0x00};
+        const std::array<std::uint8_t, 10> chevron{
+            0xf8, 0x00, 0x04, 0x00, 0x02, 0x00, 0x01, 0xe0, 0x00, 0x00,
+        };
         std::vector<std::uint32_t> frame(static_cast<std::size_t>(16) * 5,
                                          visor::host::cinux::kXrgbWhite);
         const visor::host::cinux::FrameTarget target{
-            .pixels = frame.data(), .width = 16, .height = 5, .pitch_px = 16};
+            .pixels = frame.data(),
+            .width = 16,
+            .height = 5,
+            .pitch_px = 16,
+        };
         const RectI region{.pos = PointI{2, 0}, .size = SizeI{.w = 11, .h = 5}};
         visor::host::cinux::expand_region(target, region, chevron.data(), 2,
                                           visor::host::cinux::kXrgbBlack,
@@ -58,7 +63,11 @@ void run_cinux_tests() {
         const std::array<std::uint8_t, 6> all_lit{0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
         std::vector<std::uint32_t> frame(static_cast<std::size_t>(20) * 4, 0);
         const visor::host::cinux::FrameTarget target{
-            .pixels = frame.data(), .width = 20, .height = 4, .pitch_px = 25};
+            .pixels = frame.data(),
+            .width = 20,
+            .height = 4,
+            .pitch_px = 25,
+        };
         const RectI overhang{.pos = PointI{-4, -1}, .size = SizeI{.w = 12, .h = 3}};
         visor::host::cinux::expand_region(target, overhang, all_lit.data(), 2, 7, 0);
         // Clipped to frame x 0..7, y 0..1: eight words per row lit, the
@@ -90,14 +99,16 @@ void run_cinux_tests() {
     {
         visor::host::cinux::WireEvent wire{};
         wire.type = visor::host::cinux::WireType::MouseDown;
-        wire.mouse = {.x = 12,
-                      .y = 34,
-                      .dx = 1,
-                      .dy = 2,
-                      .buttons = 1,
-                      .left = true,
-                      .right = false,
-                      .middle = false};
+        wire.mouse = {
+            .x = 12,
+            .y = 34,
+            .dx = 1,
+            .dy = 2,
+            .buttons = 1,
+            .left = true,
+            .right = false,
+            .middle = false,
+        };
         const auto down = visor::host::cinux::translate_event(wire);
         VISOR_CHECK(down.has_value());
         if (down.has_value()) {
@@ -118,12 +129,14 @@ void run_cinux_tests() {
         }
         // A printable key rides its ASCII byte.
         wire.type = visor::host::cinux::WireType::KeyDown;
-        wire.key = {.ascii = 'h',
-                    .scancode = 0x23,
-                    .pressed = true,
-                    .shift = false,
-                    .ctrl = false,
-                    .alt = false};
+        wire.key = {
+            .ascii = 'h',
+            .scancode = 0x23,
+            .pressed = true,
+            .shift = false,
+            .ctrl = false,
+            .alt = false,
+        };
         const auto letter = visor::host::cinux::translate_event(wire);
         VISOR_CHECK(letter.has_value());
         if (letter.has_value()) {
@@ -132,12 +145,14 @@ void run_cinux_tests() {
             VISOR_CHECK_EQ(key->code, static_cast<std::uint32_t>('h'));
         }
         // A scancode-only arrow lands on the core's named, out-of-band value.
-        wire.key = {.ascii = 0,
-                    .scancode = 0x52,
-                    .pressed = true,
-                    .shift = false,
-                    .ctrl = false,
-                    .alt = false};
+        wire.key = {
+            .ascii = 0,
+            .scancode = 0x52,
+            .pressed = true,
+            .shift = false,
+            .ctrl = false,
+            .alt = false,
+        };
         const auto up = visor::host::cinux::translate_event(wire);
         VISOR_CHECK(up.has_value());
         if (up.has_value()) {
@@ -156,12 +171,14 @@ void run_cinux_tests() {
             VISOR_CHECK_EQ(key->code, visor::host::kKeyUp);
         }
         // A key the core cannot name translates to nothing.
-        wire.key = {.ascii = 0,
-                    .scancode = 0x7b,
-                    .pressed = true,
-                    .shift = false,
-                    .ctrl = false,
-                    .alt = false};
+        wire.key = {
+            .ascii = 0,
+            .scancode = 0x7b,
+            .pressed = true,
+            .shift = false,
+            .ctrl = false,
+            .alt = false,
+        };
         VISOR_CHECK(!visor::host::cinux::translate_event(wire).has_value());
         // So does a type out of the wire's range.
         wire.type = static_cast<visor::host::cinux::WireType>(9);

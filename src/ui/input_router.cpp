@@ -24,7 +24,7 @@ void deliver(Widget& root, Widget*& press_owner, const host::PointerDown& word) 
     }
 }
 
-void deliver([[maybe_unused]] Widget& root, Widget*& press_owner,
+void deliver([[maybe_unused]] Widget const& root, Widget*& press_owner,
              const host::PointerUp& word) noexcept {
     // Capture: the release belongs to the press's owner, not to whoever the
     // point happens to sit on. With no press held, a stray release reaches

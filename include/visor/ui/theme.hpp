@@ -37,7 +37,7 @@ struct CornerRadius {
 struct Theme {
     canvas::Color background;
     canvas::Color foreground;
-    CornerRadius corner_radius;
+    CornerRadius corner_radius{};
 };
 
 /// Dark ink on a lit complement: the polarity every control hardcoded
@@ -45,14 +45,12 @@ struct Theme {
 inline constexpr Theme kLightTheme{
     .background = canvas::Color::Off,
     .foreground = canvas::Color::On,
-    .corner_radius = {},
 };
 
 /// The flip: lit ink on a dark complement (On ground, Off ink).
 inline constexpr Theme kDarkTheme{
     .background = canvas::Color::On,
     .foreground = canvas::Color::Off,
-    .corner_radius = {},
 };
 
 } // namespace visor::ui

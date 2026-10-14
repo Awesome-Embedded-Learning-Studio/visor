@@ -47,7 +47,7 @@ inline constexpr std::uint32_t kReplacementCodePoint = 0xfffd;
         std::uint8_t min_first;
         std::uint8_t max_first;
     };
-    const auto info = [lead]() -> std::optional<LeadInfo> {
+    const auto info = [lead] -> std::optional<LeadInfo> {
         if (lead >= 0xc2 && lead <= 0xdf) {
             return LeadInfo{.extra = 1, .min_first = 0x80, .max_first = 0xbf};
         }
@@ -77,7 +77,7 @@ inline constexpr std::uint32_t kReplacementCodePoint = 0xfffd;
     }
 
     // A two-byte lead keeps 5 payload bits, longer leads keep 4.
-    std::uint32_t codepoint = lead & (info->extra == 1 ? 0x1f : 0x0f);
+    std::uint32_t codepoint = lead & (info->extra == 1 ? 0x1fU : 0x0fU);
     for (std::size_t i = 1; i <= info->extra; ++i) {
         const std::size_t at = pos + i;
         if (at >= utf8.size()) {
@@ -86,11 +86,11 @@ inline constexpr std::uint32_t kReplacementCodePoint = 0xfffd;
         }
         const auto byte = static_cast<std::uint8_t>(utf8[at]);
         const bool in_window = byte >= info->min_first && byte <= info->max_first;
-        if ((byte & 0xc0) != 0x80 || (i == 1 && !in_window)) {
+        if ((byte & 0xc0U) != 0x80 || (i == 1 && !in_window)) {
             ++pos;
             return kReplacementCodePoint;
         }
-        codepoint = (codepoint << 6) | (byte & 0x3f);
+        codepoint = (codepoint << 6U) | (byte & 0x3fU);
     }
     pos += info->extra + 1;
     return codepoint;

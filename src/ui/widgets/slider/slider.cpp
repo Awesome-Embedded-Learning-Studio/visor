@@ -69,12 +69,18 @@ void Slider::on_draw(const Painter& painter) const noexcept {
     // A one-row track across the middle, the handle a dark block riding it:
     // the track says where, the handle says what.
     const int track_y = bounds().pos.y + (bounds().size.h / 2);
-    painter.fill(base::RectI{.pos = base::PointI{bounds().pos.x, track_y},
-                             .size = base::SizeI{.w = bounds().size.w, .h = 1}},
-                 canvas::Color::On);
-    painter.fill(base::RectI{.pos = base::PointI{bounds().pos.x + value_, track_y - 1},
-                             .size = base::SizeI{.w = kHandleWidth, .h = 3}},
-                 canvas::Color::Off);
+    painter.fill(
+        base::RectI{
+            .pos = base::PointI{bounds().pos.x, track_y},
+            .size = base::SizeI{.w = bounds().size.w, .h = 1},
+        },
+        canvas::Color::On);
+    painter.fill(
+        base::RectI{
+            .pos = base::PointI{bounds().pos.x + value_, track_y - 1},
+            .size = base::SizeI{.w = kHandleWidth, .h = 3},
+        },
+        canvas::Color::Off);
 }
 
 } // namespace visor::ui

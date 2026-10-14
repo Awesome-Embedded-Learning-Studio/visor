@@ -33,10 +33,15 @@ class Pen {
 
     /// Fills the part of area that lands on the canvas, nothing outside.
     constexpr void fill(base::RectI area) const noexcept {
-        const base::RectI visible = base::intersect(
-            area, base::RectI{.pos = base::PointI{0, 0},
-                              .size = base::SizeI{.w = static_cast<int>(CanvasT::kWidth),
-                                                  .h = static_cast<int>(CanvasT::kHeight)}});
+        const base::RectI visible =
+            base::intersect(area, base::RectI{
+                                      .pos = base::PointI{0, 0},
+                                      .size =
+                                          base::SizeI{
+                                              .w = static_cast<int>(CanvasT::kWidth),
+                                              .h = static_cast<int>(CanvasT::kHeight),
+                                          },
+                                  });
         if (visible.is_empty()) {
             return;
         }

@@ -134,9 +134,12 @@ void TextBox::on_draw(const Painter& painter) const noexcept {
         return; // an unfocused editor states its text, no caret to show
     }
     const int x = bounds().pos.x + caret_offset(first_visible_);
-    painter.fill(base::RectI{.pos = base::PointI{x, bounds().pos.y},
-                             .size = base::SizeI{.w = kCaretWidth, .h = bounds().size.h}},
-                 ink_);
+    painter.fill(
+        base::RectI{
+            .pos = base::PointI{x, bounds().pos.y},
+            .size = base::SizeI{.w = kCaretWidth, .h = bounds().size.h},
+        },
+        ink_);
 }
 
 } // namespace visor::ui

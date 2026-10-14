@@ -19,6 +19,12 @@
 
 namespace visor::base::bit {
 
+// Masking and shifting with small positive constants is this vocabulary's
+// sanctioned shape. Integer promotion hands a sub-int word -- and any signed
+// caller's literal -- to the operator as int, so the signedness that shows up
+// here is the promotion's doing, not an oversight to repair.
+// NOLINTBEGIN(bugprone-signed-bitwise)
+
 /// @brief Low nibble of any integer: the least significant 4 bits.
 /// @since 0.1.0
 /// @ingroup base_bit_ops
@@ -61,5 +67,7 @@ template <typename T>
 constexpr T nibble_at(T value, std::uint8_t shift) {
     return (value >> shift) & 0xF;
 }
+
+// NOLINTEND(bugprone-signed-bitwise)
 
 } // namespace visor::base::bit

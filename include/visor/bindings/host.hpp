@@ -63,9 +63,14 @@ struct HostTable {
  */
 template <typename CanvasT>
 [[nodiscard]] bool submit_frame(const HostTable& host, const CanvasT& canvas) noexcept {
-    const base::RectI full{.pos = base::PointI{0, 0},
-                           .size = base::SizeI{.w = static_cast<int>(CanvasT::kWidth),
-                                               .h = static_cast<int>(CanvasT::kHeight)}};
+    const base::RectI full{
+        .pos = base::PointI{0, 0},
+        .size =
+            base::SizeI{
+                .w = static_cast<int>(CanvasT::kWidth),
+                .h = static_cast<int>(CanvasT::kHeight),
+            },
+    };
     return submit_region(host, full, canvas.pixels().data(), CanvasT::kStrideBytes);
 }
 

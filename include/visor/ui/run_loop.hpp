@@ -69,8 +69,10 @@ void render_strips(const Widget& root, CanvasT& strip, base::SizeI screen,
     const int strip_h = static_cast<int>(CanvasT::kHeight);
     for (int top = 0; top < screen.h; top += strip_h) {
         const int rows = (screen.h - top < strip_h) ? (screen.h - top) : strip_h;
-        const base::RectI strip_window{.pos = base::PointI{0, top},
-                                       .size = base::SizeI{.w = screen.w, .h = rows}};
+        const base::RectI strip_window{
+            .pos = base::PointI{0, top},
+            .size = base::SizeI{.w = screen.w, .h = rows},
+        };
         if (dirty.touches(strip_window)) {
             render_window(root, strip, strip_window, host);
         }
@@ -149,9 +151,14 @@ template <typename CanvasT>
             break; // one key event per round: the rhythm rule
         }
     }
-    const base::RectI full{.pos = base::PointI{0, 0},
-                           .size = base::SizeI{.w = static_cast<int>(CanvasT::kWidth),
-                                               .h = static_cast<int>(CanvasT::kHeight)}};
+    const base::RectI full{
+        .pos = base::PointI{0, 0},
+        .size =
+            base::SizeI{
+                .w = static_cast<int>(CanvasT::kWidth),
+                .h = static_cast<int>(CanvasT::kHeight),
+            },
+    };
     render_window(root, frame, full, host);
     return consumed;
 }

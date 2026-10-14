@@ -95,6 +95,11 @@ struct BitMask {
      * @since   0.1.0
      * @ingroup base_bit_ops
      */
+    // A sub-int word type promotes to int under these operators, the same
+    // promotion the free functions in bit_ops.hpp carry a note about; the
+    // field arithmetic is deliberate and the word width is pinned by the
+    // static_assert at the top of this struct.
+    // NOLINTBEGIN(bugprone-signed-bitwise)
     [[nodiscard]] constexpr T extract(BitRange range) const {
         return static_cast<T>((raw >> range.low) & field_mask(range.width));
     }
@@ -114,6 +119,7 @@ struct BitMask {
         const auto placed = static_cast<T>(field_mask(range.width) << range.low);
         raw = static_cast<T>((raw & ~placed) | ((value << range.low) & placed));
     }
+    // NOLINTEND(bugprone-signed-bitwise)
 
   private:
     /**

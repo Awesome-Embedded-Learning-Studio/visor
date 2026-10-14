@@ -6,6 +6,7 @@
 #include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/ui/painter.hpp"
+#include "visor/ui/theme.hpp"
 
 namespace visor::ui {
 
@@ -62,7 +63,12 @@ void Button::on_key_up(std::uint32_t code) noexcept {
 }
 
 void Button::on_draw(const Painter& painter) const noexcept {
-    painter.fill(bounds(), pressed() ? canvas::Color::Off : canvas::Color::On);
+    // The scheme's two roles, or the light polarity every button hardcoded
+    // before themes arrived; the corner radius travels with the scheme.
+    const canvas::Color fg = theme() != nullptr ? theme()->foreground : canvas::Color::On;
+    const canvas::Color bg = theme() != nullptr ? theme()->background : canvas::Color::Off;
+    const CornerRadius corners = theme() != nullptr ? theme()->corner_radius : CornerRadius{};
+    painter.fill_rounded(bounds(), pressed() ? bg : fg, corners);
 }
 
 void Button::activate() noexcept {

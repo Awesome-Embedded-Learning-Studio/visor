@@ -4,6 +4,7 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/draw/mono_bitmap.hpp"
+#include "visor/ui/theme.hpp"
 
 namespace visor::ui {
 
@@ -33,6 +34,13 @@ class Painter {
     /// keeps none.
     virtual void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::Color ink,
                              int scale) const noexcept = 0;
+    /// Fills a rectangle with its corners rounded per radius: every row
+    /// paints one span, the span's insets follow the corner discs (a pixel
+    /// in a corner's zone stays dark when its corner point lies outside the
+    /// quarter disc). Radius zero is the plain fill, an oversized radius
+    /// clamps into a capsule, parts outside the frame clip silently.
+    virtual void fill_rounded(base::RectI area, canvas::Color ink,
+                              const CornerRadius& radius) const noexcept = 0;
 
   protected:
     // Non-virtual and protected: implementations are owned by their creator, never

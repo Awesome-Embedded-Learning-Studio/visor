@@ -54,6 +54,54 @@ class CanvasPainter final : public Painter {
         pen.fill(shift_to_buffer(visible));
     }
 
+    void fill_rounded(base::RectI area, canvas::Color ink,
+                      const CornerRadius& radius) const noexcept override {
+        // One span per row: a row in the upper half takes its insets from
+        // the top corners, the lower half from the bottom ones. Within a
+        // corner's r x r zone a pixel at (u, v) -- offsets from the corner
+        // -- stays dark when its corner point lies outside the quarter
+        // disc: (r - u)^2 + (r - v)^2 > r^2. The row's inset is the
+        // smallest u that lands back inside (or r when the whole zone row
+        // is outside). Radius zero collapses to the plain fill's span, an
+        // oversized radius clamps to half the shorter side.
+        const int half_short = area.size.w < area.size.h ? area.size.w / 2 : area.size.h / 2;
+        const auto clamp = [half_short](std::uint8_t r) {
+            const int wanted = r;
+            return wanted < half_short ? wanted : half_short;
+        };
+        const int tl = clamp(radius.top_left);
+        const int tr = clamp(radius.top_right);
+        const int br = clamp(radius.bottom_right);
+        const int bl = clamp(radius.bottom_left);
+        const auto inset = [](int r, int v) {
+            if (r == 0 || v >= r) {
+                return 0; // no zone, or this row is past it
+            }
+            const long long rr = static_cast<long long>(r) * r;
+            for (int u = 0; u < r; ++u) {
+                const long long du = r - u;
+                const long long dv = r - v;
+                if ((du * du) + (dv * dv) <= rr) {
+                    return u; // the first u back inside the disc
+                }
+            }
+            return r; // the whole zone row stays dark
+        };
+        for (int row = 0; row < area.size.h; ++row) {
+            const bool upper = row <= (area.size.h - 1 - row);
+            const int v = upper ? row : (area.size.h - 1 - row);
+            const int inset_left = inset(upper ? tl : bl, v);
+            const int inset_right = inset(upper ? tr : br, v);
+            if (inset_left + inset_right >= area.size.w) {
+                continue; // a fully-rounded row of a capsule paints nothing
+            }
+            const base::RectI span{
+                .pos = base::PointI{area.pos.x + inset_left, area.pos.y + row},
+                .size = base::SizeI{.w = area.size.w - inset_left - inset_right, .h = 1}};
+            fill(span, ink);
+        }
+    }
+
     void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::Color ink,
                      int scale) const noexcept override {
         // One lit source pixel is one scale x scale block, at the source

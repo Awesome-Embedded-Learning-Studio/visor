@@ -4,6 +4,7 @@ build-fontgen/
 .cache/
 
 .claude/
+.mcp.json
 CLAUDE.md
 visor_first_frame.pbm
 build-tsan/

@@ -50,6 +50,13 @@ inline constexpr std::uint32_t kKeyLeft = 0x112;
 inline constexpr std::uint32_t kKeyRight = 0x113;
 inline constexpr std::uint32_t kKeyDown = 0x111;
 
+/// @brief The space character as its code point, the number a text-producing
+///        host actually types for the space bar. Activation consumers accept
+///        it beside kKeySpace so the keyboard's press reads the same under an
+///        evdev host (57) and a text host (0x20): the two numbers share the
+///        wire by the convention above, and each consumer reads its own.
+inline constexpr std::uint32_t kCharSpace = 0x20;
+
 /// @brief The pointer moved. pos is in canvas coordinates.
 struct PointerMove {
     base::PointI pos;

@@ -75,9 +75,14 @@ void Dropdown::set_open(bool on) noexcept {
         // Grow downward over the options; set_bounds reports both boxes, so
         // the overlap with siblings is an owed repaint, never a silent one.
         highlighted_ = selected_ >= 0 ? selected_ : 0;
-        set_bounds(base::RectI{.pos = closed_bounds_.pos,
-                               .size = base::SizeI{.w = closed_bounds_.size.w,
-                                                   .h = row_height() * static_cast<int>(count_)}});
+        set_bounds(base::RectI{
+            .pos = closed_bounds_.pos,
+            .size =
+                base::SizeI{
+                    .w = closed_bounds_.size.w,
+                    .h = row_height() * static_cast<int>(count_),
+                },
+        });
     } else {
         highlighted_ = -1;
         set_bounds(closed_bounds_);
@@ -104,7 +109,9 @@ void Dropdown::on_pointer_down(base::PointI at) noexcept {
 
 void Dropdown::on_key_down(std::uint32_t code) noexcept {
     if (!open_) {
-        if (code == host::kKeyEnter || code == host::kKeySpace) {
+        // Space also opens as its code point: a text host types 0x20 for the
+        // space bar, the same press under either number.
+        if (code == host::kKeyEnter || code == host::kKeySpace || code == host::kCharSpace) {
             set_open(true);
         }
         return;
@@ -147,9 +154,11 @@ void Dropdown::on_draw(const Painter& painter) const noexcept {
         // pointing where the list will grow.
         for (int step = 0; step < 3; ++step) {
             painter.fill(
-                base::RectI{.pos = base::PointI{bounds().pos.x + bounds().size.w - 4 + step,
-                                                bounds().pos.y + 1 + step},
-                            .size = base::SizeI{.w = 3 - step, .h = 1}},
+                base::RectI{
+                    .pos = base::PointI{bounds().pos.x + bounds().size.w - 4 + step,
+                                        bounds().pos.y + 1 + step},
+                    .size = base::SizeI{.w = 3 - step, .h = 1},
+                },
                 ink_);
         }
         return;
@@ -158,9 +167,12 @@ void Dropdown::on_draw(const Painter& painter) const noexcept {
     for (std::size_t i = 0; i < count_; ++i) {
         const int y = bounds().pos.y + (static_cast<int>(i) * row_height());
         const bool lit = std::cmp_equal(i, highlighted_);
-        painter.fill(base::RectI{.pos = base::PointI{bounds().pos.x, y},
-                                 .size = base::SizeI{.w = bounds().size.w, .h = row_height()}},
-                     lit ? ink_ : other);
+        painter.fill(
+            base::RectI{
+                .pos = base::PointI{bounds().pos.x, y},
+                .size = base::SizeI{.w = bounds().size.w, .h = row_height()},
+            },
+            lit ? ink_ : other);
         const base::PointI label_pos{
             bounds().pos.x + 1, y + ((row_height() - static_cast<int>(font_->line_height)) / 2)};
         draw_text(painter, label_pos, *font_, labels_[i], lit ? other : ink_, 1);

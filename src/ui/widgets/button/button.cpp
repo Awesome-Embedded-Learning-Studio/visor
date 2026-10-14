@@ -38,9 +38,11 @@ void Button::on_pointer_up(base::PointI at) noexcept {
 
 void Button::on_key_down(std::uint32_t code) noexcept {
     // Enter and Space are the keyboard's press, the codes events.hpp names.
-    // A repeat of the held key -- or a second key while one is already held
-    // -- changes nothing: the first press owns the slot until its own up.
-    if (code != host::kKeyEnter && code != host::kKeySpace) {
+    // Space also arrives as its code point (kCharSpace, 0x20) when a text
+    // host types it -- the same press under either number. A repeat of the
+    // held key -- or a second key while one is already held -- changes
+    // nothing: the first press owns the slot until its own up.
+    if (code != host::kKeyEnter && code != host::kKeySpace && code != host::kCharSpace) {
         return;
     }
     if (key_pressed_) {

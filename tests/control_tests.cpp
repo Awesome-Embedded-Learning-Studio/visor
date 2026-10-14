@@ -69,20 +69,24 @@ inline constexpr std::uint8_t kBits[] = {
 };
 // NOLINTNEXTLINE(modernize-avoid-c-arrays) -- verbatim fontgen output shape.
 inline constexpr visor::draw::GlyphEntry kGlyphs[] = {
-    {.codepoint = 0x61,
-     .width = 2,
-     .height = 4,
-     .byte_offset = 0,
-     .advance = 3,
-     .offset_x = 0,
-     .offset_y = 0},
-    {.codepoint = 0x62,
-     .width = 2,
-     .height = 4,
-     .byte_offset = 4,
-     .advance = 3,
-     .offset_x = 0,
-     .offset_y = 0},
+    {
+        .codepoint = 0x61,
+        .width = 2,
+        .height = 4,
+        .byte_offset = 0,
+        .advance = 3,
+        .offset_x = 0,
+        .offset_y = 0,
+    },
+    {
+        .codepoint = 0x62,
+        .width = 2,
+        .height = 4,
+        .byte_offset = 4,
+        .advance = 3,
+        .offset_x = 0,
+        .offset_y = 0,
+    },
 };
 } // namespace assets::label_font
 
@@ -186,6 +190,17 @@ void run_control_tests() {
     quiet.on_key_up(visor::host::kKeyEnter);
     VISOR_CHECK(!quiet.pressed());
 
+    // The code-point space presses the same key: a text host types the space
+    // bar as 0x20 (kCharSpace) instead of the evdev 57, and the keyboard's
+    // press reads the same under both.
+    visor::ui::Button typed(left_bounds);
+    typed.set_on_activate(count_it, &activations);
+    typed.on_key_down(visor::host::kCharSpace);
+    VISOR_CHECK(typed.pressed());
+    typed.on_key_up(visor::host::kCharSpace);
+    VISOR_CHECK(!typed.pressed());
+    VISOR_CHECK_EQ(activations, 4);
+
     // Checkbox has no release vocabulary to adopt: Enter's down toggles, an
     // up changes nothing (its flip is its press, the B6 reasoning stands).
     visor::ui::Checkbox upproof(left_bounds);
@@ -193,4 +208,10 @@ void run_control_tests() {
     VISOR_CHECK(upproof.checked());
     upproof.on_key_up(visor::host::kKeyEnter);
     VISOR_CHECK(upproof.checked());
+
+    // The code-point space flips too: the same duality as the button's
+    // press, a text host types 0x20 for the space bar.
+    visor::ui::Checkbox typed_box(left_bounds);
+    typed_box.on_key_down(visor::host::kCharSpace);
+    VISOR_CHECK(typed_box.checked());
 }

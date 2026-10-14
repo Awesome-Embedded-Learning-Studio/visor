@@ -48,27 +48,33 @@ inline constexpr std::uint8_t kBits[] = {
 };
 // NOLINTNEXTLINE(modernize-avoid-c-arrays) -- verbatim fontgen output shape.
 inline constexpr visor::draw::GlyphEntry kGlyphs[] = {
-    {.codepoint = 0x68,
-     .width = 2,
-     .height = 4,
-     .byte_offset = 0,
-     .advance = 3,
-     .offset_x = 0,
-     .offset_y = 0},
-    {.codepoint = 0x69,
-     .width = 2,
-     .height = 4,
-     .byte_offset = 4,
-     .advance = 3,
-     .offset_x = 0,
-     .offset_y = 0},
-    {.codepoint = 0x6f,
-     .width = 2,
-     .height = 4,
-     .byte_offset = 8,
-     .advance = 3,
-     .offset_x = 0,
-     .offset_y = 0},
+    {
+        .codepoint = 0x68,
+        .width = 2,
+        .height = 4,
+        .byte_offset = 0,
+        .advance = 3,
+        .offset_x = 0,
+        .offset_y = 0,
+    },
+    {
+        .codepoint = 0x69,
+        .width = 2,
+        .height = 4,
+        .byte_offset = 4,
+        .advance = 3,
+        .offset_x = 0,
+        .offset_y = 0,
+    },
+    {
+        .codepoint = 0x6f,
+        .width = 2,
+        .height = 4,
+        .byte_offset = 8,
+        .advance = 3,
+        .offset_x = 0,
+        .offset_y = 0,
+    },
 };
 } // namespace assets::choice_font
 
@@ -204,6 +210,11 @@ void run_choice_tests() {
         VISOR_CHECK(!list.open());
         VISOR_CHECK_EQ(list.selected(), 0);
         VISOR_CHECK_EQ(changes, 2);
+        // The code-point space opens too: a text host types 0x20 for the
+        // space bar, the same press under either number.
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kCharSpace}));
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1);
+        VISOR_CHECK(list.open());
     }
 
     // The dropdown's pixels, open: the highlighted row inverts (filled, its

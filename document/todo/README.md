@@ -1,15 +1,16 @@
 # visor 待办（按站索引）
 
-待办按验收梯队的站分文件，一站一份。梯队顺序是作者拍板的路线（PC 离屏 → 真单色 OLED → 真 SPI 彩屏 → Cinux），站与站之间的功能批次（字体、控件、布局）不单独占站，收在交叉清单里，随批次取用。完成的项在对应站文件里划掉。
+待办按验收梯队的站分文件，一站一份。梯队顺序是作者拍板的路线（PC 离屏 → 真单色 OLED → 真 SPI 彩屏 → Cinux），站与站之间的功能批次（字体、控件、布局）不单独占站，收在交叉清单里，随批次取用。完成的站与条目直接删除（作者 2026-10-14 定），历史见教程各章与提交记录。第一站 PC 离屏（B1 至 B6，2026-10-11 完成）已清除。
+
+当前主线（作者 2026-10-14 定）：PC 窗口宿主先行、以可测试性起步，见 [梯队外](stage-x-pc-window.md)。
 
 | 站                    | 文件                                               | 状态                           |
 | --------------------- | -------------------------------------------------- | ------------------------------ |
-| 第一站 PC 离屏        | [stage-1-pc-offscreen.md](stage-1-pc-offscreen.md) | 已完成（B1 至 B6，2026-10-11） |
-| 第二站 真单色 OLED    | [stage-2-mono-oled.md](stage-2-mono-oled.md)       | 进行中（B8 纯逻辑两批项，2026-10-12） |
+| 第二站 真单色 OLED    | [stage-2-mono-oled.md](stage-2-mono-oled.md)       | 纯逻辑已毕，真板半边移交专门线 |
 | 第三站 真 SPI 彩屏    | [stage-3-spi-color.md](stage-3-spi-color.md)       | 未开始                         |
-| 第四站 Cinux 与桌面层 | [stage-4-cinux.md](stage-4-cinux.md)               | 未开始                         |
-| 梯队外 PC 窗口宿主    | [stage-x-pc-window.md](stage-x-pc-window.md)       | 未开始，站位待定               |
-| 交叉清单（不绑站）    | [crosscutting.md](crosscutting.md)                 | 长期推进                       |
+| 第四站 Cinux 与桌面层 | [stage-4-cinux.md](stage-4-cinux.md)               | visor 侧已毕（B17），适配层在 CinuxOS 仓 |
+| 梯队外 PC 窗口宿主    | [stage-x-pc-window.md](stage-x-pc-window.md)       | 主线先行（2026-10-14）         |
+| 交叉清单（不绑站）    | [crosscutting.md](crosscutting.md)                 | 基本清空，余两项挂起           |
 
 ## 分叉与留档
 

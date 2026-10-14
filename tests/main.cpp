@@ -25,5 +25,6 @@ int main() {
     run_ssd1306_tests();
     run_utf8_tests();
     run_widget_tests();
+    run_x11_tests();
     return ::visor::testing::failure_count() == 0 ? 0 : 1;
 }

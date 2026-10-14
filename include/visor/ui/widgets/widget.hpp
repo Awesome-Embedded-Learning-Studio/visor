@@ -7,6 +7,7 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
+#include "visor/ui/theme.hpp"
 
 namespace visor::ui {
 
@@ -79,6 +80,14 @@ class Widget {
     /// assembly, usually on the root; late-added children inherit it too.
     void set_dirty_sink(DirtyRegions* sink) noexcept;
 
+    /// Wires the color scheme for this whole subtree and reports every
+    /// widget's bounds as owed repaint -- switching a theme at runtime is
+    /// this one call, the pixels follow the reports. An unwired tree keeps
+    /// the pre-theme hardcoded polarities (the light scheme's values), so
+    /// nothing changes for trees that never wire one. A same-pointer call
+    /// wires nothing twice.
+    void set_theme(const Theme* theme) noexcept;
+
     /// Draws this subtree pre-order, skipping every invisible widget.
     void draw(const Painter& painter) const noexcept;
 
@@ -140,6 +149,10 @@ class Widget {
     /// Paints this widget only; the tree walk around it belongs to draw().
     virtual void on_draw(const Painter& painter) const noexcept = 0;
 
+    /// The wired color scheme, null when the tree never set one (the
+    /// controls then keep their hardcoded light polarities).
+    [[nodiscard]] const Theme* theme() const noexcept { return theme_; }
+
     /// Reports an area as owing a repaint. State mutators call this as they
     /// change; with no sink wired the report is dropped, which keeps widgets
     /// usable in painter-only tests.
@@ -159,6 +172,7 @@ class Widget {
     std::array<Widget*, kMaxChildren> children_{};
     std::size_t child_count_ = 0;
     DirtyRegions* dirty_ = nullptr;
+    const Theme* theme_ = nullptr;
 };
 
 } // namespace visor::ui

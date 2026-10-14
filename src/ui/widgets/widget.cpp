@@ -6,6 +6,7 @@
 #include "visor/canvas/color.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
+#include "visor/ui/theme.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 namespace {
@@ -18,16 +19,19 @@ using visor::base::SizeI;
 // this one-pixel border after on_draw() so every focusable control shows the
 // same ring and none of them can forget it. Controls keep their content one
 // pixel inside the bounds, which leaves the ring a lit margin to sit on.
-void paint_focus_border(const visor::ui::Painter& painter, const RectI& bounds) noexcept {
+void paint_focus_border(const visor::ui::Painter& painter, const RectI& bounds,
+                        const visor::ui::Theme* theme) noexcept {
+    // The ring carves into the holder's ink, so it takes the scheme's
+    // background -- the pre-theme hardcoded Off is the light scheme's value.
+    const visor::canvas::Color ring =
+        theme != nullptr ? theme->background : visor::canvas::Color::Off;
     const PointI at = bounds.pos;
     const int w = bounds.size.w;
     const int h = bounds.size.h;
-    painter.fill(RectI{.pos = at, .size = SizeI{.w = w, .h = 1}}, visor::canvas::Color::Off);
-    painter.fill(RectI{.pos = PointI{at.x, at.y + h - 1}, .size = SizeI{.w = w, .h = 1}},
-                 visor::canvas::Color::Off);
-    painter.fill(RectI{.pos = at, .size = SizeI{.w = 1, .h = h}}, visor::canvas::Color::Off);
-    painter.fill(RectI{.pos = PointI{at.x + w - 1, at.y}, .size = SizeI{.w = 1, .h = h}},
-                 visor::canvas::Color::Off);
+    painter.fill(RectI{.pos = at, .size = SizeI{.w = w, .h = 1}}, ring);
+    painter.fill(RectI{.pos = PointI{at.x, at.y + h - 1}, .size = SizeI{.w = w, .h = 1}}, ring);
+    painter.fill(RectI{.pos = at, .size = SizeI{.w = 1, .h = h}}, ring);
+    painter.fill(RectI{.pos = PointI{at.x + w - 1, at.y}, .size = SizeI{.w = 1, .h = h}}, ring);
 }
 
 } // namespace
@@ -77,14 +81,30 @@ void Widget::set_dirty_sink(DirtyRegions* sink) noexcept {
     }
 }
 
+// NOLINTNEXTLINE(misc-no-recursion) -- same shape and same reason as draw().
+void Widget::set_theme(const Theme* theme) noexcept {
+    if (theme_ == theme) {
+        return; // same scheme wired twice wires nothing twice
+    }
+    theme_ = theme;
+    // A switched scheme flips pixels everywhere a control consults it, so
+    // every widget reports its own bounds -- runtime switching is this call.
+    invalidate(bounds_);
+    for (std::size_t i = 0; i < child_count_; ++i) {
+        children_[i]->set_theme(theme);
+    }
+}
+
 bool Widget::add_child(Widget* child) noexcept {
     if (child == nullptr || child_count_ == kMaxChildren) {
         return false;
     }
     children_[child_count_] = child;
     ++child_count_;
-    // The adopted subtree reports into the same sink, whenever one is wired.
+    // The adopted subtree reports into the same sink and paints under the
+    // same scheme, whenever either is wired.
     child->set_dirty_sink(dirty_);
+    child->set_theme(theme_);
     return true;
 }
 
@@ -110,7 +130,7 @@ void Widget::draw(const Painter& painter) const noexcept {
     }
     on_draw(painter);
     if (focused_) {
-        paint_focus_border(painter, bounds_);
+        paint_focus_border(painter, bounds_, theme_);
     }
     for (std::size_t i = 0; i < child_count_; ++i) {
         children_[i]->draw(painter);

@@ -11,6 +11,7 @@
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
+#include "visor/ui/theme.hpp"
 #include "visor/ui/widgets/button/button.hpp"
 #include "visor/ui/widgets/checkbox/checkbox.hpp"
 #include "visor/ui/widgets/label/label.hpp"
@@ -39,6 +40,11 @@ class RecordingPainter final : public visor::ui::Painter {
                      [[maybe_unused]] visor::canvas::Color ink, int scale) const noexcept override {
         bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
     }
+
+    void
+    fill_rounded([[maybe_unused]] visor::base::RectI area,
+                 [[maybe_unused]] visor::canvas::Color ink,
+                 [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {}
 
     [[nodiscard]] const std::vector<BitmapDrawn>& bitmaps() const noexcept { return bitmaps_; }
 

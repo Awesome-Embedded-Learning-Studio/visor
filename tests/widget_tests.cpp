@@ -15,6 +15,7 @@
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
+#include "visor/ui/theme.hpp"
 #include "visor/ui/widgets/button/button.hpp"
 #include "visor/ui/widgets/checkbox/checkbox.hpp"
 #include "visor/ui/widgets/widget.hpp"
@@ -52,6 +53,12 @@ class RecordingPainter final : public visor::ui::Painter {
 
     [[nodiscard]] const std::vector<Fill>& fills() const noexcept { return fills_; }
     [[nodiscard]] const std::vector<Plotted>& plots() const noexcept { return plots_; }
+    void
+    fill_rounded(visor::base::RectI area, visor::canvas::Color ink,
+                 [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {
+        fills_.push_back(Fill{.area = area, .ink = ink});
+    }
+
     [[nodiscard]] const std::vector<BitmapDrawn>& bitmaps() const noexcept { return bitmaps_; }
 
   private:

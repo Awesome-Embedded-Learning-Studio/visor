@@ -21,6 +21,7 @@ void run_ring_queue_tests();
 void run_run_loop_tests();
 void run_smoke_tests();
 void run_text_tests();
+void run_theme_tests();
 void run_ssd1306_tests();
 void run_utf8_tests();
 void run_widget_tests();

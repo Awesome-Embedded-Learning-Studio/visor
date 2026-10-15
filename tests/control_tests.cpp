@@ -131,6 +131,12 @@ void run_control_tests() {
     label.set_text("aab"); // same text: no pixel change, no report
     VISOR_CHECK_EQ(label_reports.count(), std::size_t{0});
 
+    // Equal measurements still owe a repaint when the glyphs change.
+    label.set_text("aba");
+    VISOR_CHECK_EQ(label_reports.count(), std::size_t{1});
+    label.set_text("aab");
+    label_reports.clear();
+
     // The same story on real pixels: 'a' blocks and 'b' columns at their pens,
     // the advance gap between them stays dark.
     visor::canvas::Canvas<visor::base::SizeI{.w = 16, .h = 8}> label_frame;

@@ -173,13 +173,14 @@ void run_widget_tests() {
     button.on_pointer_down(PointI{5, 5});
     VISOR_CHECK(button.pressed());
     button.draw(painter);
-    VISOR_CHECK_EQ(painter.fills().size(), 3U);
-    VISOR_CHECK_EQ(painter.fills()[2].ink, visor::canvas::Color::Off);
+    VISOR_CHECK_EQ(painter.fills().size(), 4U);
+    VISOR_CHECK_EQ(painter.fills()[2].ink, visor::canvas::Color::On);
+    VISOR_CHECK_EQ(painter.fills()[3].ink, visor::canvas::Color::Off);
     button.on_pointer_up(PointI{5, 5});
     VISOR_CHECK(!button.pressed());
     button.draw(painter);
-    VISOR_CHECK_EQ(painter.fills().size(), 4U);
-    VISOR_CHECK_EQ(painter.fills()[3].ink, visor::canvas::Color::On);
+    VISOR_CHECK_EQ(painter.fills().size(), 5U);
+    VISOR_CHECK_EQ(painter.fills()[4].ink, visor::canvas::Color::On);
 
     // The same story on real pixels: unpressed lights its bounds, pressed
     // clears them again.
@@ -258,37 +259,30 @@ void run_widget_tests() {
     alpha.draw(ring_painter);
     VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On);
 
-    // Checkbox: the third control and the first toggler. Press flips, checked
-    // paints the box solid, unchecked leaves it hollow, and the box keeps two
-    // lit rows for ring and margin.
-    visor::ui::Checkbox toggle(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 8, .h = 8}});
+    // A checked checkbox has a visible cut-out check; unchecked is an empty outline.
+    visor::ui::Checkbox toggle(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 14, .h = 14}});
     VISOR_CHECK(!toggle.checked());
     toggle.on_pointer_down(PointI{5, 5});
     VISOR_CHECK(toggle.checked());
-    toggle.on_pointer_down(PointI{5, 5});
-    VISOR_CHECK(!toggle.checked());
-    toggle.on_pointer_down(PointI{5, 5}); // stays checked for the pixel assertions
-    // The background belongs to the scene, not the control: the checkbox only
-    // paints its box, so the lit margins here come from the clear color.
-    ring_frame.set_clear(visor::canvas::Color::On);
+    ring_frame.set_clear(visor::canvas::Color::Off);
     toggle.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On);  // no focus, no ring
-    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // box frame
-    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // solid mark
+    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == visor::canvas::Color::On);  // outline
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On);  // filled face
+    VISOR_CHECK(ring_frame.get(PointI{3, 7}) == visor::canvas::Color::Off); // check starts here
     toggle.on_pointer_down(PointI{5, 5});
-    ring_frame.set_clear(visor::canvas::Color::On);
+    ring_frame.set_clear(visor::canvas::Color::Off);
     toggle.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // frame stays
-    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On);  // hollow interior
-    // Focused and checked: ring, lit margin, box frame, mark, each on its own row.
+    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == visor::canvas::Color::On);
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // empty face
     toggle.on_pointer_down(PointI{5, 5});
     toggle.set_focused(true);
-    ring_frame.set_clear(visor::canvas::Color::On);
+    ring_frame.set_clear(visor::canvas::Color::Off);
     toggle.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::Off); // ring
-    VISOR_CHECK(ring_frame.get(PointI{1, 1}) == visor::canvas::Color::On);  // lit margin
-    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::Off); // box frame
-    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // mark
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::Off);
+    VISOR_CHECK(ring_frame.get(PointI{1, 0}) == visor::canvas::Color::On);  // dotted focus
+    VISOR_CHECK(ring_frame.get(PointI{1, 1}) == visor::canvas::Color::Off); // gap
+    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == visor::canvas::Color::On);  // outline
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On);  // checked face
 
     // The replay promise now covers focus and a toggled control too: a panel
     // with a pressed button and a checked, focused checkbox, drawn twice,

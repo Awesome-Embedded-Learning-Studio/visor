@@ -127,7 +127,7 @@ void run_layout_tests() {
         const auto host = screen.table();
         Canvas<SizeI{.w = 24, .h = 8}> frame;
 
-        VISOR_CHECK_EQ(knob.max(), 14); // 16 of track minus the 2-wide handle
+        VISOR_CHECK_EQ(knob.max(), 9); // 16 of track minus the 7-wide handle
         // A hover that never pressed is nobody's value change.
         VISOR_CHECK(screen.push_event(visor::host::PointerMove{.pos = PointI{10, 4}}));
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1);
@@ -141,12 +141,12 @@ void run_layout_tests() {
         // The drag walks past the track's right end: clamped at max.
         VISOR_CHECK(screen.push_event(visor::host::PointerMove{.pos = PointI{40, 4}}));
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1);
-        VISOR_CHECK_EQ(knob.value(), 14);
+        VISOR_CHECK_EQ(knob.value(), 9);
         // Back in and past the left end: clamped at 0.
         VISOR_CHECK(screen.push_event(visor::host::PointerMove{.pos = PointI{1, 4}}));
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1);
         VISOR_CHECK_EQ(knob.value(), 0);
-        VISOR_CHECK_EQ(changes, 3); // 4 -> 14 -> 0, one change per landing
+        VISOR_CHECK_EQ(changes, 3); // 4 -> 9 -> 0, one change per landing
         // The release lets go; later moves hover past unheard.
         VISOR_CHECK(screen.push_event(visor::host::PointerUp{.button = 1, .pos = PointI{1, 4}}));
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1);
@@ -156,27 +156,32 @@ void run_layout_tests() {
         VISOR_CHECK_EQ(changes, 3);
     }
 
-    // The slider's pixels: a lit one-row track across the middle, a dark
-    // three-row handle riding it at the value.
+    // A hollow thumb stays distinct from the thin track on both polarities.
     {
-        visor::ui::Rectangle panel(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 24, .h = 8}});
-        visor::ui::Slider knob(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 16, .h = 4}});
+        visor::ui::Rectangle panel(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 32, .h = 16}});
+        panel.fill = visor::canvas::Color::Off;
+        visor::ui::Slider knob(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 24, .h = 12}});
         VISOR_CHECK(panel.add_child(&knob));
         knob.set_value(6);
-        visor::canvas::Canvas<SizeI{.w = 24, .h = 8}> canvas;
-        canvas.set_clear(visor::canvas::Color::Off);
+        visor::canvas::Canvas<SizeI{.w = 32, .h = 16}> canvas;
         panel.draw(visor::ui::CanvasPainter{canvas});
         const auto on = visor::canvas::Color::On;
         const auto off = visor::canvas::Color::Off;
-        // Track row y=4, from x=2 through x=17.
-        VISOR_CHECK(canvas.get(PointI{2, 4}) == on);
-        VISOR_CHECK(canvas.get(PointI{17, 4}) == on);
-        // The handle at value 6: dark, x 8..9, rows 3..5.
-        VISOR_CHECK(canvas.get(PointI{8, 3}) == off);
-        VISOR_CHECK(canvas.get(PointI{9, 5}) == off);
-        VISOR_CHECK(canvas.get(PointI{7, 4}) == on);  // track beside the handle
-        VISOR_CHECK(canvas.get(PointI{10, 4}) == on); // and on its other side
-        VISOR_CHECK(canvas.get(PointI{8, 2}) == on);  // above the handle, panel
-        VISOR_CHECK(canvas.get(PointI{8, 6}) == on);  // and below, panel again
+        VISOR_CHECK(canvas.get(PointI{2, 8}) == on);   // track start
+        VISOR_CHECK(canvas.get(PointI{25, 8}) == on);  // track end
+        VISOR_CHECK(canvas.get(PointI{8, 7}) == on);   // thumb outline
+        VISOR_CHECK(canvas.get(PointI{11, 7}) == off); // hollow thumb
+        VISOR_CHECK(canvas.get(PointI{7, 8}) == on);   // adjoining track
+        VISOR_CHECK(canvas.get(PointI{15, 8}) == on);
+        VISOR_CHECK(canvas.get(PointI{8, 2}) == off); // outside the thumb
+        knob.set_focused(true);
+        knob.on_key_down(visor::host::kKeyRight);
+        VISOR_CHECK_EQ(knob.value(), 7);
+        knob.on_key_down(visor::host::kKeyLeft);
+        VISOR_CHECK_EQ(knob.value(), 6);
+        visor::ui::Slider tiny(RectI{.pos = {0, 0}, .size = {.w = 2, .h = 2}});
+        VISOR_CHECK_EQ(tiny.max(), 0);
+        tiny.set_value(20);
+        VISOR_CHECK_EQ(tiny.value(), 0);
     }
 }

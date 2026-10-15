@@ -382,8 +382,7 @@ void run_render_tests() {
         VISOR_CHECK(box.focused());
         VISOR_CHECK(!box.checked());
         VISOR_CHECK(screen.get(PointI{2, 2}) == Color::Off); // the ring went out
-        // (5,5) sits on this size's 2x2 box frame, Off checked or not; the
-        // state line above is the round's word, the pixel cannot be.
+        // The state assertion distinguishes checking from focus before later pixel checks.
 
         // Round two: Space checks the checkbox. The mark report is the same
         // box the ring used, the collector merges into one strip 0 rebuild.
@@ -405,7 +404,7 @@ void run_render_tests() {
         VISOR_CHECK(!box.focused());
         VISOR_CHECK(screen.get(PointI{12, 16}) == Color::Off); // the ring moved to the button
         VISOR_CHECK(screen.get(PointI{2, 2}) == Color::On);    // the box corner is plain again
-        VISOR_CHECK(screen.get(PointI{5, 5}) == Color::Off);   // the mark stays put
+        VISOR_CHECK(screen.get(PointI{5, 5}) == Color::On);    // the checked face stays put
 
         // Rounds four and five: Enter presses the focused button, its up
         // releases and fires. Each round rebuilds exactly the button's strip.

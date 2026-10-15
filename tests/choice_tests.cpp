@@ -87,24 +87,24 @@ constexpr visor::draw::MonoFont kChoiceFont{
 } // namespace
 
 void run_choice_tests() {
-    // The radio group: options stack by the font's line height, a press on a
+    // The radio group: options stack with six pixels of vertical padding, a press on a
     // row selects it, the arrows walk with clamping, and selection changes
     // fire exactly once per change.
     {
         int changes = 0;
-        visor::ui::RadioGroup group(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 20, .h = 12}},
+        visor::ui::RadioGroup group(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 20, .h = 30}},
                                     kChoiceFont, Color::On);
         group.set_on_change(
             [](visor::ui::RadioGroup&, void* context) { ++*static_cast<int*>(context); }, &changes);
         VISOR_CHECK(group.add_option("hi"));
         VISOR_CHECK(group.add_option("ho"));
         VISOR_CHECK(group.add_option("oh"));
-        VISOR_CHECK_EQ(group.selected(), -1);    // nobody touched it yet
-        group.on_pointer_down(PointI{3, 2 + 4}); // the second row (y 6..9)
+        VISOR_CHECK_EQ(group.selected(), -1);     // nobody touched it yet
+        group.on_pointer_down(PointI{3, 2 + 10}); // the second row (y 12..21)
         VISOR_CHECK_EQ(group.selected(), 1);
         VISOR_CHECK_EQ(changes, 1);
-        group.on_pointer_down(PointI{3, 2 + 4}); // the same row again
-        VISOR_CHECK_EQ(changes, 1);              // a re-selection is no change
+        group.on_pointer_down(PointI{3, 2 + 10}); // the same row again
+        VISOR_CHECK_EQ(changes, 1);               // a re-selection is no change
         // Down walks, clamped at the bottom.
         group.on_key_down(visor::host::kKeyDown);
         VISOR_CHECK_EQ(group.selected(), 2);
@@ -128,29 +128,22 @@ void run_choice_tests() {
         VISOR_CHECK_EQ(changes, 4);
     }
 
-    // The radio group's pixels: rings on every row, a dot on the selected
-    // one only, labels beside the rings.
+    // Circular radio outlines have an empty center until selected, with a
+    // gap between the selected dot and its ring.
     {
-        visor::ui::RadioGroup group(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 20, .h = 8}},
-                                    kChoiceFont, Color::On);
+        visor::ui::RadioGroup group(RectI{.pos = {2, 2}, .size = {.w = 28, .h = 20}}, kChoiceFont,
+                                    Color::On);
         VISOR_CHECK(group.add_option("hi"));
         VISOR_CHECK(group.add_option("ho"));
         group.select(1);
-        Canvas<SizeI{.w = 24, .h = 12}> canvas;
-        canvas.set_clear(Color::Off);
+        Canvas<SizeI{.w = 32, .h = 24}> canvas;
         group.draw(visor::ui::CanvasPainter{canvas});
-        // Row 0's ring: center row y = 2 + 2 - 2 = 2, top row x 2..6 at y 2.
-        VISOR_CHECK(canvas.get(PointI{2, 2}) == Color::On);  // ring top-left
-        VISOR_CHECK(canvas.get(PointI{6, 2}) == Color::On);  // ring top-right
-        VISOR_CHECK(canvas.get(PointI{2, 6}) == Color::On);  // ring bottom-left
-        VISOR_CHECK(canvas.get(PointI{4, 4}) == Color::Off); // row 0's hollow core
-        // Row 1's ring center y = 6 + 2 - 2 = 6: top row at y 6.
-        VISOR_CHECK(canvas.get(PointI{2, 6}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{4, 8}) == Color::On);  // the dot, row 1
-        VISOR_CHECK(canvas.get(PointI{4, 4}) == Color::Off); // row 0 has no dot
-        // The label beside the ring: 'h' is a solid 2x4 at x = 2 + 8 = 10.
-        VISOR_CHECK(canvas.get(PointI{10, 6}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{9, 6}) == Color::Off); // the gap column
+        VISOR_CHECK(canvas.get(PointI{7, 3}) == Color::On);    // ring top
+        VISOR_CHECK(canvas.get(PointI{7, 6}) == Color::Off);   // first option empty
+        VISOR_CHECK(canvas.get(PointI{7, 16}) == Color::On);   // selected dot
+        VISOR_CHECK(canvas.get(PointI{7, 14}) == Color::Off);  // gap around dot
+        VISOR_CHECK(canvas.get(PointI{15, 15}) == Color::On);  // second label
+        VISOR_CHECK(canvas.get(PointI{14, 15}) == Color::Off); // gap before label
     }
 
     // The dropdown: closed it is one row, a press opens it into the list
@@ -217,30 +210,28 @@ void run_choice_tests() {
         VISOR_CHECK(list.open());
     }
 
-    // The dropdown's pixels, open: the highlighted row inverts (filled, its
-    // label the opposite ink), the others plain.
+    // A closed dropdown has an outline and a centered chevron; opening it
+    // inverts only the selected row, preserving the panel border.
     {
-        visor::ui::Dropdown list(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 12, .h = 4}},
-                                 kChoiceFont, Color::On);
+        visor::ui::Dropdown list(RectI{.pos = {2, 2}, .size = {.w = 28, .h = 12}}, kChoiceFont,
+                                 Color::On);
         VISOR_CHECK(list.add_option("hi"));
         VISOR_CHECK(list.add_option("ho"));
         list.select(1);
-        Canvas<SizeI{.w = 16, .h = 16}> canvas;
-        canvas.set_clear(Color::Off);
+        Canvas<SizeI{.w = 32, .h = 30}> canvas;
         list.draw(visor::ui::CanvasPainter{canvas});
-        // Closed: a filled row with the selected label in ink.
-        VISOR_CHECK(canvas.get(PointI{3, 3}) == Color::On);  // 'h' glyph ink
-        VISOR_CHECK(canvas.get(PointI{9, 2}) == Color::Off); // past the label, before the marker
-        list.on_key_down(visor::host::kKeyEnter);            // focused? no -- direct key
+        VISOR_CHECK(canvas.get(PointI{6, 6}) == Color::On);   // label
+        VISOR_CHECK(canvas.get(PointI{15, 6}) == Color::Off); // empty field
+        VISOR_CHECK(canvas.get(PointI{2, 6}) == Color::On);   // outline
+        VISOR_CHECK(canvas.get(PointI{23, 8}) == Color::On);  // arrow tip
+        list.on_key_down(visor::host::kKeyEnter);
         canvas.set_clear(Color::Off);
         list.draw(visor::ui::CanvasPainter{canvas});
         VISOR_CHECK(list.open());
-        // Open: highlight starts on the selected row (index 1, y 6..9),
-        // filled with ink and its label the opposite.
-        VISOR_CHECK(canvas.get(PointI{3, 7}) == Color::Off); // row 1 label is inverted
-        VISOR_CHECK(canvas.get(PointI{5, 7}) == Color::On);  // row 1 fill
-        VISOR_CHECK(canvas.get(PointI{3, 3}) == Color::On);  // row 0 label plain
-        VISOR_CHECK(canvas.get(PointI{5, 3}) == Color::Off); // row 0 unfilled
+        VISOR_CHECK(canvas.get(PointI{6, 18}) == Color::Off); // selected label reversed
+        VISOR_CHECK(canvas.get(PointI{12, 18}) == Color::On); // selected row
+        VISOR_CHECK(canvas.get(PointI{6, 6}) == Color::On);   // first label
+        VISOR_CHECK(canvas.get(PointI{12, 6}) == Color::Off); // first row background
     }
 
     // The dropdown's open-close cycle reports both boxes: the growth and the

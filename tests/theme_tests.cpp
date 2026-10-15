@@ -3,16 +3,27 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
+#include "visor/draw/mono_font.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
+#include "visor/ui/text.hpp"
 #include "visor/ui/theme.hpp"
 #include "visor/ui/widgets/button/button.hpp"
 #include "visor/ui/widgets/checkbox/checkbox.hpp"
+#include "visor/ui/widgets/dropdown/dropdown.hpp"
+#include "visor/ui/widgets/label/label.hpp"
+#include "visor/ui/widgets/radio/radio.hpp"
+#include "visor/ui/widgets/slider/slider.hpp"
+#include "visor/ui/widgets/textbox/textbox.hpp"
+#include "visor/ui/widgets/widget.hpp"
+#include <array>
 
 #include <cstddef>
+#include <cstdint>
 
 void run_theme_tests() {
     using visor::base::PointI;
@@ -136,8 +147,8 @@ void run_theme_tests() {
         Frame unwired;
         unwired.set_clear(Color::Off);
         panel.draw(visor::ui::CanvasPainter{unwired});
-        VISOR_CHECK_EQ(unwired.get(PointI{3, 3}), Color::On);   // the button's light ink
-        VISOR_CHECK_EQ(unwired.get(PointI{12, 4}), Color::Off); // the checkbox frame
+        VISOR_CHECK_EQ(unwired.get(PointI{3, 3}), Color::On);  // the button's light ink
+        VISOR_CHECK_EQ(unwired.get(PointI{13, 4}), Color::On); // the checkbox frame
 
         // Wiring the light scheme: pixels identical to the hardcoded
         // polarity, and the walk reports every widget (the pointer changed
@@ -163,8 +174,8 @@ void run_theme_tests() {
         Frame dark;
         dark.set_clear(Color::Off);
         panel.draw(visor::ui::CanvasPainter{dark});
-        VISOR_CHECK_EQ(dark.get(PointI{3, 3}), Color::Off); // the button's dark ink
-        VISOR_CHECK_EQ(dark.get(PointI{12, 4}), Color::On); // the frame carves as ink now
+        VISOR_CHECK_EQ(dark.get(PointI{3, 3}), Color::Off);  // the button's dark ink
+        VISOR_CHECK_EQ(dark.get(PointI{13, 4}), Color::Off); // the frame flips with the theme
         // A late child inherits the scheme of the parent it joins.
         visor::ui::Button late(RectI{.pos = PointI{2, 6}, .size = SizeI{.w = 6, .h = 3}});
         VISOR_CHECK(panel.add_child(&late));
@@ -197,5 +208,121 @@ void run_theme_tests() {
         VISOR_CHECK(canvas.get(PointI{4, 2}) == Color::On);  // the row's span
         VISOR_CHECK(canvas.get(PointI{2, 3}) == Color::Off); // the side inset row (v=1)
         VISOR_CHECK(canvas.get(PointI{3, 3}) == Color::On);  // the body
+    }
+    // Every control honors scheme polarity, stays within its dirty bounds,
+    // and produces identical pixels when replayed through five-row strips.
+    {
+        constexpr std::array<std::uint8_t, 4> bits{0xc0, 0xc0, 0xc0, 0xc0};
+        constexpr std::array<visor::draw::GlyphEntry, 1> glyphs{
+            {{.codepoint = 'a', .width = 2, .height = 4, .byte_offset = 0, .advance = 3}},
+        };
+        const visor::draw::MonoFont font{.line_height = 4, .glyphs = glyphs, .bits = bits};
+        visor::ui::Rectangle panel(RectI{.pos = {0, 0}, .size = {.w = 64, .h = 64}});
+        visor::ui::Button button(RectI{.pos = {2, 2}, .size = {.w = 18, .h = 12}});
+        button.set_label("aaaaaaaaaa", font);
+        visor::ui::Checkbox checkbox(RectI{.pos = {22, 2}, .size = {.w = 14, .h = 14}});
+        visor::ui::Slider slider(RectI{.pos = {40, 2}, .size = {.w = 20, .h = 12}});
+        slider.set_value(6);
+        visor::ui::TextBox textbox(RectI{.pos = {2, 20}, .size = {.w = 22, .h = 12}}, font,
+                                   Color::On);
+        textbox.set_text("aaaaaaaaaaaaaaaa");
+        textbox.set_focused(true);
+        visor::ui::RadioGroup radio(RectI{.pos = {28, 20}, .size = {.w = 32, .h = 20}}, font,
+                                    Color::On);
+        VISOR_CHECK(radio.add_option("aaaaaaaaaaaaaaaaaaaa"));
+        VISOR_CHECK(radio.add_option("a"));
+        radio.select(1);
+        visor::ui::Dropdown dropdown(RectI{.pos = {2, 36}, .size = {.w = 24, .h = 12}}, font,
+                                     Color::On);
+        VISOR_CHECK(dropdown.add_option("aaaaaaaaaaaaaaaaaaaa"));
+        VISOR_CHECK(dropdown.add_option("a"));
+        dropdown.select(0);
+        visor::ui::Label label(PointI{32, 52}, "aa", font, Color::On);
+        const std::array<visor::ui::Widget*, 7> controls{
+            &button, &checkbox, &slider, &textbox, &radio, &dropdown, &label,
+        };
+        for (auto* control : controls) {
+            VISOR_CHECK(panel.add_child(control));
+        }
+        using Frame = Canvas<SizeI{.w = 64, .h = 64}>;
+        for (int state = 0; state < 3; ++state) {
+            if (state == 1) {
+                button.on_pointer_down({3, 3});
+                checkbox.on_key_down(visor::host::kKeyEnter);
+                dropdown.set_open(true);
+            } else if (state == 2) {
+                button.on_pointer_up({3, 3});
+                button.set_outlined(true);
+                dropdown.on_key_down(visor::host::kKeyDown);
+            }
+            Frame light;
+            Frame dark;
+            const auto render = [&](const visor::ui::Theme& scheme, Frame& full) {
+                panel.fill = scheme.background;
+                panel.set_theme(&scheme);
+                panel.draw(visor::ui::CanvasPainter{full});
+                for (int top = 0; top < 64; top += 5) {
+                    Canvas<SizeI{.w = 64, .h = 5}> strip;
+                    panel.draw(visor::ui::CanvasPainter{
+                        strip, RectI{.pos = {0, top}, .size = {.w = 64, .h = 5}}});
+                    for (int y = 0; y < 5 && top + y < 64; ++y) {
+                        for (int x = 0; x < 64; ++x) {
+                            VISOR_CHECK_EQ(strip.get(PointI{x, y}), full.get(PointI{x, top + y}));
+                        }
+                    }
+                }
+                for (const auto* control : controls) {
+                    Frame isolated;
+                    isolated.set_clear(scheme.background);
+                    control->draw(visor::ui::CanvasPainter{isolated});
+                    for (int y = 0; y < 64; ++y) {
+                        for (int x = 0; x < 64; ++x) {
+                            if (!control->bounds().contains(PointI{x, y})) {
+                                VISOR_CHECK_EQ(isolated.get(PointI{x, y}), scheme.background);
+                            }
+                        }
+                    }
+                }
+            };
+            render(visor::ui::kLightTheme, light);
+            render(visor::ui::kDarkTheme, dark);
+            for (int y = 0; y < 64; ++y) {
+                for (int x = 0; x < 64; ++x) {
+                    VISOR_CHECK(light.get(PointI{x, y}) != dark.get(PointI{x, y}));
+                }
+            }
+        }
+    }
+    // Clipping must handle scaled overhangs on all four edges without
+    // changing the glyph's placement or writing into neighboring controls.
+    {
+        constexpr std::array<std::uint8_t, 4> bits{0xe0, 0xa0, 0xe0, 0xe0};
+        constexpr std::array<visor::draw::GlyphEntry, 1> glyphs{
+            {
+                {
+                    .codepoint = 'a',
+                    .width = 3,
+                    .height = 4,
+                    .byte_offset = 0,
+                    .advance = 4,
+                    .offset_x = -2,
+                    .offset_y = -1,
+                },
+            },
+        };
+        const visor::draw::MonoFont font{.line_height = 4, .glyphs = glyphs, .bits = bits};
+        Canvas<SizeI{.w = 24, .h = 24}> full;
+        Canvas<SizeI{.w = 24, .h = 24}> clipped;
+        const RectI clip{.pos = {5, 5}, .size = {.w = 7, .h = 7}};
+        visor::ui::draw_text(visor::ui::CanvasPainter{full}, {6, 6}, font, "aa\naa", Color::On, 2);
+        visor::ui::draw_text_clipped(visor::ui::CanvasPainter{clipped}, clip, {6, 6}, font,
+                                     "aa\naa", Color::On, 2);
+        for (int y = 0; y < 24; ++y) {
+            for (int x = 0; x < 24; ++x) {
+                const auto expected =
+                    clip.contains(PointI{x, y}) ? full.get(PointI{x, y}) : Color::Off;
+                VISOR_CHECK_EQ(clipped.get(PointI{x, y}), expected);
+            }
+        }
     }
 }

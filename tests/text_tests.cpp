@@ -86,7 +86,7 @@ constexpr visor::draw::MonoFont kTypeFont{
 } // namespace
 
 void run_text_tests() {
-    const RectI box_bounds{.pos = PointI{2, 2}, .size = SizeI{.w = 16, .h = 4}};
+    const RectI box_bounds{.pos = PointI{2, 2}, .size = SizeI{.w = 22, .h = 12}};
 
     // Typing accumulates at the caret, through the whole stack: Tab focuses
     // the editor, printable codes land as characters, Backspace deletes
@@ -104,7 +104,7 @@ void run_text_tests() {
         visor::host::OffscreenHost screen(24, 8);
         visor::ui::InputRouter input;
         const auto host = screen.table();
-        Canvas<SizeI{.w = 24, .h = 8}> frame;
+        Canvas<SizeI{.w = 32, .h = 20}> frame;
 
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1);
@@ -190,74 +190,95 @@ void run_text_tests() {
         VISOR_CHECK_EQ(box.text(), "h");
     }
 
-    // The editor's pixels: the text rides the box's origin, the caret is an
-    // ink column after the visible prefix while focused and nothing when not.
-    // One glyph of text, so only the caret explains ink past it.
+    // Clicking an editor takes keyboard focus from the previous control.
+    // Subsequent characters must change this editor, and Tab continues from it.
+    {
+        visor::ui::Rectangle panel(RectI{.pos = {0, 0}, .size = {.w = 64, .h = 24}});
+        visor::ui::TextBox first(RectI{.pos = {2, 2}, .size = {.w = 22, .h = 12}}, kTypeFont,
+                                 visor::canvas::Color::On);
+        visor::ui::TextBox second(RectI{.pos = {28, 2}, .size = {.w = 22, .h = 12}}, kTypeFont,
+                                  visor::canvas::Color::On);
+        VISOR_CHECK(panel.add_child(&first));
+        VISOR_CHECK(panel.add_child(&second));
+        visor::host::OffscreenHost screen(64, 24);
+        visor::ui::InputRouter input;
+        Canvas<SizeI{.w = 64, .h = 24}> frame;
+        VISOR_CHECK(panel.advance_focus());
+        VISOR_CHECK(first.focused());
+        VISOR_CHECK(screen.push_event(visor::host::PointerDown{.button = 1, .pos = {32, 6}}));
+        VISOR_CHECK(screen.push_event(visor::host::PointerUp{.button = 1, .pos = {32, 6}}));
+        VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = 'h'}));
+        static_cast<void>(visor::ui::run_once(screen.table(), panel, input, frame));
+        VISOR_CHECK(!first.focused());
+        VISOR_CHECK(second.focused());
+        VISOR_CHECK_EQ(first.text(), "");
+        VISOR_CHECK_EQ(second.text(), "h");
+        VISOR_CHECK(panel.advance_focus());
+        VISOR_CHECK(first.focused());
+        VISOR_CHECK(!second.focused());
+    }
+
+    // Text and the focused caret sit inside a padded outline. Moving the
+    // caret leaves the field border intact.
     {
         visor::ui::TextBox box(box_bounds, kTypeFont, visor::canvas::Color::On);
         box.set_text("h");
-        Canvas<SizeI{.w = 24, .h = 8}> canvas;
+        Canvas<SizeI{.w = 32, .h = 20}> canvas;
         const visor::ui::CanvasPainter painter{canvas};
         const auto on = visor::canvas::Color::On;
         const auto off = visor::canvas::Color::Off;
-        canvas.set_clear(off);
         box.draw(painter);
-        // 'h' is a solid 2x4 block at (2,2); unfocused, nothing past it.
-        VISOR_CHECK(canvas.get(PointI{2, 2}) == on);
-        VISOR_CHECK(canvas.get(PointI{3, 5}) == on);
-        VISOR_CHECK(canvas.get(PointI{4, 2}) == off); // the advance gap
-        VISOR_CHECK(canvas.get(PointI{5, 2}) == off); // where a caret would sit
+        VISOR_CHECK(canvas.get(PointI{2, 6}) == on); // border
+        VISOR_CHECK(canvas.get(PointI{5, 6}) == on); // glyph
+        VISOR_CHECK(canvas.get(PointI{6, 9}) == on);
+        VISOR_CHECK(canvas.get(PointI{7, 6}) == off); // advance gap
+        VISOR_CHECK(canvas.get(PointI{8, 6}) == off); // unfocused caret absent
         box.set_focused(true);
         canvas.set_clear(off);
         box.draw(painter);
-        // The caret after "h" sits at x = 2 + 3 = 5. The focus ring owns the
-        // border rows, so the interior rows carry the caret's ink.
-        VISOR_CHECK(canvas.get(PointI{5, 3}) == on);
-        VISOR_CHECK(canvas.get(PointI{5, 4}) == on);
-        VISOR_CHECK(canvas.get(PointI{6, 3}) == off);
-        // Back one: the caret before the glyph sits at the box's left edge,
-        // sharing the ring column; row 3 keeps glyph ink beside it.
+        VISOR_CHECK(canvas.get(PointI{8, 6}) == on);
+        VISOR_CHECK(canvas.get(PointI{8, 9}) == on);
+        VISOR_CHECK(canvas.get(PointI{9, 6}) == off);
         box.on_key_down(visor::host::kKeyLeft);
         canvas.set_clear(off);
         box.draw(painter);
-        VISOR_CHECK(canvas.get(PointI{3, 3}) == on); // the glyph's right column
-        VISOR_CHECK(canvas.get(PointI{5, 3}) == off);
+        VISOR_CHECK(canvas.get(PointI{5, 6}) == on);  // caret before glyph
+        VISOR_CHECK(canvas.get(PointI{6, 6}) == on);  // glyph unchanged
+        VISOR_CHECK(canvas.get(PointI{8, 6}) == off); // previous caret erased
     }
 
-    // The window slides: a box 16 wide shows at most the run that keeps the
+    // The window slides: a box with 16 pixels of content shows at most the run that keeps the
     // caret inside, and deletion pulls the window back.
     {
         visor::ui::TextBox box(box_bounds, kTypeFont, visor::canvas::Color::On);
-        // 8 glyphs of advance 3 = 24px past a 16px box: the window must slide
+        // 8 glyphs of advance 3 = 24px past its content area: the window must slide
         // until the caret fits with its column.
         box.set_text("iiiihhhh");
         VISOR_CHECK_EQ(box.text().size(), std::size_t{8});
-        Canvas<SizeI{.w = 24, .h = 8}> canvas;
+        Canvas<SizeI{.w = 32, .h = 20}> canvas;
         box.set_focused(true);
         canvas.set_clear(visor::canvas::Color::Off);
         box.draw(visor::ui::CanvasPainter{canvas});
         // The window slid to index 3 (five glyphs of advance 3 fit 15px of
         // room): the first visible glyph is 'i', whose interior-right column
         // is dark on the middle rows -- a solid 'h' there would prove
-        // nothing. The ring owns the left column, so the shape test rides
-        // the interior column, and the second glyph's ink proves text runs.
-        VISOR_CHECK(canvas.get(PointI{3, 3}) == visor::canvas::Color::Off);
-        VISOR_CHECK(canvas.get(PointI{5, 3}) == visor::canvas::Color::On);
-        // The caret at the tail sits at x = 17, the box's ring column: row 3
-        // of that column shows glyph gaps Off where no caret runs... the
-        // caret merges with the ring, so the slide is proven by the glyphs.
-        VISOR_CHECK(canvas.get(PointI{18, 3}) == visor::canvas::Color::Off); // outside the box
+        // nothing. The second glyph's ink proves text continues after it.
+        VISOR_CHECK(canvas.get(PointI{6, 7}) == visor::canvas::Color::Off);
+        VISOR_CHECK(canvas.get(PointI{8, 7}) == visor::canvas::Color::On);
+        VISOR_CHECK(canvas.get(PointI{20, 7}) == visor::canvas::Color::On);  // caret at tail
+        VISOR_CHECK(canvas.get(PointI{21, 7}) == visor::canvas::Color::Off); // right padding
+        VISOR_CHECK(canvas.get(PointI{24, 6}) == visor::canvas::Color::Off); // outside the box
         // Deleting down to one glyph pulls the caret left of the window, and
         // the window follows: the surviving 'i' shows at the box's own origin
         // again (left column ink, right column dark on middle rows), the
-        // caret after it at x = 5.
+        // caret after it at x = 8.
         for (int i = 0; i < 7; ++i) {
             box.on_key_down(visor::host::kKeyBackspace);
         }
         VISOR_CHECK_EQ(box.text(), "i");
         canvas.set_clear(visor::canvas::Color::Off);
         box.draw(visor::ui::CanvasPainter{canvas});
-        VISOR_CHECK(canvas.get(PointI{3, 3}) == visor::canvas::Color::Off); // 'i', not 'h'
-        VISOR_CHECK(canvas.get(PointI{5, 3}) == visor::canvas::Color::On);  // the caret
+        VISOR_CHECK(canvas.get(PointI{6, 7}) == visor::canvas::Color::Off); // 'i', not 'h'
+        VISOR_CHECK(canvas.get(PointI{8, 7}) == visor::canvas::Color::On);  // the caret
     }
 }

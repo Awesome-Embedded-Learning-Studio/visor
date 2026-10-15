@@ -78,4 +78,10 @@ void run_rect_tests() {
     VISOR_CHECK_EQ(a.pos + a.size, (PointI{10, 10}));
     VISOR_CHECK_EQ(offset((PointI{1, 2}), SizeI{.w = 3, .h = 4}), (PointI{4, 6}));
     VISOR_CHECK_EQ((PointI{4, 6} - SizeI{.w = 3, .h = 4}), (PointI{1, 2}));
+    // Content insets collapse instead of wrapping or producing negative sizes.
+    VISOR_CHECK_EQ(visor::base::inset(a, 2), (RectI{.pos = {2, 2}, .size = {.w = 6, .h = 6}}));
+    VISOR_CHECK(visor::base::inset(a, 6).is_empty());
+    VISOR_CHECK_EQ(visor::base::inset(a, -1), a);
+    constexpr visor::base::Rect<unsigned> unsigned_rect{.pos = {0, 0}, .size = {.w = 1, .h = 2}};
+    static_assert(visor::base::inset(unsigned_rect, 2U).is_empty());
 }

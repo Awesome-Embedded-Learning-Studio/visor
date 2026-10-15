@@ -179,7 +179,7 @@ void run_run_loop_tests() {
     }
 
     // A press on the checkbox flips it: the hit widget toggles on press, the
-    // submitted frame carries the solid mark, and release changes nothing.
+    // submitted frame carries the checked face, and release changes nothing.
     {
         visor::ui::Rectangle panel(root_bounds);
         visor::ui::Checkbox box(RectI{.pos = PointI{4, 4}, .size = SizeI{.w = 8, .h = 8}});
@@ -192,12 +192,12 @@ void run_run_loop_tests() {
         Canvas<SizeI{.w = 20, .h = 20}> frame;
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 2);
         VISOR_CHECK(box.checked());
-        VISOR_CHECK_EQ(screen.get(PointI{8, 8}), visor::canvas::Color::Off);
+        VISOR_CHECK_EQ(screen.get(PointI{8, 8}), visor::canvas::Color::On);
         VISOR_CHECK_EQ(screen.get(PointI{0, 0}), visor::canvas::Color::On);
     }
 
     // Keyboard activation: Tab lands the focus on the checkbox, Enter flips it
-    // (the frame carries the solid mark), then Space flips it back while a
+    // (the frame carries the checked face), then Space flips it back while a
     // code no control claims passes through and changes nothing. One key per
     // round, so each of the four keys is its own run.
     {
@@ -215,13 +215,13 @@ void run_run_loop_tests() {
         VISOR_CHECK(!box.checked());
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // Enter
         VISOR_CHECK(box.checked());
-        // (7,7) is the interior the mark fills; (6,6) is the frame both states share.
-        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::Off);
+        // (7,7) is the selected face; unchecking clears it back to the background.
+        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::On);
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = 42}));
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // Space
         VISOR_CHECK(!box.checked());
-        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::Off);
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // 42, claimed by nobody
     }
 

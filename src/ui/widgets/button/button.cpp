@@ -1,11 +1,17 @@
 #include "visor/ui/widgets/button/button.hpp"
 
 #include <cstdint>
+#include <string_view>
 
 #include "visor/base/geometry/point.hpp"
+#include "visor/base/geometry/size.hpp"
+#include "visor/base/helpers/rect_helper.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
+#include "visor/draw/mono_font.hpp"
+#include "visor/ui/control_style.hpp"
 #include "visor/ui/painter.hpp"
+#include "visor/ui/text.hpp"
 #include "visor/ui/theme.hpp"
 
 namespace visor::ui {
@@ -13,6 +19,23 @@ namespace visor::ui {
 void Button::set_on_activate(ActivateHandler handler, void* context) noexcept {
     on_activate_ = handler;
     activate_context_ = context;
+}
+
+void Button::set_label(std::string_view text, const draw::MonoFont& font) noexcept {
+    if (label_ == text && font_ == &font) {
+        return;
+    }
+    label_ = text;
+    font_ = &font;
+    invalidate(bounds());
+}
+
+void Button::set_outlined(bool on) noexcept {
+    if (outlined_ == on) {
+        return;
+    }
+    outlined_ = on;
+    invalidate(bounds());
 }
 
 bool Button::pressed() const noexcept {
@@ -70,7 +93,20 @@ void Button::on_draw(const Painter& painter) const noexcept {
     const canvas::Color fg = theme() != nullptr ? theme()->foreground : canvas::Color::On;
     const canvas::Color bg = theme() != nullptr ? theme()->background : canvas::Color::Off;
     const CornerRadius corners = theme() != nullptr ? theme()->corner_radius : CornerRadius{};
-    painter.fill_rounded(bounds(), pressed() ? bg : fg, corners);
+    // Keep the silhouette while pressed so an empty button never disappears.
+    const bool solid = outlined_ == pressed();
+    const canvas::Color face = solid ? fg : bg;
+    painter.fill_rounded(bounds(), fg, corners);
+    if (!solid) {
+        painter.fill_rounded(base::inset(bounds(), 1), bg, inset_corners(corners));
+    }
+    if (font_ != nullptr) {
+        const base::SizeI size = draw::measure_text(*font_, label_, 1);
+        const base::PointI at{bounds().pos.x + ((bounds().size.w - size.w) / 2),
+                              bounds().pos.y + ((bounds().size.h - size.h) / 2)};
+        draw_text_clipped(painter, base::inset(bounds(), 2), at, *font_, label_,
+                          face == fg ? bg : fg, 1);
+    }
 }
 
 void Button::activate() noexcept {

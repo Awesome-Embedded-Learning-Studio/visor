@@ -69,6 +69,8 @@ class TextBox : public Widget {
     void on_draw(const Painter& painter) const noexcept override;
 
   private:
+    static constexpr int kPadding = 3;
+
     /// The caret column's width in pixels.
     static constexpr int kCaretWidth = 1;
 

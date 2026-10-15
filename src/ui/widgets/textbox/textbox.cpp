@@ -1,5 +1,6 @@
 #include "visor/ui/widgets/textbox/textbox.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -7,9 +8,11 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/base/helpers/rect_helper.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/draw/mono_font.hpp"
+#include "visor/ui/control_style.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/text.hpp"
 #include "visor/ui/widgets/widget.hpp"
@@ -61,7 +64,7 @@ int TextBox::caret_offset(std::size_t from) const noexcept {
 }
 
 void TextBox::fit_window() noexcept {
-    const int room = bounds().size.w - kCaretWidth;
+    const int room = std::max(0, bounds().size.w - (2 * kPadding) - kCaretWidth);
     while (first_visible_ < caret_ && caret_offset(first_visible_) > room) {
         ++first_visible_;
     }
@@ -128,18 +131,29 @@ void TextBox::on_key_down(std::uint32_t code) noexcept {
 }
 
 void TextBox::on_draw(const Painter& painter) const noexcept {
+    const auto fg = theme() != nullptr ? theme()->foreground : ink_;
+    const auto bg = control_background(theme(), ink_);
+    const auto corners = theme() != nullptr ? theme()->corner_radius : CornerRadius{};
+    paint_outline(painter, bounds(), fg, bg, corners);
+    const auto content = base::inset(bounds(), kPadding);
+    const base::PointI at{
+        content.pos.x,
+        content.pos.y + std::max(0, (content.size.h - static_cast<int>(font_->line_height)) / 2)};
     const std::string_view visible{chars_ + first_visible_, length_ - first_visible_};
-    draw_text(painter, bounds().pos, *font_, visible, ink_, 1);
-    if (!focused()) {
-        return; // an unfocused editor states its text, no caret to show
+    draw_text_clipped(painter, content, at, *font_, visible, fg, 1);
+    if (focused() && !content.is_empty()) {
+        const int x = content.pos.x + std::min(caret_offset(first_visible_), content.size.w - 1);
+        painter.fill(
+            base::RectI{
+                .pos = {x, at.y},
+                .size =
+                    {
+                        .w = kCaretWidth,
+                        .h = std::min(content.size.h, static_cast<int>(font_->line_height)),
+                    },
+            },
+            fg);
     }
-    const int x = bounds().pos.x + caret_offset(first_visible_);
-    painter.fill(
-        base::RectI{
-            .pos = base::PointI{x, bounds().pos.y},
-            .size = base::SizeI{.w = kCaretWidth, .h = bounds().size.h},
-        },
-        ink_);
 }
 
 } // namespace visor::ui

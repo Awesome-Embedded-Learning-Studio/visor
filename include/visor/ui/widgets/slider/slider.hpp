@@ -16,10 +16,7 @@ namespace visor::ui {
  * value is the handle's left edge offset, 0 through max(), max being the
  * track width minus the handle -- the handle never leaves the track.
  *
- * No keyboard leg yet, on purpose: left and right arrows are host-defined
- * codes the core never names, and the slider will not guess at them. When a
- * batch names the arrow codes (or a host maps them onto named ones), the leg
- * arrives on the same value vocabulary.
+ * Left and Right step the value while the slider holds keyboard focus.
  *
  * Value feedback is a plain function plus a context word, the Button shape:
  * no closure, no std::function, the vocabulary stays plain pointers.
@@ -47,6 +44,9 @@ class Slider : public Widget {
     /// still tracks and paints its value; changes fire into the quiet.
     void set_on_value(ValueHandler handler, void* context = nullptr) noexcept;
 
+    [[nodiscard]] bool focusable() const noexcept override { return true; }
+    void on_key_down(std::uint32_t code) noexcept override;
+
     void on_pointer_down(base::PointI at) noexcept override;
     void on_pointer_move(base::PointI at) noexcept override;
     void on_pointer_up([[maybe_unused]] base::PointI at) noexcept override;
@@ -55,9 +55,8 @@ class Slider : public Widget {
     void on_draw(const Painter& painter) const noexcept override;
 
   private:
-    /// The handle's width in pixels. Two, so one pixel of track shows beside
-    /// it at both ends of the range.
-    static constexpr int kHandleWidth = 2;
+    /// The outlined thumb remains visible on either theme polarity.
+    static constexpr int kHandleWidth = 7;
 
     /// Maps a pointer x to the value it names, clamped to the track.
     [[nodiscard]] int value_at(int x) const noexcept;

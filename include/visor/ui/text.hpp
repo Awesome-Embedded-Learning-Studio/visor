@@ -27,4 +27,9 @@ namespace visor::ui {
 void draw_text(const Painter& painter, base::PointI at, const draw::MonoFont& font,
                std::string_view utf8, canvas::Color ink, int scale) noexcept;
 
+/// Clips glyph ink to a control's content rectangle, including overhangs.
+void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at,
+                       const draw::MonoFont& font, std::string_view utf8, canvas::Color ink,
+                       int scale) noexcept;
+
 } // namespace visor::ui

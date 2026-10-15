@@ -1,12 +1,16 @@
 #include "visor/ui/widgets/slider/slider.hpp"
 
 #include <algorithm>
+#include <cstdint>
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/base/helpers/rect_helper.hpp"
+#include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/ui/painter.hpp"
+#include "visor/ui/theme.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {
@@ -18,7 +22,7 @@ int Slider::value() const noexcept {
 }
 
 int Slider::max() const noexcept {
-    return bounds().size.w - kHandleWidth;
+    return std::max(0, bounds().size.w - kHandleWidth);
 }
 
 void Slider::set_value(int value) noexcept {
@@ -66,21 +70,35 @@ void Slider::on_pointer_up([[maybe_unused]] base::PointI at) noexcept {
 }
 
 void Slider::on_draw(const Painter& painter) const noexcept {
-    // A one-row track across the middle, the handle a dark block riding it:
-    // the track says where, the handle says what.
+    if (bounds().is_empty()) {
+        return;
+    }
+    const auto fg = theme() != nullptr ? theme()->foreground : canvas::Color::On;
+    const auto bg = theme() != nullptr ? theme()->background : canvas::Color::Off;
     const int track_y = bounds().pos.y + (bounds().size.h / 2);
+    const int width = std::min(kHandleWidth, bounds().size.w);
+    const int height = std::min(9, bounds().size.h);
+    const int offset = std::clamp(value_, 0, max());
     painter.fill(
-        base::RectI{
-            .pos = base::PointI{bounds().pos.x, track_y},
-            .size = base::SizeI{.w = bounds().size.w, .h = 1},
-        },
-        canvas::Color::On);
-    painter.fill(
-        base::RectI{
-            .pos = base::PointI{bounds().pos.x + value_, track_y - 1},
-            .size = base::SizeI{.w = kHandleWidth, .h = 3},
-        },
-        canvas::Color::Off);
+        base::RectI{.pos = {bounds().pos.x, track_y}, .size = {.w = bounds().size.w, .h = 1}}, fg);
+    const base::RectI handle{
+        .pos = {bounds().pos.x + offset, bounds().pos.y + ((bounds().size.h - height) / 2)},
+        .size = {.w = width, .h = height},
+    };
+    painter.fill_rounded(
+        handle, fg,
+        CornerRadius{.top_left = 2, .top_right = 2, .bottom_right = 2, .bottom_left = 2});
+    painter.fill_rounded(
+        base::inset(handle, 1), bg,
+        CornerRadius{.top_left = 1, .top_right = 1, .bottom_right = 1, .bottom_left = 1});
+}
+
+void Slider::on_key_down(std::uint32_t code) noexcept {
+    if (code == host::kKeyLeft) {
+        set_value(value_ - 1);
+    } else if (code == host::kKeyRight) {
+        set_value(value_ + 1);
+    }
 }
 
 } // namespace visor::ui

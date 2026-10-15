@@ -20,19 +20,15 @@ struct CornerRadius {
  * @brief The semantic colors of one interface scheme, mapped onto the two
  *        states a mono canvas has.
  *
- * A theme in a 1bpp world is not a palette, it is a polarity: which canvas
- * state plays the background and which plays the ink. The light scheme is
- * dark ink on a lit panel's complement (Off background, On foreground -- the
- * colors every control hardcoded before themes arrived), the dark scheme
- * flips both. The corner radius rides along because in the predecessor it
- * was a scheme decision too (per-corner rounding traveled with the theme),
- * and because mono controls have no other geometry knobs worth carrying.
+ * A theme maps the background and ink roles onto canvas states. On means
+ * a lit pixel in the X11 and OLED hosts, while other exporters may choose
+ * their own polarity. The named presets retain their original bit values.
+ * Corner radii keep filled faces and their inner outlines on the same geometry.
  *
- * Controls consult the theme through the tree's wiring (Widget::set_theme);
- * an unwired tree keeps the pre-theme hardcoded polarities, so existing
- * judgments hold without a theme in sight. Switching at runtime is one
- * set_theme call: the walk re-reports every widget's bounds, the repaint
- * follows.
+ * Widget::set_theme propagates the scheme through the tree and invalidates
+ * every widget. Without a theme, shape controls use Off ground and On ink;
+ * text controls use their explicit ink. The scheme storage must outlive
+ * the tree that refers to it.
  */
 struct Theme {
     canvas::Color background;
@@ -40,14 +36,13 @@ struct Theme {
     CornerRadius corner_radius{};
 };
 
-/// Dark ink on a lit complement: the polarity every control hardcoded
-/// before themes arrived (Off ground, On ink, square corners).
+/// The original polarity: Off ground, On ink, square corners.
 inline constexpr Theme kLightTheme{
     .background = canvas::Color::Off,
     .foreground = canvas::Color::On,
 };
 
-/// The flip: lit ink on a dark complement (On ground, Off ink).
+/// The opposite polarity: On ground, Off ink, square corners.
 inline constexpr Theme kDarkTheme{
     .background = canvas::Color::On,
     .foreground = canvas::Color::Off,

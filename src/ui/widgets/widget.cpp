@@ -15,23 +15,24 @@ using visor::base::PointI;
 using visor::base::RectI;
 using visor::base::SizeI;
 
-// Focus feedback is framework policy, not a control's choice: draw() paints
-// this one-pixel border after on_draw() so every focusable control shows the
-// same ring and none of them can forget it. Controls keep their content one
-// pixel inside the bounds, which leaves the ring a lit margin to sit on.
+// Alternating ink and ground stays visible on both filled and hollow controls.
 void paint_focus_border(const visor::ui::Painter& painter, const RectI& bounds,
                         const visor::ui::Theme* theme) noexcept {
-    // The ring carves into the holder's ink, so it takes the scheme's
-    // background -- the pre-theme hardcoded Off is the light scheme's value.
-    const visor::canvas::Color ring =
-        theme != nullptr ? theme->background : visor::canvas::Color::Off;
-    const PointI at = bounds.pos;
-    const int w = bounds.size.w;
-    const int h = bounds.size.h;
-    painter.fill(RectI{.pos = at, .size = SizeI{.w = w, .h = 1}}, ring);
-    painter.fill(RectI{.pos = PointI{at.x, at.y + h - 1}, .size = SizeI{.w = w, .h = 1}}, ring);
-    painter.fill(RectI{.pos = at, .size = SizeI{.w = 1, .h = h}}, ring);
-    painter.fill(RectI{.pos = PointI{at.x + w - 1, at.y}, .size = SizeI{.w = 1, .h = h}}, ring);
+    const auto fg = theme != nullptr ? theme->foreground : visor::canvas::Color::On;
+    const auto bg = theme != nullptr ? theme->background : visor::canvas::Color::Off;
+    if (bounds.is_empty()) {
+        return;
+    }
+    for (int x = 0; x < bounds.size.w; ++x) {
+        const auto ink = x % 2 == 0 ? bg : fg;
+        painter.plot(PointI{bounds.pos.x + x, bounds.pos.y}, ink);
+        painter.plot(PointI{bounds.pos.x + x, bounds.pos.y + bounds.size.h - 1}, ink);
+    }
+    for (int y = 0; y < bounds.size.h; ++y) {
+        const auto ink = y % 2 == 0 ? bg : fg;
+        painter.plot(PointI{bounds.pos.x, bounds.pos.y + y}, ink);
+        painter.plot(PointI{bounds.pos.x + bounds.size.w - 1, bounds.pos.y + y}, ink);
+    }
 }
 
 } // namespace

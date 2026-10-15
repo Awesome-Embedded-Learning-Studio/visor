@@ -1,5 +1,6 @@
 #include "visor/ui/widgets/radio/radio.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -7,12 +8,14 @@
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
-#include "visor/base/geometry/size.hpp"
+#include "visor/base/helpers/rect_helper.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/draw/mono_font.hpp"
+#include "visor/ui/control_style.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/text.hpp"
+#include "visor/ui/theme.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {
@@ -48,10 +51,13 @@ void RadioGroup::set_on_change(SelectHandler handler, void* context) noexcept {
 }
 
 int RadioGroup::row_height() const noexcept {
-    return static_cast<int>(font_->line_height);
+    return std::max(1, static_cast<int>(font_->line_height) + 6);
 }
 
 int RadioGroup::row_at(base::PointI at) const noexcept {
+    if (!bounds().contains(at)) {
+        return -1;
+    }
     const int row = (at.y - bounds().pos.y) / row_height();
     if (row < 0 || std::cmp_greater_equal(row, count_)) {
         return -1;
@@ -91,37 +97,32 @@ void RadioGroup::on_key_down(std::uint32_t code) noexcept {
 }
 
 void RadioGroup::on_draw(const Painter& painter) const noexcept {
+    if (bounds().size.w < 11 || bounds().size.h < row_height()) {
+        return;
+    }
+    const auto fg = theme() != nullptr ? theme()->foreground : ink_;
+    const auto bg = control_background(theme(), ink_);
     for (std::size_t i = 0; i < count_; ++i) {
         const int y = bounds().pos.y + (static_cast<int>(i) * row_height());
-        // The ring: a five-pixel square outline, four one-pixel fills.
-        const base::PointI ring_pos{bounds().pos.x, y + (row_height() / 2) - 2};
-        painter.fill(base::RectI{.pos = ring_pos, .size = base::SizeI{.w = 5, .h = 1}}, ink_);
-        painter.fill(
-            base::RectI{
-                .pos = base::PointI{ring_pos.x, ring_pos.y + 4},
-                .size = base::SizeI{.w = 5, .h = 1},
-            },
-            ink_);
-        painter.fill(base::RectI{.pos = ring_pos, .size = base::SizeI{.w = 1, .h = 5}}, ink_);
-        painter.fill(
-            base::RectI{
-                .pos = base::PointI{ring_pos.x + 4, ring_pos.y},
-                .size = base::SizeI{.w = 1, .h = 5},
-            },
-            ink_);
-        // The dot on the chosen option: a two-pixel core inside the ring.
-        if (std::cmp_equal(i, selected_)) {
-            painter.fill(
-                base::RectI{
-                    .pos = base::PointI{ring_pos.x + 2, ring_pos.y + 2},
-                    .size = base::SizeI{.w = 2, .h = 2},
-                },
-                ink_);
+        if (y + row_height() > bounds().pos.y + bounds().size.h) {
+            break;
         }
-        // The label rides beside the ring, vertically centered on the row.
+        const base::RectI ring{
+            .pos = {bounds().pos.x + 2, y + ((row_height() - 7) / 2)},
+            .size = {.w = 7, .h = 7},
+        };
+        // Rounded concentric silhouettes leave a clear gap around the selected dot.
+        paint_outline(
+            painter, ring, fg, bg,
+            CornerRadius{.top_left = 3, .top_right = 3, .bottom_right = 3, .bottom_left = 3});
+        if (std::cmp_equal(i, selected_)) {
+            painter.fill_rounded(
+                base::inset(ring, 2), fg,
+                CornerRadius{.top_left = 1, .top_right = 1, .bottom_right = 1, .bottom_left = 1});
+        }
         const base::PointI label_pos{
-            ring_pos.x + 8, y + ((row_height() - static_cast<int>(font_->line_height)) / 2)};
-        draw_text(painter, label_pos, *font_, labels_[i], ink_, 1);
+            ring.pos.x + 11, y + ((row_height() - static_cast<int>(font_->line_height)) / 2)};
+        draw_text_clipped(painter, base::inset(bounds(), 1), label_pos, *font_, labels_[i], fg, 1);
     }
 }
 

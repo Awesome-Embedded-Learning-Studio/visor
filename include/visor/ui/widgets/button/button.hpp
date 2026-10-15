@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
+
+#include "visor/draw/mono_font.hpp"
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/ui/widgets/widget.hpp"
@@ -45,6 +48,11 @@ class Button : public Widget {
     /// into the quiet, the same stance the empty host table takes.
     void set_on_activate(ActivateHandler handler, void* context = nullptr) noexcept;
 
+    /// Sets a centered label; its storage and font must outlive the button.
+    void set_label(std::string_view text, const draw::MonoFont& font) noexcept;
+    /// Outlined buttons use the same press feedback as filled buttons.
+    void set_outlined(bool on) noexcept;
+
     /// Whether either source currently holds the press.
     [[nodiscard]] bool pressed() const noexcept;
 
@@ -60,6 +68,9 @@ class Button : public Widget {
     /// Fires the activation if a handler is wired.
     void activate() noexcept;
 
+    std::string_view label_;
+    const draw::MonoFont* font_ = nullptr;
+    bool outlined_ = false;
     bool pointer_pressed_ = false;
     bool key_pressed_ = false;
     std::uint32_t held_key_ = 0; // valid while key_pressed_

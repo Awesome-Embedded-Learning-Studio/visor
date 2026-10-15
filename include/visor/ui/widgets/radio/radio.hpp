@@ -23,8 +23,9 @@ inline constexpr std::size_t kRadioCapacity = 8;
  * The group is one widget, not a box of sibling controls: exclusivity is the
  * group's fact, so the selection lives here and no child can drift out of
  * step. Options are labels over caller-owned storage (the label view
- * discipline), rows spaced by the font's line height, the ring a five-pixel
- * square outline with a two-pixel dot for the selection.
+ * discipline). Rows use the font's line height plus six pixels. A seven-pixel
+ * rounded ring surrounds the selected dot. Bounds must be at least eleven
+ * pixels wide; rows that do not fit entirely inside the bounds are omitted.
  *
  * Selecting is the whole interaction, so it has no separate activation:
  * a pointer press on a row selects it, and the arrows the core names (Up
@@ -69,7 +70,7 @@ class RadioGroup : public Widget {
     void on_draw(const Painter& painter) const noexcept override;
 
   private:
-    /// One option row's height: the font's line height, the label's own grid.
+    /// One option row's height: the font's line height plus six pixels of padding.
     [[nodiscard]] int row_height() const noexcept;
     /// The option index at a point in the group, -1 past the last row.
     [[nodiscard]] int row_at(base::PointI at) const noexcept;

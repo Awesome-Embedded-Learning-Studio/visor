@@ -25,6 +25,7 @@ void Label::set_text(std::string_view text) noexcept {
     // set_bounds keeps the origin and reports both boxes; measurement is the
     // only input to the size, so this one call is the whole resize story.
     set_bounds(measured_bounds(bounds().pos));
+    invalidate(bounds());
 }
 
 std::string_view Label::text() const noexcept {
@@ -36,7 +37,8 @@ base::RectI Label::measured_bounds(base::PointI origin) const noexcept {
 }
 
 void Label::on_draw(const Painter& painter) const noexcept {
-    draw_text(painter, bounds().pos, font_, text_, ink_, scale_);
+    draw_text(painter, bounds().pos, font_, text_, theme() != nullptr ? theme()->foreground : ink_,
+              scale_);
 }
 
 } // namespace visor::ui

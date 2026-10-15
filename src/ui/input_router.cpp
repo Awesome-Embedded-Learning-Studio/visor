@@ -20,6 +20,13 @@ namespace {
 void deliver(Widget& root, Widget*& press_owner, const host::PointerDown& word) noexcept {
     press_owner = root.hit_test(word.pos);
     if (press_owner != nullptr) {
+        if (press_owner->focusable()) {
+            if (Widget* previous = root.focused_widget();
+                previous != nullptr && previous != press_owner) {
+                previous->set_focused(false);
+            }
+            press_owner->set_focused(true);
+        }
         press_owner->on_pointer_down(word.pos);
     }
 }

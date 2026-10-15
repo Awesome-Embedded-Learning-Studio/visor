@@ -1,5 +1,6 @@
 #include "visor/ui/widgets/dropdown/dropdown.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -11,6 +12,7 @@
 #include "visor/bindings/events.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/draw/mono_font.hpp"
+#include "visor/ui/control_style.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/text.hpp"
 #include "visor/ui/widgets/widget.hpp"
@@ -52,11 +54,11 @@ void Dropdown::set_on_change(SelectHandler handler, void* context) noexcept {
 }
 
 int Dropdown::row_height() const noexcept {
-    return closed_bounds_.size.h;
+    return std::max(1, closed_bounds_.size.h);
 }
 
 int Dropdown::row_at(base::PointI at) const noexcept {
-    if (!open_) {
+    if (!open_ || !bounds().contains(at)) {
         return -1;
     }
     const int row = (at.y - bounds().pos.y) / row_height();
@@ -71,6 +73,7 @@ void Dropdown::set_open(bool on) noexcept {
         return; // already there, or nothing to show
     }
     open_ = on;
+    invalidate(bounds());
     if (on) {
         // Grow downward over the options; set_bounds reports both boxes, so
         // the overlap with siblings is an owed repaint, never a silent one.
@@ -139,43 +142,49 @@ void Dropdown::on_key_down(std::uint32_t code) noexcept {
 }
 
 void Dropdown::on_draw(const Painter& painter) const noexcept {
-    // The closed row: the selected label (or nothing, if none), a marker
-    // column of three shrinking rows on the right, a frame all around.
-    const canvas::Color other = ink_ == canvas::Color::On ? canvas::Color::Off : canvas::Color::On;
+    const auto fg = theme() != nullptr ? theme()->foreground : ink_;
+    const auto bg = control_background(theme(), ink_);
+    const auto corners = theme() != nullptr ? theme()->corner_radius : CornerRadius{};
+    paint_outline(painter, bounds(), fg, bg, corners);
     if (!open_) {
-        painter.fill(base::RectI{.pos = bounds().pos, .size = bounds().size}, other);
-        const base::PointI label_pos{
-            bounds().pos.x + 1,
-            bounds().pos.y + ((row_height() - static_cast<int>(font_->line_height)) / 2)};
-        if (selected_ >= 0) {
-            draw_text(painter, label_pos, *font_, labels_[selected_], ink_, 1);
-        }
-        // The marker: three rows, one pixel narrower each -- a plain arrow
-        // pointing where the list will grow.
-        for (int step = 0; step < 3; ++step) {
-            painter.fill(
-                base::RectI{
-                    .pos = base::PointI{bounds().pos.x + bounds().size.w - 4 + step,
-                                        bounds().pos.y + 1 + step},
-                    .size = base::SizeI{.w = 3 - step, .h = 1},
+        const base::RectI content{
+            .pos = {bounds().pos.x + 4, bounds().pos.y + 1},
+            .size =
+                {
+                    .w = std::max(0, bounds().size.w - 16),
+                    .h = std::max(0, bounds().size.h - 2),
                 },
-                ink_);
+        };
+        if (selected_ >= 0) {
+            draw_text_clipped(
+                painter, content,
+                {content.pos.x,
+                 bounds().pos.y + ((row_height() - static_cast<int>(font_->line_height)) / 2)},
+                *font_, labels_[selected_], fg, 1);
+        }
+        if (bounds().size.w >= 12 && bounds().size.h >= 7) {
+            const int x = bounds().pos.x + bounds().size.w - 9;
+            const int y = bounds().pos.y + (bounds().size.h / 2) - 1;
+            for (int step = 0; step < 3; ++step) {
+                painter.fill(
+                    base::RectI{.pos = {x + step, y + step}, .size = {.w = 5 - (2 * step), .h = 1}},
+                    fg);
+            }
         }
         return;
     }
-    // The open list: option rows, the highlighted one inverted.
     for (std::size_t i = 0; i < count_; ++i) {
         const int y = bounds().pos.y + (static_cast<int>(i) * row_height());
-        const bool lit = std::cmp_equal(i, highlighted_);
-        painter.fill(
-            base::RectI{
-                .pos = base::PointI{bounds().pos.x, y},
-                .size = base::SizeI{.w = bounds().size.w, .h = row_height()},
-            },
-            lit ? ink_ : other);
-        const base::PointI label_pos{
-            bounds().pos.x + 1, y + ((row_height() - static_cast<int>(font_->line_height)) / 2)};
-        draw_text(painter, label_pos, *font_, labels_[i], lit ? other : ink_, 1);
+        const bool highlighted = std::cmp_equal(i, highlighted_);
+        const base::RectI row{
+            .pos = {bounds().pos.x + 2, y + 2},
+            .size = {.w = std::max(0, bounds().size.w - 4), .h = std::max(0, row_height() - 4)},
+        };
+        painter.fill(row, highlighted ? fg : bg);
+        draw_text_clipped(
+            painter, row,
+            {row.pos.x + 2, y + ((row_height() - static_cast<int>(font_->line_height)) / 2)},
+            *font_, labels_[i], highlighted ? bg : fg, 1);
     }
 }
 

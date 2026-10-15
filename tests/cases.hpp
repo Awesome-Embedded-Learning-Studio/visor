@@ -25,4 +25,5 @@ void run_theme_tests();
 void run_ssd1306_tests();
 void run_utf8_tests();
 void run_widget_tests();
+void run_x11_host_tests();
 void run_x11_tests();

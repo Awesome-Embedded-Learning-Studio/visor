@@ -56,10 +56,13 @@ add_library(visor.host.cinux STATIC src/bindings/cinux/frame_expand.cpp
 target_link_libraries(visor.host.cinux PUBLIC visor.core)
 # The X11 binding's pure half: keysym and pointer-word translation, free of
 # XOpenDisplay so PC judgments drive it without a display. The window half --
-# XOpenDisplay, the expose-driven repaint, the Xvfb judgments -- is where
-# libX11 gets linked, in the host batch.
-add_library(visor.host.x11 STATIC src/bindings/x11/event_wire.cpp)
-target_link_libraries(visor.host.x11 PUBLIC visor.core)
+# XOpenDisplay, the expose-driven repaint, the Xvfb judgments -- links the
+# system Xlib (a system library, not a third-party dependency, the stage
+# file's own words).
+add_library(visor.host.x11 STATIC src/bindings/x11/event_wire.cpp
+                                    src/bindings/x11/x11_window_host.cpp)
+find_package(X11 REQUIRED)
+target_link_libraries(visor.host.x11 PUBLIC visor.core X11::X11)
 add_library(
     visor.ui STATIC
     src/ui/widgets/widget.cpp

@@ -83,6 +83,9 @@ target_link_libraries(visor.ui PUBLIC visor.core)
 file(GLOB_RECURSE VISOR_FORMAT_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/include/*.hpp
     ${CMAKE_SOURCE_DIR}/src/*.hpp
+    ${CMAKE_SOURCE_DIR}/src/*.cpp
+    ${CMAKE_SOURCE_DIR}/examples/*.hpp
+    ${CMAKE_SOURCE_DIR}/examples/*.cpp
     ${CMAKE_SOURCE_DIR}/tests/*.hpp
     ${CMAKE_SOURCE_DIR}/tests/*.cpp)
 
@@ -94,7 +97,8 @@ if(VISOR_CLANG_FORMAT)
 endif()
 
 file(GLOB_RECURSE VISOR_TIDY_SOURCES CONFIGURE_DEPENDS
-    ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/tests/*.cpp)
+    ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/tests/*.cpp
+    ${CMAKE_SOURCE_DIR}/examples/*.cpp)
 
 if(VISOR_CLANG_TIDY)
     add_custom_target(visor.check-tidy
@@ -112,3 +116,4 @@ endif()
 
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(examples)

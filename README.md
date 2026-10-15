@@ -20,13 +20,13 @@ visor 面向想看一个跨宿主 GUI 框架如何从零搭起来的读者。想
 - 文本。UTF-8 解码住 `base`，`MonoFont` 视图组装字模组头文件（码点二分查表、共享位块、每字模自带 advance 与偏移），`TextLayout` 游标是间距规则唯一住处，`measure_text` 与 `draw_text` 同源，换行与缺字跳过都有判例。
 - 渲染管线。绘制发生在场景坐标系的窗口里，缓冲形状由编译期条带 profile 决定，屏幕尺寸只是运行期循环参数。控件状态改变时当场申报欠画区域，`run_dirty` 一轮只重画被申报的条带，区域装不下时折叠成包围盒，保证不漏画。区域提交有整字节快路径：字节对齐时按字节搬，尾位掩码融合不殃及邻居，逐位路径留作正确性底线。
 - 取模工具 `tools/fontgen` 独立构建：子命令 `image` 把二进制 PBM（P4）图片转成与画布同款打包的 C++ 点阵数组头文件，子命令 `font` 把一张条带图按格子切成字模组头文件（码点连续标号，字距烤进格子），子命令 `bdf` 从 BDF 点阵字体（文泉驿、GNU Unifont 一类授权干净的自由字体）按码点范围切子集，比例字模自带 advance 与偏移，独立测试与命令行界面齐备。
-- 第二站已开工的纯逻辑半边（2026-10-12 拍板 SSD1306、I2C、128x64）：bindings 按宿主分目录（离屏替身与 SSD1306 各立门户），画布行主序到 GDDRAM 页主序的转换在 PC 侧先行验证，I2C 传输与初始化时序等主控板定了再动工。Cinux 宿主的 visor 侧已落地：1bpp 到 XRGB8888 的帧展开与 /dev/event0 事件翻译在 `bindings/cinux` 以 PC 判例先行验证，Cinux 链接层标准库白名单零违规（适配层在 CinuxOS 仓另批）。PC 窗口宿主线已开工（2026-10-14 拍板 X11 起步）：keysym 与指针词的事件翻译在 `bindings/x11` 以 PC 判例先行验证，X 调用半边与真窗口冒烟在后续批次。
+- 第二站已开工的纯逻辑半边（2026-10-12 拍板 SSD1306、I2C、128x64）：bindings 按宿主分目录（离屏替身与 SSD1306 各立门户），画布行主序到 GDDRAM 页主序的转换在 PC 侧先行验证，I2C 传输与初始化时序等主控板定了再动工。Cinux 宿主的 visor 侧已落地：1bpp 到 XRGB8888 的帧展开与 /dev/event0 事件翻译在 `bindings/cinux` 以 PC 判例先行验证，Cinux 链接层标准库白名单零违规（适配层在 CinuxOS 仓另批）。PC 窗口宿主线已开工（2026-10-14 拍板 X11 起步）：keysym 与指针词的事件翻译在 `bindings/x11` 以 PC 判例先行验证，`X11WindowHost`（开窗、影子帧、暴露重放、宿主表三口接 Xlib）与演示二进制 `examples/x11_window` 已落地，无头判例跑 Xvfb 读回差分，真窗口直接弹在桌面显示上（WSLg 下 `DISPLAY=:0 ./build/examples/x11_window`）。
 
 正在路上的：RGB565 彩色光栅、更多控件与布局、桌面窗口宿主、真实 OLED 与 SPI 彩屏开发板（驱动适配另线推进）、Cinux 宿主（visor 侧已落地，适配层在 CinuxOS 仓推进）。路线与每一步的待办见[待办清单](document/todo/README.md)。
 
 ## 构建与验证
 
-需要一个支持 C++23 的编译器（比如 GCC）、CMake 3.28 以上与 Ninja。clang-format、clang-tidy、Doxygen 是可选的开发工具：装了才有格式检查、静态检查与 API 文档三个目标，没装不影响 configure、构建与测试。工具版本不设卡，不同版本的检查结论可能略有出入，这是接受的漂移。
+需要一个支持 C++23 的编译器（比如 GCC）、CMake 3.28 以上与 Ninja，X11 开发库（Xlib 系统库，X11 宿主与示例链接它）。clang-format、clang-tidy、Doxygen 是可选的开发工具：装了才有格式检查、静态检查与 API 文档三个目标，没装不影响 configure、构建与测试。工具版本不设卡，不同版本的检查结论可能略有出入，这是接受的漂移。
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++
@@ -42,9 +42,18 @@ ctest --test-dir build --output-on-failure
 VISOR_CHECK_JOBS=4 scripts/checks/acceptance.sh
 ```
 
+## 黑白控件演示
+
+```bash
+DISPLAY=:0 ./build/examples/x11_window
+./build/examples/x11_window --snapshot /tmp/visor-controls.pbm
+```
+
+桌面示例使用 480×320 的单色画布、两倍显示，包含可编辑文本、复选框、滑块、单选组、下拉框，以及带文字的实心／描边按钮。纸白与夜黑主题即时切换，Tab 遍历焦点，方向键调整滑块与选项。示例字模随源码提供，不需要系统字体；嵌入式仍可自行选择画布尺寸。样式与裁剪的实现见[第二十八章](document/tutorials/28-control-polish.md)。
+
 ## 文档地图
 
-- [跟跑教程](document/tutorials/01-skeleton.md)：从空仓库到 X11 起步的二十六章正文，入口导读与逐批推进记录在[教程目录](document/tutorials/README.md)。
+- [跟跑教程](document/tutorials/01-skeleton.md)：从空仓库到 X11 窗口宿主的二十八章正文，入口导读与逐批推进记录在[教程目录](document/tutorials/README.md)。
 - [待办清单](document/todo/README.md)：按验收梯队分站的路线图，含分叉前置条件与留档决定。
 - [验收脚本 README](scripts/checks/README.md)：六道检查各自覆盖什么。
 

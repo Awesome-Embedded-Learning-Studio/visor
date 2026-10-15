@@ -18,6 +18,14 @@ bool Checkbox::checked() const noexcept {
     return checked_;
 }
 
+void Checkbox::set_checked(bool on) noexcept {
+    if (checked_ == on) {
+        return;
+    }
+    checked_ = on;
+    invalidate(bounds());
+}
+
 void Checkbox::on_pointer_down([[maybe_unused]] base::PointI at) noexcept {
     checked_ = !checked_;
     invalidate(bounds());

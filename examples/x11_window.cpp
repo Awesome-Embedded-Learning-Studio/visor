@@ -4,7 +4,6 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
-#include "visor/bindings/events.hpp"
 #include "visor/bindings/x11/x11_window_host.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
@@ -88,9 +87,7 @@ class Gallery final : public visor::ui::Widget {
             [](visor::ui::Button&, void* context) {
                 auto& gallery = *static_cast<Gallery*>(context);
                 gallery.name_.set_text("VISOR-01");
-                if (gallery.grid_.checked()) {
-                    gallery.grid_.on_key_down(visor::host::kKeyEnter);
-                }
+                gallery.grid_.set_checked(false);
                 gallery.brightness_.set_value(gallery.brightness_.max() * 65 / 100);
                 gallery.appearance_.select(0);
                 gallery.output_.select(0);

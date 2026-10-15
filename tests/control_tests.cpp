@@ -220,4 +220,21 @@ void run_control_tests() {
     visor::ui::Checkbox typed_box(left_bounds);
     typed_box.on_key_down(visor::host::kCharSpace);
     VISOR_CHECK(typed_box.checked());
+
+    // The state door: set_checked writes the mark directly and owes the
+    // redraw, while a write of the state it already holds changes nothing --
+    // the same quiet a re-selection gets from the radio group's select.
+    // Restore flows through this door, not through a synthesized key press.
+    visor::ui::Checkbox stateful(left_bounds);
+    visor::ui::DirtyRegions state_reports;
+    stateful.set_dirty_sink(&state_reports);
+    stateful.set_checked(true);
+    VISOR_CHECK(stateful.checked());
+    VISOR_CHECK_EQ(state_reports.count(), std::size_t{1});
+    stateful.set_checked(true);
+    VISOR_CHECK_EQ(state_reports.count(), std::size_t{1}); // the quiet rewrite
+    state_reports.clear();
+    stateful.set_checked(false);
+    VISOR_CHECK(!stateful.checked());
+    VISOR_CHECK_EQ(state_reports.count(), std::size_t{1}); // the flip owes its area
 }

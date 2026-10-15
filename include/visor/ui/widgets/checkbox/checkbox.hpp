@@ -20,6 +20,11 @@ class Checkbox : public Widget {
     [[nodiscard]] bool focusable() const noexcept override { return true; }
 
     [[nodiscard]] bool checked() const noexcept;
+    /// Writes the mark directly: restore flows and initial states come
+    /// through this door, not through a synthesized key press. A write of
+    /// the state already held changes nothing, the radio's quiet
+    /// re-selection.
+    void set_checked(bool on) noexcept;
     void on_pointer_down([[maybe_unused]] base::PointI at) noexcept override;
     /// Enter and Space flip the box, the keyboard's press; other codes pass.
     void on_key_down(std::uint32_t code) noexcept override;

@@ -4,6 +4,7 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/base/helpers/rect_helper.hpp"
+#include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/bindings/x11/event_wire.hpp"
@@ -151,6 +152,10 @@ HostTable X11WindowHost::table() noexcept {
     table.poll_event = &X11WindowHost::poll_event_thunk;
     table.clock_ms = &X11WindowHost::clock_thunk;
     table.context = this;
+    table.info = HostInfo{
+        .screen = base::SizeI{.w = width_, .h = height_},
+        .format = PixelFormat::Mono1,
+    };
     return table;
 }
 

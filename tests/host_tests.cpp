@@ -12,6 +12,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
@@ -40,7 +41,7 @@ void run_host_tests() {
     brush.fill(RectI{.pos = PointI{9, 2}, .size = SizeI{.w = 2, .h = 2}});
 
     OffscreenHost mirror(13, 5);
-    VISOR_CHECK(visor::host::submit_frame(mirror.table(), source));
+    VISOR_CHECK(mirror.table().submit_frame(source));
     VISOR_CHECK_EQ(mirror.flush_count(), 1);
     VISOR_CHECK_EQ(mirror.rejected_count(), 0);
     for (int y = 0; y < 5; ++y) {
@@ -51,15 +52,15 @@ void run_host_tests() {
 
     // A second submission counts; an empty table is refused without a crash
     // and without touching any counter.
-    VISOR_CHECK(visor::host::submit_frame(mirror.table(), source));
+    VISOR_CHECK(mirror.table().submit_frame(source));
     VISOR_CHECK_EQ(mirror.flush_count(), 2);
     const HostTable empty_table{};
-    VISOR_CHECK(!visor::host::submit_frame(empty_table, source));
+    VISOR_CHECK(!empty_table.submit_frame(source));
     VISOR_CHECK_EQ(mirror.flush_count(), 2);
 
     // A differently shaped host refuses the frame and keeps its own pixels dark.
     OffscreenHost smaller(12, 5);
-    VISOR_CHECK(visor::host::submit_frame(smaller.table(), source));
+    VISOR_CHECK(smaller.table().submit_frame(source));
     VISOR_CHECK_EQ(smaller.rejected_count(), 1);
     VISOR_CHECK_EQ(smaller.flush_count(), 0);
     VISOR_CHECK_EQ(smaller.get((PointI{0, 0})), false);
@@ -88,10 +89,13 @@ void run_host_tests() {
     // Ch2 entries on a bare table: poll reports no event, the clock reads zero,
     // and neither crashes — the same stance as an empty flush entry.
     const HostTable bare{};
+    VISOR_CHECK_EQ(bare.info.screen.w, 0);
+    VISOR_CHECK_EQ(bare.info.screen.h, 0);
+    VISOR_CHECK_EQ(bare.info.format, visor::host::PixelFormat::Mono1);
     visor::host::Event polled{};
-    VISOR_CHECK(!visor::host::try_poll_event(bare, polled));
-    VISOR_CHECK_EQ(visor::host::current_time_ms(bare), 0U);
-    VISOR_CHECK(!visor::host::has_clock(bare));
+    VISOR_CHECK(!bare.poll(polled));
+    VISOR_CHECK_EQ(bare.now_ms(), 0U);
+    VISOR_CHECK(!bare.has_clock());
 
     // Ch2 feed: six events in, the same six out in order, each carrying its
     // own fields. Everything crosses the table, the only channel the core sees.
@@ -99,8 +103,11 @@ void run_host_tests() {
     const HostTable fed = feeder.table();
     VISOR_CHECK(fed.poll_event != nullptr);
     VISOR_CHECK(fed.clock_ms != nullptr);
-    VISOR_CHECK(visor::host::has_clock(fed));
-    VISOR_CHECK_EQ(visor::host::current_time_ms(fed), 0U);
+    VISOR_CHECK(fed.has_clock());
+    VISOR_CHECK_EQ(fed.info.screen.w, 4);
+    VISOR_CHECK_EQ(fed.info.screen.h, 4);
+    VISOR_CHECK_EQ(fed.info.format, visor::host::PixelFormat::Mono1);
+    VISOR_CHECK_EQ(fed.now_ms(), 0U);
     VISOR_CHECK(feeder.push_event(visor::host::KeyDown{.code = 30}));
     VISOR_CHECK(feeder.push_event(visor::host::PointerMove{.pos = PointI{5, 6}}));
     VISOR_CHECK(feeder.push_event(visor::host::PointerDown{.button = 1, .pos = PointI{7, 8}}));
@@ -113,24 +120,24 @@ void run_host_tests() {
         .modifiers = visor::host::Modifiers{.ctrl = true},
     }));
 
-    VISOR_CHECK(visor::host::try_poll_event(fed, polled));
+    VISOR_CHECK(fed.poll(polled));
     VISOR_CHECK(std::holds_alternative<visor::host::KeyDown>(polled));
     VISOR_CHECK_EQ(std::get<visor::host::KeyDown>(polled).code, 30U);
-    VISOR_CHECK(visor::host::try_poll_event(fed, polled));
+    VISOR_CHECK(fed.poll(polled));
     VISOR_CHECK(std::holds_alternative<visor::host::PointerMove>(polled));
     VISOR_CHECK_EQ(std::get<visor::host::PointerMove>(polled).pos, (PointI{5, 6}));
-    VISOR_CHECK(visor::host::try_poll_event(fed, polled));
+    VISOR_CHECK(fed.poll(polled));
     VISOR_CHECK(std::holds_alternative<visor::host::PointerDown>(polled));
     VISOR_CHECK_EQ(std::get<visor::host::PointerDown>(polled).button, 1U);
     VISOR_CHECK_EQ(std::get<visor::host::PointerDown>(polled).pos, (PointI{7, 8}));
-    VISOR_CHECK(visor::host::try_poll_event(fed, polled));
+    VISOR_CHECK(fed.poll(polled));
     VISOR_CHECK(std::holds_alternative<visor::host::KeyUp>(polled));
     VISOR_CHECK_EQ(std::get<visor::host::KeyUp>(polled).code, 30U);
-    VISOR_CHECK(visor::host::try_poll_event(fed, polled));
+    VISOR_CHECK(fed.poll(polled));
     VISOR_CHECK(std::holds_alternative<visor::host::PointerUp>(polled));
     VISOR_CHECK_EQ(std::get<visor::host::PointerUp>(polled).button, 1U);
     VISOR_CHECK_EQ(std::get<visor::host::PointerUp>(polled).pos, (PointI{7, 8}));
-    VISOR_CHECK(visor::host::try_poll_event(fed, polled));
+    VISOR_CHECK(fed.poll(polled));
     VISOR_CHECK(std::holds_alternative<visor::host::PointerWheel>(polled));
     VISOR_CHECK_EQ(std::get<visor::host::PointerWheel>(polled).dx, 1);
     VISOR_CHECK_EQ(std::get<visor::host::PointerWheel>(polled).dy, -2);
@@ -138,16 +145,16 @@ void run_host_tests() {
     VISOR_CHECK(std::get<visor::host::PointerWheel>(polled).modifiers.ctrl);
 
     // Drained queue: poll refuses, the host keeps answering.
-    VISOR_CHECK(!visor::host::try_poll_event(fed, polled));
+    VISOR_CHECK(!fed.poll(polled));
 
     // Wraparound: park the scripted clock next to the top of its range, let it
     // cross the boundary, and read the duration by unsigned subtraction, the
     // only way the ch2 contract allows.
     feeder.advance_ms(0xFFFF'FFFF'FFFF'0000ULL);
-    VISOR_CHECK_EQ(visor::host::current_time_ms(fed), 0xFFFF'FFFF'FFFF'0000ULL);
+    VISOR_CHECK_EQ(fed.now_ms(), 0xFFFF'FFFF'FFFF'0000ULL);
     feeder.advance_ms(0x1000ULL);
     const std::uint64_t then = 0xFFFF'FFFF'FFFF'0000ULL;
-    const std::uint64_t now = visor::host::current_time_ms(fed);
+    const std::uint64_t now = fed.now_ms();
     VISOR_CHECK_EQ(now - then, 0x1000ULL);
 
     // Full feed: a sixteen-slot ring holds fifteen (one slot stays empty), the
@@ -161,10 +168,10 @@ void run_host_tests() {
     VISOR_CHECK(!crowded.push_event(visor::host::KeyDown{.code = 99}));
     VISOR_CHECK_EQ(crowded.dropped_event_count(), 1);
     for (std::uint32_t i = 0; i < OffscreenHost::kFeedCapacity - 1U; ++i) {
-        VISOR_CHECK(visor::host::try_poll_event(busy, polled));
+        VISOR_CHECK(busy.poll(polled));
         VISOR_CHECK_EQ(std::get<visor::host::KeyDown>(polled).code, i);
     }
-    VISOR_CHECK(!visor::host::try_poll_event(busy, polled));
+    VISOR_CHECK(!busy.poll(polled));
 
     // The byte-aligned fast path: a region starting on a byte boundary lands
     // byte for byte. The source is a canvas of the region's own shape, and a
@@ -178,9 +185,9 @@ void run_host_tests() {
         patch_brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 12, .h = 1}});
         patch_brush.plot(PointI{5, 1});
         OffscreenHost wide(24, 4);
-        VISOR_CHECK(visor::host::submit_region(
-            wide.table(), RectI{.pos = PointI{8, 1}, .size = SizeI{.w = 12, .h = 2}},
-            patch.pixels().data(), Patch::kStrideBytes));
+        VISOR_CHECK(
+            wide.table().submit_region(RectI{.pos = PointI{8, 1}, .size = SizeI{.w = 12, .h = 2}},
+                                       patch.pixels().data(), Patch::kStrideBytes));
         VISOR_CHECK_EQ(wide.flush_count(), 1);
         for (int y = 0; y < 2; ++y) {
             for (int x = 0; x < 12; ++x) {
@@ -206,10 +213,10 @@ void run_host_tests() {
         Full ground;
         const Pen ground_brush{ground, true};
         ground_brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 16, .h = 1}});
-        VISOR_CHECK(visor::host::submit_frame(lit.table(), ground)); // all lit
-        VISOR_CHECK(visor::host::submit_region(
-            lit.table(), RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}},
-            bar.pixels().data(), Half::kStrideBytes));
+        VISOR_CHECK(lit.table().submit_frame(ground)); // all lit
+        VISOR_CHECK(
+            lit.table().submit_region(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}},
+                                      bar.pixels().data(), Half::kStrideBytes));
         // The bar is all lit too, so every pixel stays lit: the assertion is
         // not about ink, it is about the tail bits at x 10..15 surviving an
         // overwrite whose source byte is zero there.
@@ -220,10 +227,10 @@ void run_host_tests() {
         // source, only x 0..9 may change.
         Half dark;
         OffscreenHost second(16, 1);
-        VISOR_CHECK(visor::host::submit_frame(second.table(), ground));
-        VISOR_CHECK(visor::host::submit_region(
-            second.table(), RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}},
-            dark.pixels().data(), Half::kStrideBytes));
+        VISOR_CHECK(second.table().submit_frame(ground));
+        VISOR_CHECK(
+            second.table().submit_region(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}},
+                                         dark.pixels().data(), Half::kStrideBytes));
         for (int x = 0; x < 10; ++x) {
             VISOR_CHECK_EQ(second.get(PointI{x, 0}), false);
         }
@@ -240,9 +247,9 @@ void run_host_tests() {
         mark_brush.plot(PointI{0, 0});
         mark_brush.plot(PointI{4, 1});
         OffscreenHost odd(13, 5);
-        VISOR_CHECK(visor::host::submit_region(
-            odd.table(), RectI{.pos = PointI{3, 2}, .size = SizeI{.w = 5, .h = 2}},
-            mark.pixels().data(), Sliver::kStrideBytes));
+        VISOR_CHECK(
+            odd.table().submit_region(RectI{.pos = PointI{3, 2}, .size = SizeI{.w = 5, .h = 2}},
+                                      mark.pixels().data(), Sliver::kStrideBytes));
         VISOR_CHECK(odd.get(PointI{3, 2}) == true);
         VISOR_CHECK(odd.get(PointI{7, 3}) == true);
         VISOR_CHECK(odd.get(PointI{4, 2}) == false);

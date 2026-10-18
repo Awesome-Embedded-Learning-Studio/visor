@@ -2,6 +2,7 @@
 
 #include "visor/base/containers/ring_queue.hpp"
 #include "visor/base/geometry/point.hpp"
+#include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 

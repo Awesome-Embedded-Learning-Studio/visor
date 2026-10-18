@@ -36,8 +36,7 @@ void render_window(const Widget& root, CanvasT& buffer, base::RectI window,
     const Theme& scheme = root.theme() != nullptr ? *root.theme() : kLightTheme;
     const CanvasPainter<CanvasT> painter{buffer, window, scheme};
     root.draw(painter);
-    static_cast<void>(
-        host::submit_region(host, window, buffer.pixels().data(), CanvasT::kStrideBytes));
+    static_cast<void>(host.submit_region(window, buffer.pixels().data(), CanvasT::kStrideBytes));
 }
 
 /**
@@ -110,9 +109,9 @@ template <typename CanvasT>
 [[nodiscard]] int run_dirty(const host::HostTable& host, Widget& root, InputRouter& input,
                             CanvasT& strip, base::SizeI screen, DirtyRegions& dirty) noexcept {
     int consumed = 0;
-    const std::uint64_t now_ms = host::current_time_ms(host);
+    const std::uint64_t now_ms = host.now_ms();
     host::Event event;
-    while (host::try_poll_event(host, event)) {
+    while (host.poll(event)) {
         ++consumed;
         dispatch_event(root, input, event, now_ms);
         if (std::holds_alternative<host::KeyDown>(event) ||
@@ -145,9 +144,9 @@ template <typename CanvasT>
 [[nodiscard]] int run_once(const host::HostTable& host, Widget& root, InputRouter& input,
                            CanvasT& frame) noexcept {
     int consumed = 0;
-    const std::uint64_t now_ms = host::current_time_ms(host);
+    const std::uint64_t now_ms = host.now_ms();
     host::Event event;
-    while (host::try_poll_event(host, event)) {
+    while (host.poll(event)) {
         ++consumed;
         dispatch_event(root, input, event, now_ms);
         if (std::holds_alternative<host::KeyDown>(event) ||

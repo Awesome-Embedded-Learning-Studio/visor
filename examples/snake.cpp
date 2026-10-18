@@ -969,10 +969,10 @@ int main(int argc, char* const* argv) {
 
     std::println(
         "visor: snake; arrows turn, Space pauses, Enter restarts, I inverts; close with X");
-    auto last = visor::host::current_time_ms(host.table());
+    auto last = host.table().now_ms();
     std::uint64_t frames = 0;
     while (!host.close_requested()) {
-        const auto now = visor::host::current_time_ms(host.table());
+        const auto now = host.table().now_ms();
         std::uint64_t dt = now - last;
         last = now;
         dt = std::min<std::uint64_t>(dt, 100);

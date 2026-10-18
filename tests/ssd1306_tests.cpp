@@ -3,7 +3,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
-#include "visor/bindings/host.hpp"
+#include "visor/bindings/display.hpp"
 #include "visor/bindings/ssd1306/page_buffer.hpp"
 
 #include <array>

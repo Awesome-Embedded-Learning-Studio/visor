@@ -1,10 +1,12 @@
 #include "visor/bindings/offscreen/offscreen_host.hpp"
 
+#include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 
 #include "visor/base/bit_ops/bitmask.hpp"
 #include "visor/base/geometry/point.hpp"
+#include "visor/base/geometry/size.hpp"
 #include "visor/canvas/mono_canvas.hpp"
 
 #include <cstddef>
@@ -31,6 +33,11 @@ HostTable OffscreenHost::table() noexcept {
         .poll_event = &OffscreenHost::poll_event_thunk,
         .clock_ms = &OffscreenHost::clock_thunk,
         .context = this,
+        .info =
+            HostInfo{
+                .screen = base::SizeI{.w = width_, .h = height_},
+                .format = PixelFormat::Mono1,
+            },
     };
 }
 

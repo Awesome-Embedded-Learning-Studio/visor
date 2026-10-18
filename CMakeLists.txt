@@ -83,6 +83,7 @@ add_library(
     src/ui/widgets/dropdown/dropdown.cpp
     src/ui/dirty_regions.cpp
     src/ui/input_router.cpp
+    src/ui/popup_layer.cpp
     src/ui/text.cpp)
 target_link_libraries(visor.ui PUBLIC visor.core)
 

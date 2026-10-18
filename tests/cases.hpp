@@ -19,6 +19,7 @@ void run_id_session_tests();
 void run_layout_tests();
 void run_pen_tests();
 void run_point_tests();
+void run_popup_tests();
 void run_rect_tests();
 void run_render_tests();
 void run_ring_queue_tests();

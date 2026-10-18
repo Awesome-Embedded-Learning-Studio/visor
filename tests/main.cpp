@@ -19,6 +19,7 @@ int main() {
     run_layout_tests();
     run_pen_tests();
     run_point_tests();
+    run_popup_tests();
     run_rect_tests();
     run_render_tests();
     run_ring_queue_tests();

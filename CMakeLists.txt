@@ -54,6 +54,11 @@ target_link_libraries(visor.host.offscreen PUBLIC visor.host)
 add_library(visor.host.cinux STATIC src/bindings/cinux/frame_expand.cpp
                                     src/bindings/cinux/event_wire.cpp)
 target_link_libraries(visor.host.cinux PUBLIC visor.core)
+# The evdev binding's pure half: Linux input words to core events, no
+# /dev/input open or ioctl. The adapter that reads the device and clocks
+# the host links this in.
+add_library(visor.host.evdev STATIC src/bindings/evdev/event_wire.cpp)
+target_link_libraries(visor.host.evdev PUBLIC visor.core)
 # The X11 binding's pure half: keysym and pointer-word translation, free of
 # XOpenDisplay so PC judgments drive it without a display. The window half --
 # XOpenDisplay, the expose-driven repaint, the Xvfb judgments -- links the

@@ -21,25 +21,25 @@ namespace visor::ui {
  */
 class Painter {
   public:
-    /// Fills a half-open rectangle with one color; out-of-frame parts clip silently.
-    virtual void fill(base::RectI area, canvas::Color ink) const noexcept = 0;
-    /// Paints a single pixel; a point outside the frame is dropped silently.
-    virtual void plot(base::PointI at, canvas::Color ink) const noexcept = 0;
+    /// Fills a half-open rectangle with one color role; out-of-frame parts clip silently.
+    virtual void fill(base::RectI area, canvas::ColorRole role) const noexcept = 0;
+    /// Paints a single pixel in one color role; a point outside the frame is dropped silently.
+    virtual void plot(base::PointI at, canvas::ColorRole role) const noexcept = 0;
     /// Blits a packed 1bpp bitmap: every lit source pixel becomes a scale x
-    /// scale block of ink, dark pixels paint nothing (this is ink transfer,
-    /// not area overwrite — erasing around a bitmap is the caller's fill).
-    /// Parts outside the frame clip silently. scale < 1 clamps to 1. The
-    /// scale is explicit at every call site on purpose: a default argument on
-    /// a virtual would bind to the static type's declaration, so the seam
+    /// scale block of the role's ink, dark pixels paint nothing (this is ink
+    /// transfer, not area overwrite — erasing around a bitmap is the caller's
+    /// fill). Parts outside the frame clip silently. scale < 1 clamps to 1.
+    /// The scale is explicit at every call site on purpose: a default argument
+    /// on a virtual would bind to the static type's declaration, so the seam
     /// keeps none.
-    virtual void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::Color ink,
-                             int scale) const noexcept = 0;
+    virtual void draw_bitmap(base::PointI at, const draw::MonoBitmap& source,
+                             canvas::ColorRole role, int scale) const noexcept = 0;
     /// Fills a rectangle with its corners rounded per radius: every row
     /// paints one span, the span's insets follow the corner discs (a pixel
     /// in a corner's zone stays dark when its corner point lies outside the
     /// quarter disc). Radius zero is the plain fill, an oversized radius
     /// clamps into a capsule, parts outside the frame clip silently.
-    virtual void fill_rounded(base::RectI area, canvas::Color ink,
+    virtual void fill_rounded(base::RectI area, canvas::ColorRole role,
                               const CornerRadius& radius) const noexcept = 0;
 
   protected:

@@ -144,6 +144,21 @@ void run_cinux_tests() {
             VISOR_CHECK(key != nullptr);
             VISOR_CHECK_EQ(key->code, static_cast<std::uint32_t>('h'));
         }
+        // The wire's three flags ride the key word as named modifiers.
+        wire.key.shift = true;
+        wire.key.ctrl = true;
+        const auto shifted = visor::host::cinux::translate_event(wire);
+        VISOR_CHECK(shifted.has_value());
+        if (shifted.has_value()) {
+            const auto* key = std::get_if<visor::host::KeyDown>(&*shifted);
+            VISOR_CHECK(key != nullptr);
+            VISOR_CHECK(key->modifiers.shift);
+            VISOR_CHECK(key->modifiers.ctrl);
+            VISOR_CHECK(!key->modifiers.alt);
+            VISOR_CHECK(!key->modifiers.super);
+        }
+        wire.key.shift = false;
+        wire.key.ctrl = false;
         // A scancode-only arrow lands on the core's named, out-of-band value.
         wire.key = {
             .ascii = 0,

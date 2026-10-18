@@ -5,7 +5,6 @@
 
 #include "visor/base/bit_ops/bitmask.hpp"
 #include "visor/base/geometry/point.hpp"
-#include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
 
 #include <cstddef>
@@ -157,16 +156,15 @@ std::uint64_t OffscreenHost::clock_thunk(void* context) noexcept {
     return static_cast<OffscreenHost*>(context)->now_ms_;
 }
 
-canvas::Color OffscreenHost::get(base::PointI p) const noexcept {
+bool OffscreenHost::get(base::PointI p) const noexcept {
     if (p.x < 0 || p.y < 0 || p.x >= width_ || p.y >= height_) {
-        return canvas::Color::Off;
+        return false;
     }
     const auto x = static_cast<std::size_t>(p.x);
     const auto y = static_cast<std::size_t>(p.y);
     const std::size_t stride = (static_cast<std::size_t>(width_) + 7) / 8;
     const base::bit::BitMask<std::uint8_t> word{frame_[(y * stride) + (x / 8)]};
-    const bool on = word.has(base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(x)));
-    return on ? canvas::Color::On : canvas::Color::Off;
+    return word.has(base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(x)));
 }
 
 bool OffscreenHost::save_pbm(std::string_view path) const noexcept {

@@ -13,16 +13,16 @@
 namespace visor::ui {
 
 void draw_text(const Painter& painter, base::PointI at, const draw::MonoFont& font,
-               std::string_view utf8, canvas::Color ink, int scale) noexcept {
+               std::string_view utf8, canvas::ColorRole role, int scale) noexcept {
     draw::TextLayout layout{font, utf8, scale};
     while (const auto placement = layout.next()) {
         painter.draw_bitmap(base::PointI{at.x + placement->pos.x, at.y + placement->pos.y},
-                            font.bitmap(*placement->glyph), ink, draw::TextLayout::clamped(scale));
+                            font.bitmap(*placement->glyph), role, draw::TextLayout::clamped(scale));
     }
 }
 
 void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at,
-                       const draw::MonoFont& font, std::string_view utf8, canvas::Color ink,
+                       const draw::MonoFont& font, std::string_view utf8, canvas::ColorRole role,
                        int scale) noexcept {
     const int factor = draw::TextLayout::clamped(scale);
     draw::TextLayout layout{font, utf8, factor};
@@ -41,7 +41,7 @@ void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at
             continue;
         }
         if (visible == area) {
-            painter.draw_bitmap(area.pos, bitmap, ink, factor);
+            painter.draw_bitmap(area.pos, bitmap, role, factor);
             continue;
         }
         // Only boundary glyphs need per-pixel clipping; interior glyphs blit directly.
@@ -56,7 +56,7 @@ void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at
                             },
                         .size = {.w = factor, .h = factor},
                     };
-                    painter.fill(base::intersect(pixel, clip), ink);
+                    painter.fill(base::intersect(pixel, clip), role);
                 }
             }
         }

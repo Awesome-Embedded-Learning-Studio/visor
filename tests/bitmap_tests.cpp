@@ -18,7 +18,7 @@ using visor::base::PointI;
 using visor::base::RectI;
 using visor::base::SizeI;
 using visor::canvas::Canvas;
-using visor::canvas::Color;
+using visor::canvas::ColorRole;
 using visor::draw::MonoBitmap;
 using visor::ui::CanvasPainter;
 
@@ -67,14 +67,14 @@ constexpr MonoBitmap kDiagonal{
 void diagonal_at_scale_one_lands_pixel_per_bit() {
     Canvas<SizeI{.w = 16, .h = 16}> canvas;
     const CanvasPainter painter{canvas};
-    painter.draw_bitmap(PointI{2, 3}, kDiagonal, Color::On, 1);
+    painter.draw_bitmap(PointI{2, 3}, kDiagonal, ColorRole::Foreground, 1);
     for (std::size_t step = 0; step < 8; ++step) {
         VISOR_CHECK(canvas.get(PointI{2 + static_cast<int>(step), 3 + static_cast<int>(step)}) ==
-                    Color::On);
+                    true);
     }
-    VISOR_CHECK(canvas.get(PointI{3, 3}) == Color::Off);
-    VISOR_CHECK(canvas.get(PointI{2, 4}) == Color::Off);
-    VISOR_CHECK(canvas.get(PointI{10, 10}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{3, 3}) == false);
+    VISOR_CHECK(canvas.get(PointI{2, 4}) == false);
+    VISOR_CHECK(canvas.get(PointI{10, 10}) == false);
 }
 
 void scale_two_grows_one_bit_into_a_block() {
@@ -84,37 +84,37 @@ void scale_two_grows_one_bit_into_a_block() {
     // lanes dark.
     Canvas<SizeI{.w = 16, .h = 16}> canvas;
     const CanvasPainter painter{canvas};
-    painter.draw_bitmap(PointI{0, 0}, kDiagonal, Color::On, 2);
+    painter.draw_bitmap(PointI{0, 0}, kDiagonal, ColorRole::Foreground, 2);
     for (std::size_t step = 0; step < 8; ++step) {
         const int x = 2 * static_cast<int>(step);
         const int y = x;
-        VISOR_CHECK(canvas.get(PointI{x, y}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{x + 1, y}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{x, y + 1}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{x + 1, y + 1}) == Color::On);
+        VISOR_CHECK(canvas.get(PointI{x, y}) == true);
+        VISOR_CHECK(canvas.get(PointI{x + 1, y}) == true);
+        VISOR_CHECK(canvas.get(PointI{x, y + 1}) == true);
+        VISOR_CHECK(canvas.get(PointI{x + 1, y + 1}) == true);
     }
     // Between two diagonal blocks: x=1,y=2 belongs to no lit source pixel.
-    VISOR_CHECK(canvas.get(PointI{1, 2}) == Color::Off);
-    VISOR_CHECK(canvas.get(PointI{2, 1}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{1, 2}) == false);
+    VISOR_CHECK(canvas.get(PointI{2, 1}) == false);
 }
 
 void dark_pixels_paint_nothing() {
     // Ink transfer, not area overwrite: pre-lit canvas stays lit wherever the
     // bitmap is dark, so erasing around a bitmap is the caller's fill.
     Canvas<SizeI{.w = 16, .h = 16}> canvas;
-    canvas.set_clear(Color::On);
+    canvas.set_clear(true);
     const CanvasPainter painter{canvas};
-    painter.draw_bitmap(PointI{4, 4}, kDiagonal, Color::Off, 1);
+    painter.draw_bitmap(PointI{4, 4}, kDiagonal, ColorRole::Background, 1);
     // The dark majority of the glyph box keeps the canvas ink: (6, 4) and
     // (11, 4) sit inside the box but off the diagonal.
-    VISOR_CHECK(canvas.get(PointI{5, 4}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{4, 5}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{6, 4}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{11, 4}) == Color::On);
+    VISOR_CHECK(canvas.get(PointI{5, 4}) == true);
+    VISOR_CHECK(canvas.get(PointI{4, 5}) == true);
+    VISOR_CHECK(canvas.get(PointI{6, 4}) == true);
+    VISOR_CHECK(canvas.get(PointI{11, 4}) == true);
     // Exactly the diagonal carries the stroke's ink.
     for (std::size_t step = 0; step < 8; ++step) {
         VISOR_CHECK(canvas.get(PointI{4 + static_cast<int>(step), 4 + static_cast<int>(step)}) ==
-                    Color::Off);
+                    false);
     }
 }
 
@@ -123,11 +123,11 @@ void canvas_edge_clips_silently() {
     // glyph fits, the rest names pixels the canvas does not have.
     Canvas<SizeI{.w = 16, .h = 16}> canvas;
     const CanvasPainter painter{canvas};
-    painter.draw_bitmap(PointI{14, 14}, kDiagonal, Color::On, 1);
-    VISOR_CHECK(canvas.get(PointI{14, 14}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{15, 15}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{15, 14}) == Color::Off);
-    VISOR_CHECK(canvas.get(PointI{14, 15}) == Color::Off);
+    painter.draw_bitmap(PointI{14, 14}, kDiagonal, ColorRole::Foreground, 1);
+    VISOR_CHECK(canvas.get(PointI{14, 14}) == true);
+    VISOR_CHECK(canvas.get(PointI{15, 15}) == true);
+    VISOR_CHECK(canvas.get(PointI{15, 14}) == false);
+    VISOR_CHECK(canvas.get(PointI{14, 15}) == false);
 }
 
 void window_translates_and_clips() {
@@ -137,20 +137,20 @@ void window_translates_and_clips() {
     Canvas<SizeI{.w = 16, .h = 16}> canvas;
     const RectI window{.pos = PointI{2, 2}, .size = SizeI{.w = 8, .h = 8}};
     const CanvasPainter painter{canvas, window};
-    painter.draw_bitmap(PointI{5, 4}, kDiagonal, Color::On, 1);
+    painter.draw_bitmap(PointI{5, 4}, kDiagonal, ColorRole::Foreground, 1);
     // Scene (5,4) is buffer (3,2): diagonal steps land at buffer
     // (3+step, 2+step). The window spans scene x in [2,10), so of the eight
     // steps only five fit (x = 5..9); steps five to seven name columns the
     // window does not store.
     for (std::size_t step = 0; step < 5; ++step) {
         VISOR_CHECK(canvas.get(PointI{3 + static_cast<int>(step), 2 + static_cast<int>(step)}) ==
-                    Color::On);
+                    true);
     }
-    VISOR_CHECK(canvas.get(PointI{8, 7}) == Color::Off);
-    VISOR_CHECK(canvas.get(PointI{9, 8}) == Color::Off);
-    VISOR_CHECK(canvas.get(PointI{10, 9}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{8, 7}) == false);
+    VISOR_CHECK(canvas.get(PointI{9, 8}) == false);
+    VISOR_CHECK(canvas.get(PointI{10, 9}) == false);
     // And nothing leaked into the untouched rows below the window.
-    VISOR_CHECK(canvas.get(PointI{3, 10}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{3, 10}) == false);
 }
 
 void strip_replay_matches_full_frame() {
@@ -158,9 +158,9 @@ void strip_replay_matches_full_frame() {
     // replays hit a glyph several times (at scale two even inside one strip),
     // and the two frames must agree pixel for pixel.
     const auto paint_scene = [](const auto& painter) {
-        painter.draw_bitmap(PointI{3, 2}, kChevron, Color::On, 1);
-        painter.draw_bitmap(PointI{5, 8}, kDiagonal, Color::On, 2);
-        painter.draw_bitmap(PointI{0, 0}, kChevron, Color::Off, 1);
+        painter.draw_bitmap(PointI{3, 2}, kChevron, ColorRole::Foreground, 1);
+        painter.draw_bitmap(PointI{5, 8}, kDiagonal, ColorRole::Foreground, 2);
+        painter.draw_bitmap(PointI{0, 0}, kChevron, ColorRole::Background, 1);
     };
     Canvas<SizeI{.w = 16, .h = 16}> whole;
     paint_scene(CanvasPainter<Canvas<SizeI{.w = 16, .h = 16}>>{whole});
@@ -188,9 +188,9 @@ void clamp_and_default_scale() {
     // clamps to one rather than painting nothing or dividing by anything.
     Canvas<SizeI{.w = 16, .h = 16}> canvas;
     const CanvasPainter painter{canvas};
-    painter.draw_bitmap(PointI{0, 0}, kDiagonal, Color::On, 0);
-    VISOR_CHECK(canvas.get(PointI{0, 0}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{1, 0}) == Color::Off);
+    painter.draw_bitmap(PointI{0, 0}, kDiagonal, ColorRole::Foreground, 0);
+    VISOR_CHECK(canvas.get(PointI{0, 0}) == true);
+    VISOR_CHECK(canvas.get(PointI{1, 0}) == false);
 }
 
 } // namespace

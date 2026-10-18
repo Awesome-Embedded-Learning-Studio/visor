@@ -36,18 +36,29 @@ namespace {
 using visor::base::PointI;
 using visor::base::RectI;
 using visor::base::SizeI;
-using visor::canvas::Color;
+using visor::canvas::ColorRole;
+using visor::canvas::Ink;
 using visor::examples::kDemoFont;
 constexpr SizeI kScreen{.w = 480, .h = 320};
 constexpr RectI kScreenBounds{.pos = {0, 0}, .size = kScreen};
 constexpr visor::ui::Theme kPaper{
-    .background = Color::On,
-    .foreground = Color::Off,
+    .background = Ink::white(),
+    .foreground = Ink::black(),
+    .muted = Ink::black(),
+    .accent = Ink::black(),
+    .on_accent = Ink::white(),
+    .border = Ink::black(),
+    .disabled = Ink::black(),
     .corner_radius = {.top_left = 3, .top_right = 3, .bottom_right = 3, .bottom_left = 3},
 };
 constexpr visor::ui::Theme kNight{
-    .background = Color::Off,
-    .foreground = Color::On,
+    .background = Ink::black(),
+    .foreground = Ink::white(),
+    .muted = Ink::white(),
+    .accent = Ink::white(),
+    .on_accent = Ink::black(),
+    .border = Ink::white(),
+    .disabled = Ink::white(),
     .corner_radius = {.top_left = 3, .top_right = 3, .bottom_right = 3, .bottom_left = 3},
 };
 
@@ -109,8 +120,8 @@ class Gallery final : public visor::ui::Widget {
 
   protected:
     void on_draw(const visor::ui::Painter& painter) const noexcept override {
-        const auto fg = theme()->foreground;
-        const auto bg = theme()->background;
+        const auto fg = ColorRole::Foreground;
+        const auto bg = ColorRole::Background;
         painter.fill(bounds(), bg);
         const auto text = [&](PointI at, std::string_view words, int scale = 1) {
             visor::ui::draw_text(painter, at, kDemoFont, words, fg, scale);
@@ -123,10 +134,12 @@ class Gallery final : public visor::ui::Widget {
         text({24, 87}, "DISPLAY SETTINGS");
         text({336, 87}, "BLACK. WHITE. DONE.");
         visor::ui::paint_outline(
-            painter, {.pos = {22, 108}, .size = {.w = 278, .h = 154}}, fg, bg,
+            painter, {.pos = {22, 108}, .size = {.w = 278, .h = 154}}, ColorRole::Border,
+            ColorRole::Background,
             {.top_left = 4, .top_right = 4, .bottom_right = 4, .bottom_left = 4});
         visor::ui::paint_outline(
-            painter, {.pos = {312, 108}, .size = {.w = 146, .h = 154}}, fg, bg,
+            painter, {.pos = {312, 108}, .size = {.w = 146, .h = 154}}, ColorRole::Border,
+            ColorRole::Background,
             {.top_left = 4, .top_right = 4, .bottom_right = 4, .bottom_left = 4});
         text({36, 121}, "DEVICE NAME");
         text({57, 181}, "ENABLE PIXEL GRID");
@@ -148,16 +161,14 @@ class Gallery final : public visor::ui::Widget {
     }
 
   private:
-    visor::ui::TextBox name_{RectI{.pos = {36, 137}, .size = {.w = 250, .h = 23}}, kDemoFont,
-                             Color::Off};
+    visor::ui::TextBox name_{RectI{.pos = {36, 137}, .size = {.w = 250, .h = 23}}, kDemoFont};
     visor::ui::Checkbox grid_{RectI{.pos = {34, 176}, .size = {.w = 17, .h = 17}}};
     visor::ui::Slider brightness_{RectI{.pos = {36, 229}, .size = {.w = 192, .h = 17}}};
     visor::ui::RadioGroup appearance_{RectI{.pos = {324, 137}, .size = {.w = 120, .h = 30}},
-                                      kDemoFont, Color::Off};
+                                      kDemoFont};
     visor::ui::Button reset_{RectI{.pos = {252, 277}, .size = {.w = 82, .h = 23}}};
     visor::ui::Button apply_{RectI{.pos = {346, 277}, .size = {.w = 112, .h = 23}}};
-    visor::ui::Dropdown output_{RectI{.pos = {326, 212}, .size = {.w = 118, .h = 23}}, kDemoFont,
-                                Color::Off};
+    visor::ui::Dropdown output_{RectI{.pos = {326, 212}, .size = {.w = 118, .h = 23}}, kDemoFont};
     std::string_view status_ = "READY WHEN YOU ARE.";
 };
 } // namespace
@@ -172,7 +183,7 @@ int main(int argc, char* const* argv) {
     // This exact scene can also be inspected without an X server.
     if (argc == 3 && std::strcmp(argv[1], "--snapshot") == 0) {
         Frame frame;
-        panel.draw(visor::ui::CanvasPainter{frame});
+        panel.draw(visor::ui::CanvasPainter{frame, *panel.theme()});
         auto* file = std::fopen(argv[2], "wb");
         if (file == nullptr) {
             return 1;

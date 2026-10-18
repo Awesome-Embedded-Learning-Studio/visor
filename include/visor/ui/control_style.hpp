@@ -22,18 +22,11 @@ namespace visor::ui {
     };
 }
 
-[[nodiscard]] constexpr canvas::Color control_background(const Theme* theme,
-                                                         canvas::Color ink) noexcept {
-    if (theme != nullptr) {
-        return theme->background;
-    }
-    return ink == canvas::Color::On ? canvas::Color::Off : canvas::Color::On;
-}
-
-inline void paint_outline(const Painter& painter, base::RectI area, canvas::Color fg,
-                          canvas::Color bg, CornerRadius corners = {}) noexcept {
-    painter.fill_rounded(area, fg, corners);
-    painter.fill_rounded(base::inset(area, 1), bg, inset_corners(corners));
+/// Fills a rounded outline: the outer shape in edge, the inner hole in ground.
+inline void paint_outline(const Painter& painter, base::RectI area, canvas::ColorRole edge,
+                          canvas::ColorRole ground, CornerRadius corners = {}) noexcept {
+    painter.fill_rounded(area, edge, corners);
+    painter.fill_rounded(base::inset(area, 1), ground, inset_corners(corners));
 }
 
 } // namespace visor::ui

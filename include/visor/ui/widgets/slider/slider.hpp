@@ -45,9 +45,9 @@ class Slider : public Widget {
     void set_on_value(ValueHandler handler, void* context = nullptr) noexcept;
 
     [[nodiscard]] bool focusable() const noexcept override { return true; }
-    void on_key_down(std::uint32_t code) noexcept override;
+    void on_key_down(std::uint32_t code, host::Modifiers modifiers) noexcept override;
 
-    void on_pointer_down(base::PointI at) noexcept override;
+    void on_pointer_down(base::PointI at, host::Modifiers modifiers) noexcept override;
     void on_pointer_move(base::PointI at) noexcept override;
     void on_pointer_up([[maybe_unused]] base::PointI at) noexcept override;
 

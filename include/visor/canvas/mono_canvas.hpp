@@ -2,7 +2,6 @@
 #include "visor/base/bit_ops/bitmask.hpp"
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/size.hpp"
-#include "visor/canvas/color.hpp"
 
 #include <array>
 #include <cstddef>
@@ -34,9 +33,9 @@ class Canvas {
     static constexpr std::size_t kHeight = CanvasSize.h;
     static constexpr std::size_t kStrideBytes = (kWidth + 7) / 8;
 
-    /// Sets every pixel to state. The padding bits past the last pixel stay zero.
-    constexpr void set_clear(Color state) noexcept {
-        bits_.fill(state == Color::On ? base::bit::ones<std::uint8_t>(8) : std::uint8_t{0});
+    /// Sets every pixel lit or unlit. The padding bits past the last pixel stay zero.
+    constexpr void set_clear(bool lit) noexcept {
+        bits_.fill(lit ? base::bit::ones<std::uint8_t>(8) : std::uint8_t{0});
         if constexpr (kWidth % 8 != 0) {
             // The tail byte's padding field: the bits below the last pixel stay zero.
             const base::bit::BitRange padding{
@@ -53,7 +52,7 @@ class Canvas {
     }
 
     /// Writes one pixel. Out-of-bounds coordinates return false and touch nothing.
-    [[nodiscard]] constexpr bool set(base::PointI p, Color value) noexcept {
+    [[nodiscard]] constexpr bool set(base::PointI p, bool value) noexcept {
         if (p.x < 0 || p.y < 0) {
             return false;
         }
@@ -64,25 +63,24 @@ class Canvas {
         }
         const std::size_t index = (y * kStrideBytes) + (x / 8);
         base::bit::BitMask<std::uint8_t> word{bits_[index]};
-        word.deposit(base::bit::bit_at(pixel_bit_position(x)), value == Color::On ? 1 : 0);
+        word.deposit(base::bit::bit_at(pixel_bit_position(x)), value ? 1 : 0);
         bits_[index] = word.raw;
         return true;
     }
 
-    /// Reads one pixel. Out-of-bounds coordinates read as Off.
-    [[nodiscard]] constexpr Color get(base::PointI p) const noexcept {
+    /// Reads one pixel. Out-of-bounds coordinates read as unlit.
+    [[nodiscard]] constexpr bool get(base::PointI p) const noexcept {
         if (p.x < 0 || p.y < 0) {
-            return Color::Off;
+            return false;
         }
         const auto x = static_cast<std::size_t>(p.x);
         const auto y = static_cast<std::size_t>(p.y);
         if (x >= kWidth || y >= kHeight) {
-            return Color::Off;
+            return false;
         }
         const std::size_t index = (y * kStrideBytes) + (x / 8);
         const base::bit::BitMask<std::uint8_t> word{bits_[index]};
-        const bool on = word.has(base::bit::mask_bit<std::uint8_t>(pixel_bit_position(x)));
-        return on ? Color::On : Color::Off;
+        return word.has(base::bit::mask_bit<std::uint8_t>(pixel_bit_position(x)));
     }
 
     /// Raw rows for the host table's flush, kStrideBytes bytes per row, MSB first.

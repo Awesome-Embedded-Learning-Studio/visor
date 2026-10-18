@@ -10,18 +10,18 @@
 namespace visor::draw {
 
 /**
- * @brief A drawing hand bound to one canvas: carries the ink state, provides the strokes.
+ * @brief A drawing hand bound to one canvas: carries the pixel state, provides the strokes.
  *
- * Templates on the canvas type, not on how the canvas is parameterized, so a profile
- * parameter added in the RGB565 chapter never touches the Pen. Requirement on CanvasT:
- * exposes kWidth, kHeight and set(PointI, Ink). Ch1 ink is one Color; later chapters
- * grow the state without changing the call sites. A pen is meant to be short-lived,
- * created per draw call beside the canvas it borrows.
+ * Templates on the canvas type and its pixel type, not on how the canvas is
+ * parameterized, so a profile parameter added in the RGB565 chapter never touches
+ * the Pen. Requirement on CanvasT: exposes kWidth, kHeight and set(PointI, Pixel).
+ * A pen is meant to be short-lived, created per draw call beside the canvas it
+ * borrows.
  */
-template <typename CanvasT, typename Ink>
+template <typename CanvasT, typename Pixel>
 class Pen {
   public:
-    constexpr Pen(CanvasT& target, Ink ink) noexcept : canvas_{target}, ink_{ink} {}
+    constexpr Pen(CanvasT& target, Pixel ink) noexcept : canvas_{target}, ink_{ink} {}
 
     /// Paints one pixel; an out-of-bounds plot vanishes silently. Const: the pen
     /// never changes, the canvas it points at does.
@@ -56,7 +56,7 @@ class Pen {
 
   private:
     CanvasT& canvas_;
-    Ink ink_;
+    Pixel ink_;
 };
 
 } // namespace visor::draw

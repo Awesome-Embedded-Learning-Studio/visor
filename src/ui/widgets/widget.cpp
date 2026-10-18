@@ -13,13 +13,12 @@ namespace {
 
 using visor::base::PointI;
 using visor::base::RectI;
-using visor::base::SizeI;
+using visor::canvas::ColorRole;
 
 // Alternating ink and ground stays visible on both filled and hollow controls.
-void paint_focus_border(const visor::ui::Painter& painter, const RectI& bounds,
-                        const visor::ui::Theme* theme) noexcept {
-    const auto fg = theme != nullptr ? theme->foreground : visor::canvas::Color::On;
-    const auto bg = theme != nullptr ? theme->background : visor::canvas::Color::Off;
+void paint_focus_border(const visor::ui::Painter& painter, const RectI& bounds) noexcept {
+    const auto fg = ColorRole::Foreground;
+    const auto bg = ColorRole::Background;
     if (bounds.is_empty()) {
         return;
     }
@@ -131,7 +130,7 @@ void Widget::draw(const Painter& painter) const noexcept {
     }
     on_draw(painter);
     if (focused_) {
-        paint_focus_border(painter, bounds_, theme_);
+        paint_focus_border(painter, bounds_);
     }
     for (std::size_t i = 0; i < child_count_; ++i) {
         children_[i]->draw(painter);

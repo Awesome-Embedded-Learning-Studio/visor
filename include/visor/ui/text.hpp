@@ -25,11 +25,11 @@ namespace visor::ui {
  *                  draw_bitmap's is: the seam keeps no defaults.
  */
 void draw_text(const Painter& painter, base::PointI at, const draw::MonoFont& font,
-               std::string_view utf8, canvas::Color ink, int scale) noexcept;
+               std::string_view utf8, canvas::ColorRole role, int scale) noexcept;
 
 /// Clips glyph ink to a control's content rectangle, including overhangs.
 void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at,
-                       const draw::MonoFont& font, std::string_view utf8, canvas::Color ink,
+                       const draw::MonoFont& font, std::string_view utf8, canvas::ColorRole role,
                        int scale) noexcept;
 
 } // namespace visor::ui

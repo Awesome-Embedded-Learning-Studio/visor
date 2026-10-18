@@ -43,7 +43,8 @@ class RadioGroup : public Widget {
     ///        set_on_change, given back untouched.
     using SelectHandler = void (*)(RadioGroup& self, void* context);
 
-    RadioGroup(base::RectI bounds, const draw::MonoFont& font, canvas::Color ink) noexcept;
+    RadioGroup(base::RectI bounds, const draw::MonoFont& font,
+               canvas::ColorRole role = canvas::ColorRole::Foreground) noexcept;
 
     /// Adds an option; false when the capacity is full. Labels are views:
     /// the storage behind them outlives the group.
@@ -63,8 +64,8 @@ class RadioGroup : public Widget {
     /// A radio group takes the keyboard: the arrows walk the options.
     [[nodiscard]] bool focusable() const noexcept override { return true; }
 
-    void on_pointer_down(base::PointI at) noexcept override;
-    void on_key_down(std::uint32_t code) noexcept override;
+    void on_pointer_down(base::PointI at, host::Modifiers modifiers) noexcept override;
+    void on_key_down(std::uint32_t code, host::Modifiers modifiers) noexcept override;
 
   protected:
     void on_draw(const Painter& painter) const noexcept override;
@@ -84,7 +85,7 @@ class RadioGroup : public Widget {
     std::size_t count_ = 0;
     int selected_ = -1;
     const draw::MonoFont* font_;
-    canvas::Color ink_;
+    canvas::ColorRole role_;
     SelectHandler on_change_ = nullptr;
     void* change_context_ = nullptr;
 };

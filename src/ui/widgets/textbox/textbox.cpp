@@ -19,8 +19,8 @@
 
 namespace visor::ui {
 
-TextBox::TextBox(base::RectI bounds, const draw::MonoFont& font, canvas::Color ink) noexcept
-    : Widget{bounds}, font_{&font}, ink_{ink} {}
+TextBox::TextBox(base::RectI bounds, const draw::MonoFont& font, canvas::ColorRole role) noexcept
+    : Widget{bounds}, font_{&font}, role_{role} {}
 
 std::string_view TextBox::text() const noexcept {
     return {chars_, length_};
@@ -82,7 +82,7 @@ void TextBox::changed() noexcept {
     }
 }
 
-void TextBox::on_key_down(std::uint32_t code) noexcept {
+void TextBox::on_key_down(std::uint32_t code, [[maybe_unused]] host::Modifiers modifiers) noexcept {
     if (code >= 0x20 && code <= 0x7e && length_ < kTextBoxCapacity) {
         // Insert at the caret: the tail steps right one byte at a time, no
         // memmove, no vocabulary the freestanding world cannot carry.
@@ -131,16 +131,16 @@ void TextBox::on_key_down(std::uint32_t code) noexcept {
 }
 
 void TextBox::on_draw(const Painter& painter) const noexcept {
-    const auto fg = theme() != nullptr ? theme()->foreground : ink_;
-    const auto bg = control_background(theme(), ink_);
+    const auto text = role_;
+    const auto ground = canvas::ColorRole::Background;
     const auto corners = theme() != nullptr ? theme()->corner_radius : CornerRadius{};
-    paint_outline(painter, bounds(), fg, bg, corners);
+    paint_outline(painter, bounds(), canvas::ColorRole::Border, ground, corners);
     const auto content = base::inset(bounds(), kPadding);
     const base::PointI at{
         content.pos.x,
         content.pos.y + std::max(0, (content.size.h - static_cast<int>(font_->line_height)) / 2)};
     const std::string_view visible{chars_ + first_visible_, length_ - first_visible_};
-    draw_text_clipped(painter, content, at, *font_, visible, fg, 1);
+    draw_text_clipped(painter, content, at, *font_, visible, text, 1);
     if (focused() && !content.is_empty()) {
         const int x = content.pos.x + std::min(caret_offset(first_visible_), content.size.w - 1);
         painter.fill(
@@ -152,7 +152,7 @@ void TextBox::on_draw(const Painter& painter) const noexcept {
                         .h = std::min(content.size.h, static_cast<int>(font_->line_height)),
                     },
             },
-            fg);
+            text);
     }
 }
 

@@ -48,7 +48,8 @@ class TextBox : public Widget {
     ///        to the setter, given back untouched.
     using TextHandler = void (*)(TextBox& self, void* context);
 
-    TextBox(base::RectI bounds, const draw::MonoFont& font, canvas::Color ink) noexcept;
+    TextBox(base::RectI bounds, const draw::MonoFont& font,
+            canvas::ColorRole role = canvas::ColorRole::Foreground) noexcept;
 
     /// The text so far, as a view over the fixed buffer.
     [[nodiscard]] std::string_view text() const noexcept;
@@ -63,7 +64,7 @@ class TextBox : public Widget {
     /// An editor takes the keyboard: focus traversal may land here.
     [[nodiscard]] bool focusable() const noexcept override { return true; }
 
-    void on_key_down(std::uint32_t code) noexcept override;
+    void on_key_down(std::uint32_t code, host::Modifiers modifiers) noexcept override;
 
   protected:
     void on_draw(const Painter& painter) const noexcept override;
@@ -89,7 +90,7 @@ class TextBox : public Widget {
     std::size_t caret_ = 0;         // insertion index, 0 through length_
     std::size_t first_visible_ = 0; // window start, caret_ >= first_visible_
     const draw::MonoFont* font_;
-    canvas::Color ink_;
+    canvas::ColorRole role_;
     TextHandler on_change_ = nullptr;
     void* change_context_ = nullptr;
     TextHandler on_submit_ = nullptr;

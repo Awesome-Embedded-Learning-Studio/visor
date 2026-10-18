@@ -5,7 +5,6 @@
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
-#include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
 #include "visor/ui/input_router.hpp"
 #include "visor/ui/painter.hpp"
@@ -66,7 +65,7 @@ void run_gesture_tests() {
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 2);
         VISOR_CHECK(!button.pressed());
         VISOR_CHECK_EQ(fired, 0);
-        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), true);
     }
 
     // Move delivery, the gesture layer's own vocabulary: without a press the

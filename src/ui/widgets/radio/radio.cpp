@@ -20,8 +20,9 @@
 
 namespace visor::ui {
 
-RadioGroup::RadioGroup(base::RectI bounds, const draw::MonoFont& font, canvas::Color ink) noexcept
-    : Widget{bounds}, font_{&font}, ink_{ink} {}
+RadioGroup::RadioGroup(base::RectI bounds, const draw::MonoFont& font,
+                       canvas::ColorRole role) noexcept
+    : Widget{bounds}, font_{&font}, role_{role} {}
 
 bool RadioGroup::add_option(std::string_view label) noexcept {
     if (count_ == static_cast<std::size_t>(kRadioCapacity)) {
@@ -71,14 +72,16 @@ void RadioGroup::changed() noexcept {
     }
 }
 
-void RadioGroup::on_pointer_down(base::PointI at) noexcept {
+void RadioGroup::on_pointer_down(base::PointI at,
+                                 [[maybe_unused]] host::Modifiers modifiers) noexcept {
     // The press on a row IS the selection; the row geometry decides which.
     if (const int row = row_at(at); row >= 0) {
         select(row);
     }
 }
 
-void RadioGroup::on_key_down(std::uint32_t code) noexcept {
+void RadioGroup::on_key_down(std::uint32_t code,
+                             [[maybe_unused]] host::Modifiers modifiers) noexcept {
     // The arrows walk the selection, clamped at both ends -- the honest
     // refusal to wrap past the column. Enter and Space are nothing here: a
     // radio has no moment to complete, its state moves as it moves.
@@ -100,8 +103,7 @@ void RadioGroup::on_draw(const Painter& painter) const noexcept {
     if (bounds().size.w < 11 || bounds().size.h < row_height()) {
         return;
     }
-    const auto fg = theme() != nullptr ? theme()->foreground : ink_;
-    const auto bg = control_background(theme(), ink_);
+    const auto text = role_;
     for (std::size_t i = 0; i < count_; ++i) {
         const int y = bounds().pos.y + (static_cast<int>(i) * row_height());
         if (y + row_height() > bounds().pos.y + bounds().size.h) {
@@ -113,16 +115,17 @@ void RadioGroup::on_draw(const Painter& painter) const noexcept {
         };
         // Rounded concentric silhouettes leave a clear gap around the selected dot.
         paint_outline(
-            painter, ring, fg, bg,
+            painter, ring, canvas::ColorRole::Border, canvas::ColorRole::Background,
             CornerRadius{.top_left = 3, .top_right = 3, .bottom_right = 3, .bottom_left = 3});
         if (std::cmp_equal(i, selected_)) {
             painter.fill_rounded(
-                base::inset(ring, 2), fg,
+                base::inset(ring, 2), canvas::ColorRole::Accent,
                 CornerRadius{.top_left = 1, .top_right = 1, .bottom_right = 1, .bottom_left = 1});
         }
         const base::PointI label_pos{
             ring.pos.x + 11, y + ((row_height() - static_cast<int>(font_->line_height)) / 2)};
-        draw_text_clipped(painter, base::inset(bounds(), 1), label_pos, *font_, labels_[i], fg, 1);
+        draw_text_clipped(painter, base::inset(bounds(), 1), label_pos, *font_, labels_[i], text,
+                          1);
     }
 }
 

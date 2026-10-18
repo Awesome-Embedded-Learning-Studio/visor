@@ -18,7 +18,7 @@ using visor::base::PointI;
 using visor::base::RectI;
 using visor::base::SizeI;
 using visor::canvas::Canvas;
-using visor::canvas::Color;
+using visor::canvas::ColorRole;
 using visor::draw::measure_text;
 using visor::draw::MonoFont;
 using visor::draw::TextLayout;
@@ -206,53 +206,53 @@ void layout_places_glyphs_on_the_line_grid() {
 
 void draw_text_paints_each_glyph_at_its_pen() {
     Canvas<SizeI{.w = 24, .h = 16}> canvas;
-    canvas.set_clear(Color::Off);
+    canvas.set_clear(false);
     const visor::ui::CanvasPainter painter{canvas};
-    draw_text(painter, PointI{3, 2}, kDemoFont, "AB", Color::On, 1);
+    draw_text(painter, PointI{3, 2}, kDemoFont, "AB", ColorRole::Foreground, 1);
     // A's row 0 is 0x60: x1 and x2 lit, so at origin (3,2) the pair (4,2)
     // and (5,2) carries ink and the cell's own first column stays dark.
-    VISOR_CHECK(canvas.get(PointI{4, 2}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{5, 2}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{3, 2}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{4, 2}) == true);
+    VISOR_CHECK(canvas.get(PointI{5, 2}) == true);
+    VISOR_CHECK(canvas.get(PointI{3, 2}) == false);
     // A's row 2 is the full 0xf0 bar.
     for (int x = 3; x < 7; ++x) {
-        VISOR_CHECK(canvas.get(PointI{x, 4}) == Color::On);
+        VISOR_CHECK(canvas.get(PointI{x, 4}) == true);
     }
     // B starts at the pen past A: x = 3 + 5 = 8. Row 0 is 0xe0, three lit.
-    VISOR_CHECK(canvas.get(PointI{8, 2}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{10, 2}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{11, 2}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{8, 2}) == true);
+    VISOR_CHECK(canvas.get(PointI{10, 2}) == true);
+    VISOR_CHECK(canvas.get(PointI{11, 2}) == false);
     // B's row 1 is 0x90: columns 0 and 3 of the glyph.
-    VISOR_CHECK(canvas.get(PointI{8, 3}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{11, 3}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{9, 3}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{8, 3}) == true);
+    VISOR_CHECK(canvas.get(PointI{11, 3}) == true);
+    VISOR_CHECK(canvas.get(PointI{9, 3}) == false);
 }
 
 void draw_text_advances_lines_on_newline() {
     Canvas<SizeI{.w = 24, .h = 16}> canvas;
-    canvas.set_clear(Color::Off);
+    canvas.set_clear(false);
     const visor::ui::CanvasPainter painter{canvas};
-    draw_text(painter, PointI{0, 0}, kDemoFont, "A\nB", Color::On, 1);
+    draw_text(painter, PointI{0, 0}, kDemoFont, "A\nB", ColorRole::Foreground, 1);
     // B sits on the second line, six rows down: line_height 6 from origin 0.
-    VISOR_CHECK(canvas.get(PointI{0, 6}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{2, 6}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{3, 6}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{0, 6}) == true);
+    VISOR_CHECK(canvas.get(PointI{2, 6}) == true);
+    VISOR_CHECK(canvas.get(PointI{3, 6}) == false);
     // Nothing from B leaked back into the first line's tail columns.
-    VISOR_CHECK(canvas.get(PointI{4, 6}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{4, 6}) == false);
 }
 
 void draw_text_scales_blocks() {
     Canvas<SizeI{.w = 16, .h = 16}> canvas;
-    canvas.set_clear(Color::Off);
+    canvas.set_clear(false);
     const visor::ui::CanvasPainter painter{canvas};
-    draw_text(painter, PointI{0, 0}, kDemoFont, "A", Color::On, 2);
+    draw_text(painter, PointI{0, 0}, kDemoFont, "A", ColorRole::Foreground, 2);
     // A's row 0 lights x1: a 2x2 block at (2,0). Row 2 lights x0: block at (0,4).
-    VISOR_CHECK(canvas.get(PointI{2, 0}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{3, 1}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{0, 4}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{1, 5}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{0, 0}) == Color::Off);
-    VISOR_CHECK(canvas.get(PointI{1, 1}) == Color::Off); // A's (1,1) is dark at 0x90
+    VISOR_CHECK(canvas.get(PointI{2, 0}) == true);
+    VISOR_CHECK(canvas.get(PointI{3, 1}) == true);
+    VISOR_CHECK(canvas.get(PointI{0, 4}) == true);
+    VISOR_CHECK(canvas.get(PointI{1, 5}) == true);
+    VISOR_CHECK(canvas.get(PointI{0, 0}) == false);
+    VISOR_CHECK(canvas.get(PointI{1, 1}) == false); // A's (1,1) is dark at 0x90
 }
 
 void draw_text_matches_strip_replay() {
@@ -260,20 +260,20 @@ void draw_text_matches_strip_replay() {
     // straddling a strip boundary is replayed across strips, and the frames
     // must agree pixel for pixel.
     const auto paint_scene = [](const auto& painter) {
-        draw_text(painter, PointI{1, 1}, kDemoFont, "A\n\xe4\xb8\xad", Color::On, 1);
+        draw_text(painter, PointI{1, 1}, kDemoFont, "A\n\xe4\xb8\xad", ColorRole::Foreground, 1);
     };
     Canvas<SizeI{.w = 24, .h = 16}> whole;
-    whole.set_clear(Color::Off);
+    whole.set_clear(false);
     paint_scene(visor::ui::CanvasPainter<Canvas<SizeI{.w = 24, .h = 16}>>{whole});
 
     Canvas<SizeI{.w = 24, .h = 16}> replayed;
-    replayed.set_clear(Color::Off);
+    replayed.set_clear(false);
     for (int top = 0; top < 16; top += 6) {
         const int height = top + 6 <= 16 ? 6 : 16 - top;
         const RectI window{.pos = PointI{0, top}, .size = SizeI{.w = 24, .h = height}};
         if (height == 6) {
             Canvas<SizeI{.w = 24, .h = 6}> strip;
-            strip.set_clear(Color::Off);
+            strip.set_clear(false);
             paint_scene(visor::ui::CanvasPainter<Canvas<SizeI{.w = 24, .h = 6}>>{strip, window});
             for (int y = 0; y < 6; ++y) {
                 for (int x = 0; x < 24; ++x) {
@@ -282,7 +282,7 @@ void draw_text_matches_strip_replay() {
             }
         } else {
             Canvas<SizeI{.w = 24, .h = 4}> strip;
-            strip.set_clear(Color::Off);
+            strip.set_clear(false);
             paint_scene(visor::ui::CanvasPainter<Canvas<SizeI{.w = 24, .h = 4}>>{strip, window});
             for (int y = 0; y < 4; ++y) {
                 for (int x = 0; x < 24; ++x) {
@@ -300,16 +300,16 @@ void draw_text_matches_strip_replay() {
 
 void draw_text_skips_invalid_bytes() {
     Canvas<SizeI{.w = 24, .h = 16}> canvas;
-    canvas.set_clear(Color::Off);
+    canvas.set_clear(false);
     const visor::ui::CanvasPainter painter{canvas};
     draw_text(painter, PointI{0, 0}, kDemoFont,
               "\x80"
               "A",
-              Color::On, 1);
+              ColorRole::Foreground, 1);
     // Only A painted, at the origin: the stray byte left neither ink nor gap.
-    VISOR_CHECK(canvas.get(PointI{1, 0}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{0, 0}) == Color::Off);
-    VISOR_CHECK(canvas.get(PointI{5, 0}) == Color::Off);
+    VISOR_CHECK(canvas.get(PointI{1, 0}) == true);
+    VISOR_CHECK(canvas.get(PointI{0, 0}) == false);
+    VISOR_CHECK(canvas.get(PointI{5, 0}) == false);
 }
 
 void proportional_offsets_hang_below_the_line_top() {
@@ -321,15 +321,15 @@ void proportional_offsets_hang_below_the_line_top() {
     VISOR_CHECK_EQ(measure_text(kDemoFont, ",", 1), (SizeI{.w = 2, .h = 6}));
     VISOR_CHECK_EQ(measure_text(kDemoFont, "A,", 1), (SizeI{.w = 7, .h = 6}));
     Canvas<SizeI{.w = 24, .h = 16}> canvas;
-    canvas.set_clear(Color::Off);
+    canvas.set_clear(false);
     const visor::ui::CanvasPainter painter{canvas};
-    draw_text(painter, PointI{0, 0}, kDemoFont, "A,", Color::On, 1);
+    draw_text(painter, PointI{0, 0}, kDemoFont, "A,", ColorRole::Foreground, 1);
     // The comma paints at pen 5 plus its offset_x: column 6, rows 4 and 5.
-    VISOR_CHECK(canvas.get(PointI{6, 4}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{6, 5}) == Color::On);
-    VISOR_CHECK(canvas.get(PointI{5, 4}) == Color::Off); // offset_x pushed it right
-    VISOR_CHECK(canvas.get(PointI{6, 3}) == Color::Off); // offset_y held it down
-    VISOR_CHECK(canvas.get(PointI{7, 4}) == Color::Off); // one pixel wide, no more
+    VISOR_CHECK(canvas.get(PointI{6, 4}) == true);
+    VISOR_CHECK(canvas.get(PointI{6, 5}) == true);
+    VISOR_CHECK(canvas.get(PointI{5, 4}) == false); // offset_x pushed it right
+    VISOR_CHECK(canvas.get(PointI{6, 3}) == false); // offset_y held it down
+    VISOR_CHECK(canvas.get(PointI{7, 4}) == false); // one pixel wide, no more
 }
 
 } // namespace

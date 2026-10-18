@@ -25,7 +25,7 @@ using visor::base::PointI;
 using visor::base::RectI;
 using visor::base::SizeI;
 using visor::canvas::Canvas;
-using visor::canvas::Color;
+using visor::canvas::ColorRole;
 
 // The same three-glyph font the text judgments ride (h, i, o, advance 3,
 // line height 4): enough alphabet for a choice list's first words.
@@ -93,28 +93,28 @@ void run_choice_tests() {
     {
         int changes = 0;
         visor::ui::RadioGroup group(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 20, .h = 30}},
-                                    kChoiceFont, Color::On);
+                                    kChoiceFont, visor::canvas::ColorRole::Foreground);
         group.set_on_change(
             [](visor::ui::RadioGroup&, void* context) { ++*static_cast<int*>(context); }, &changes);
         VISOR_CHECK(group.add_option("hi"));
         VISOR_CHECK(group.add_option("ho"));
         VISOR_CHECK(group.add_option("oh"));
-        VISOR_CHECK_EQ(group.selected(), -1);     // nobody touched it yet
-        group.on_pointer_down(PointI{3, 2 + 10}); // the second row (y 12..21)
+        VISOR_CHECK_EQ(group.selected(), -1);         // nobody touched it yet
+        group.on_pointer_down(PointI{3, 2 + 10}, {}); // the second row (y 12..21)
         VISOR_CHECK_EQ(group.selected(), 1);
         VISOR_CHECK_EQ(changes, 1);
-        group.on_pointer_down(PointI{3, 2 + 10}); // the same row again
-        VISOR_CHECK_EQ(changes, 1);               // a re-selection is no change
+        group.on_pointer_down(PointI{3, 2 + 10}, {}); // the same row again
+        VISOR_CHECK_EQ(changes, 1);                   // a re-selection is no change
         // Down walks, clamped at the bottom.
-        group.on_key_down(visor::host::kKeyDown);
+        group.on_key_down(visor::host::kKeyDown, {});
         VISOR_CHECK_EQ(group.selected(), 2);
-        group.on_key_down(visor::host::kKeyDown);
+        group.on_key_down(visor::host::kKeyDown, {});
         VISOR_CHECK_EQ(group.selected(), 2);
         VISOR_CHECK_EQ(changes, 2);
         // Up walks, clamped at the top; a press between rows picks nothing.
-        group.on_key_down(visor::host::kKeyUp);
-        group.on_key_down(visor::host::kKeyUp);
-        group.on_key_down(visor::host::kKeyUp);
+        group.on_key_down(visor::host::kKeyUp, {});
+        group.on_key_down(visor::host::kKeyUp, {});
+        group.on_key_down(visor::host::kKeyUp, {});
         VISOR_CHECK_EQ(group.selected(), 0);
         VISOR_CHECK_EQ(changes, 4); // 2 -> 1 -> 0 is two moves, not three
         group.select(7);            // out of range asks nothing
@@ -122,8 +122,8 @@ void run_choice_tests() {
         VISOR_CHECK_EQ(changes, 4);
         // Enter and Space are nothing here: a radio has no moment to
         // complete, its state moves as it moves.
-        group.on_key_down(visor::host::kKeyEnter);
-        group.on_key_down(visor::host::kKeySpace);
+        group.on_key_down(visor::host::kKeyEnter, {});
+        group.on_key_down(visor::host::kKeySpace, {});
         VISOR_CHECK_EQ(group.selected(), 0);
         VISOR_CHECK_EQ(changes, 4);
     }
@@ -132,18 +132,18 @@ void run_choice_tests() {
     // gap between the selected dot and its ring.
     {
         visor::ui::RadioGroup group(RectI{.pos = {2, 2}, .size = {.w = 28, .h = 20}}, kChoiceFont,
-                                    Color::On);
+                                    visor::canvas::ColorRole::Foreground);
         VISOR_CHECK(group.add_option("hi"));
         VISOR_CHECK(group.add_option("ho"));
         group.select(1);
         Canvas<SizeI{.w = 32, .h = 24}> canvas;
         group.draw(visor::ui::CanvasPainter{canvas});
-        VISOR_CHECK(canvas.get(PointI{7, 3}) == Color::On);    // ring top
-        VISOR_CHECK(canvas.get(PointI{7, 6}) == Color::Off);   // first option empty
-        VISOR_CHECK(canvas.get(PointI{7, 16}) == Color::On);   // selected dot
-        VISOR_CHECK(canvas.get(PointI{7, 14}) == Color::Off);  // gap around dot
-        VISOR_CHECK(canvas.get(PointI{15, 15}) == Color::On);  // second label
-        VISOR_CHECK(canvas.get(PointI{14, 15}) == Color::Off); // gap before label
+        VISOR_CHECK(canvas.get(PointI{7, 3}) == true);    // ring top
+        VISOR_CHECK(canvas.get(PointI{7, 6}) == false);   // first option empty
+        VISOR_CHECK(canvas.get(PointI{7, 16}) == true);   // selected dot
+        VISOR_CHECK(canvas.get(PointI{7, 14}) == false);  // gap around dot
+        VISOR_CHECK(canvas.get(PointI{15, 15}) == true);  // second label
+        VISOR_CHECK(canvas.get(PointI{14, 15}) == false); // gap before label
     }
 
     // The dropdown: closed it is one row, a press opens it into the list
@@ -153,7 +153,7 @@ void run_choice_tests() {
         int changes = 0;
         visor::ui::Rectangle panel(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 32, .h = 16}});
         visor::ui::Dropdown list(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 12, .h = 4}},
-                                 kChoiceFont, Color::On);
+                                 kChoiceFont, visor::canvas::ColorRole::Foreground);
         list.set_on_change(
             [](visor::ui::Dropdown&, void* context) { ++*static_cast<int*>(context); }, &changes);
         VISOR_CHECK(list.add_option("hi"));
@@ -214,31 +214,31 @@ void run_choice_tests() {
     // inverts only the selected row, preserving the panel border.
     {
         visor::ui::Dropdown list(RectI{.pos = {2, 2}, .size = {.w = 28, .h = 12}}, kChoiceFont,
-                                 Color::On);
+                                 visor::canvas::ColorRole::Foreground);
         VISOR_CHECK(list.add_option("hi"));
         VISOR_CHECK(list.add_option("ho"));
         list.select(1);
         Canvas<SizeI{.w = 32, .h = 30}> canvas;
         list.draw(visor::ui::CanvasPainter{canvas});
-        VISOR_CHECK(canvas.get(PointI{6, 6}) == Color::On);   // label
-        VISOR_CHECK(canvas.get(PointI{15, 6}) == Color::Off); // empty field
-        VISOR_CHECK(canvas.get(PointI{2, 6}) == Color::On);   // outline
-        VISOR_CHECK(canvas.get(PointI{23, 8}) == Color::On);  // arrow tip
-        list.on_key_down(visor::host::kKeyEnter);
-        canvas.set_clear(Color::Off);
+        VISOR_CHECK(canvas.get(PointI{6, 6}) == true);   // label
+        VISOR_CHECK(canvas.get(PointI{15, 6}) == false); // empty field
+        VISOR_CHECK(canvas.get(PointI{2, 6}) == true);   // outline
+        VISOR_CHECK(canvas.get(PointI{23, 8}) == true);  // arrow tip
+        list.on_key_down(visor::host::kKeyEnter, {});
+        canvas.set_clear(false);
         list.draw(visor::ui::CanvasPainter{canvas});
         VISOR_CHECK(list.open());
-        VISOR_CHECK(canvas.get(PointI{6, 18}) == Color::Off); // selected label reversed
-        VISOR_CHECK(canvas.get(PointI{12, 18}) == Color::On); // selected row
-        VISOR_CHECK(canvas.get(PointI{6, 6}) == Color::On);   // first label
-        VISOR_CHECK(canvas.get(PointI{12, 6}) == Color::Off); // first row background
+        VISOR_CHECK(canvas.get(PointI{6, 18}) == false); // selected label reversed
+        VISOR_CHECK(canvas.get(PointI{12, 18}) == true); // selected row
+        VISOR_CHECK(canvas.get(PointI{6, 6}) == true);   // first label
+        VISOR_CHECK(canvas.get(PointI{12, 6}) == false); // first row background
     }
 
     // The dropdown's open-close cycle reports both boxes: the growth and the
     // collapse each owe their old and new area.
     {
         visor::ui::Dropdown list(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 12, .h = 4}},
-                                 kChoiceFont, Color::On);
+                                 kChoiceFont, visor::canvas::ColorRole::Foreground);
         VISOR_CHECK(list.add_option("hi"));
         VISOR_CHECK(list.add_option("ho"));
         visor::ui::DirtyRegions debts;

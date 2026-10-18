@@ -15,21 +15,23 @@ namespace visor::host::x11 {
  *
  * The keysym resolution itself is the X half's job (XLookupString consults
  * the display's keymap, a connection this function stays free of): that half
- * hands over the keysym plus whether the word is a press or a release.
- * Printable ASCII keysyms ride the code-point convention unchanged, space
- * included (0x20, which is why activation consumers accept kCharSpace beside
- * kKeySpace). The keys the core names map onto their named codes, the arrows
- * taking the out-of-band values from events.hpp. Everything else -- keypad
- * variants, function keys, dead accents -- translates to nothing, the same
- * honest refusal as an empty table entry.
+ * hands over the keysym, whether the word is a press or a release, and the
+ * X modifier mask that came with the event. Printable ASCII keysyms ride the
+ * code-point convention unchanged, space included (0x20, which is why
+ * activation consumers accept kCharSpace beside kKeySpace). The keys the core
+ * names map onto their named codes, the arrows taking the out-of-band values
+ * from events.hpp. Everything else -- keypad variants, function keys, dead
+ * accents -- translates to nothing, the same honest refusal as an empty table
+ * entry.
  */
-[[nodiscard]] std::optional<host::Event> translate_key(std::uint32_t keysym, bool pressed) noexcept;
+[[nodiscard]] std::optional<host::Event> translate_key(std::uint32_t keysym, bool pressed,
+                                                       unsigned int state) noexcept;
 
 /**
  * @brief Translates one X pointer button word. Buttons 1 through 3 pass their
- *        number through (the core's button word is host-defined and small);
- *        the wheel and beyond (4 up) are scrolls, not button words, and drop
- *        until a scroll layer exists.
+ *        number through and carry the event's modifier mask. Buttons 4 through
+ *        7 are wheel words on press: 4 up, 5 down, 6 left, 7 right. Their
+ *        releases carry no new word.
  */
 [[nodiscard]] std::optional<host::Event> translate_button(const XButtonEvent& event) noexcept;
 

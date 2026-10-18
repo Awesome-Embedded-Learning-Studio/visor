@@ -51,11 +51,14 @@ struct WireEvent {
  * @brief Translates one wire event into the core's Event, pure logic.
  *
  * Mouse words become pointer moves and presses at the wire's absolute
- * position, button 1. Key words become presses or releases; the code is the
- * ASCII byte when the kernel filled one (printable text rides the code-point
+ * position, button 1. Key words become presses or releases carrying the
+ * wire's shift, ctrl and alt flags as named modifiers; the code is the ASCII
+ * byte when the kernel filled one (printable text rides the code-point
  * convention), otherwise a small table maps the scancodes the core names
  * (Backspace, Tab, Enter, Space on their set-1 values, the arrows on the HID
- * usage ids the kernel emits for them). A key with neither an ascii nor a
+ * usage ids the kernel emits for them). The wire has no wheel word and no
+ * mouse modifier flags, so those stay absent until the kernel protocol grows
+ * them. A key with neither an ascii nor a
  * known scancode, or a type out of range, translates to nothing -- the
  * adapter drops it, the same honest refusal as an empty table entry.
  */

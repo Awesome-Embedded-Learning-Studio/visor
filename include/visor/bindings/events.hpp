@@ -8,16 +8,28 @@
 
 namespace visor::host {
 
+/// @brief The keyboard modifiers held while a word was produced. Four named
+///        flags, not a bit mask: the event table names them one by one and a
+///        reader should not have to decode a number to see what is held.
+struct Modifiers {
+    bool shift = false;
+    bool ctrl = false;
+    bool alt = false;
+    bool super = false;
+};
+
 /// @brief A key went down. code is host-defined: a PC host maps its platform's
 ///        key symbols, a board host maps its matrix scan lines. The core only
 ///        ever compares codes, it never decodes them.
 struct KeyDown {
     std::uint32_t code;
+    Modifiers modifiers{};
 };
 
 /// @brief A key came back up, closing the KeyDown that carried the same code.
 struct KeyUp {
     std::uint32_t code;
+    Modifiers modifiers{};
 };
 
 /// @brief The key codes the core names itself. Tab is the tree's own traversal
@@ -66,6 +78,7 @@ struct PointerMove {
 struct PointerDown {
     std::uint32_t button;
     base::PointI pos;
+    Modifiers modifiers{};
 };
 
 /// @brief A pointer button came back up at pos, closing the PointerDown that
@@ -75,15 +88,26 @@ struct PointerUp {
     base::PointI pos;
 };
 
+/// @brief A wheel turned at pos. dx and dy are detents, not pixels and not
+///        lines: one physical notch is one unit. dy is positive when the
+///        wheel turns toward the user (content moves down), dx is positive to
+///        the right. A value of two is two notches in one word, not two words.
+struct PointerWheel {
+    std::int32_t dx = 0;
+    std::int32_t dy = 0;
+    base::PointI pos;
+    Modifiers modifiers{};
+};
+
 /**
  * @brief One input fact travelling from the host into the core, carried as a
- *        variant over the five ch2 events. Gestures, text input and key
- *        repeat are later layers grown from these five, not new table entries
+ *        variant over the six ch2 events. Gestures, text input and key
+ *        repeat are later layers grown from these six, not new table entries
  *        -- text input in particular is a KeyDown convention: a host that
  *        produces text maps each printable key to its code point, and the
  *        core's named codes carry the editing semantics around it.
  */
-using Event = std::variant<KeyDown, KeyUp, PointerMove, PointerDown, PointerUp>;
+using Event = std::variant<KeyDown, KeyUp, PointerMove, PointerDown, PointerUp, PointerWheel>;
 
 // The ch2 event queue stores plain values only, so this is a promise about the
 // vocabulary, checked where the promise is made.

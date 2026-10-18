@@ -42,7 +42,8 @@ bool Button::pressed() const noexcept {
     return pointer_pressed_ || key_pressed_;
 }
 
-void Button::on_pointer_down([[maybe_unused]] base::PointI at) noexcept {
+void Button::on_pointer_down([[maybe_unused]] base::PointI at,
+                             [[maybe_unused]] host::Modifiers modifiers) noexcept {
     pointer_pressed_ = true;
     invalidate(bounds());
 }
@@ -59,7 +60,7 @@ void Button::on_pointer_up(base::PointI at) noexcept {
     }
 }
 
-void Button::on_key_down(std::uint32_t code) noexcept {
+void Button::on_key_down(std::uint32_t code, [[maybe_unused]] host::Modifiers modifiers) noexcept {
     // Enter and Space are the keyboard's press, the codes events.hpp names.
     // Space also arrives as its code point (kCharSpace, 0x20) when a text
     // host types it -- the same press under either number. A repeat of the
@@ -76,7 +77,7 @@ void Button::on_key_down(std::uint32_t code) noexcept {
     invalidate(bounds());
 }
 
-void Button::on_key_up(std::uint32_t code) noexcept {
+void Button::on_key_up(std::uint32_t code, [[maybe_unused]] host::Modifiers modifiers) noexcept {
     // Only the up that matches the held key completes the activation; every
     // other release is somebody else's press coming home.
     if (!key_pressed_ || code != held_key_) {
@@ -88,24 +89,23 @@ void Button::on_key_up(std::uint32_t code) noexcept {
 }
 
 void Button::on_draw(const Painter& painter) const noexcept {
-    // The scheme's two roles, or the light polarity every button hardcoded
-    // before themes arrived; the corner radius travels with the scheme.
-    const canvas::Color fg = theme() != nullptr ? theme()->foreground : canvas::Color::On;
-    const canvas::Color bg = theme() != nullptr ? theme()->background : canvas::Color::Off;
+    // A filled face takes the accent pair, a hollow one the ground and its
+    // border; the corner radius travels with the scheme.
     const CornerRadius corners = theme() != nullptr ? theme()->corner_radius : CornerRadius{};
     // Keep the silhouette while pressed so an empty button never disappears.
     const bool solid = outlined_ == pressed();
-    const canvas::Color face = solid ? fg : bg;
-    painter.fill_rounded(bounds(), fg, corners);
+    const auto edge = solid ? canvas::ColorRole::Accent : canvas::ColorRole::Border;
+    const auto face = solid ? canvas::ColorRole::Accent : canvas::ColorRole::Background;
+    const auto text = solid ? canvas::ColorRole::OnAccent : canvas::ColorRole::Foreground;
+    painter.fill_rounded(bounds(), edge, corners);
     if (!solid) {
-        painter.fill_rounded(base::inset(bounds(), 1), bg, inset_corners(corners));
+        painter.fill_rounded(base::inset(bounds(), 1), face, inset_corners(corners));
     }
     if (font_ != nullptr) {
         const base::SizeI size = draw::measure_text(*font_, label_, 1);
         const base::PointI at{bounds().pos.x + ((bounds().size.w - size.w) / 2),
                               bounds().pos.y + ((bounds().size.h - size.h) / 2)};
-        draw_text_clipped(painter, base::inset(bounds(), 2), at, *font_, label_,
-                          face == fg ? bg : fg, 1);
+        draw_text_clipped(painter, base::inset(bounds(), 2), at, *font_, label_, text, 1);
     }
 }
 

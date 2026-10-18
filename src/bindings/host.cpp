@@ -29,4 +29,8 @@ std::uint64_t current_time_ms(const HostTable& host) noexcept {
     return host.clock_ms != nullptr ? host.clock_ms(host.context) : 0;
 }
 
+bool has_clock(const HostTable& host) noexcept {
+    return host.clock_ms != nullptr;
+}
+
 } // namespace visor::host

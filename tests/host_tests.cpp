@@ -24,7 +24,7 @@ void run_host_tests() {
     using visor::base::RectI;
     using visor::base::SizeI;
     using visor::canvas::Canvas;
-    using visor::canvas::Color;
+    using visor::canvas::ColorRole;
     using visor::draw::Pen;
     using visor::host::HostTable;
     using visor::host::OffscreenHost;
@@ -34,7 +34,7 @@ void run_host_tests() {
     // Full-frame handover on an odd-width canvas: the host copies row by row
     // honouring stride, and every received pixel matches the canvas.
     OddCanvas source;
-    const Pen brush{source, Color::On};
+    const Pen brush{source, true};
     brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 13, .h = 1}});
     brush.plot(PointI{6, 3});
     brush.fill(RectI{.pos = PointI{9, 2}, .size = SizeI{.w = 2, .h = 2}});
@@ -62,7 +62,7 @@ void run_host_tests() {
     VISOR_CHECK(visor::host::submit_frame(smaller.table(), source));
     VISOR_CHECK_EQ(smaller.rejected_count(), 1);
     VISOR_CHECK_EQ(smaller.flush_count(), 0);
-    VISOR_CHECK_EQ(smaller.get((PointI{0, 0})), Color::Off);
+    VISOR_CHECK_EQ(smaller.get((PointI{0, 0})), false);
 
     // write_pbm round trip: header text, then the packed rows, then nothing else.
     constexpr std::string_view path = "visor_test.pbm";
@@ -91,19 +91,27 @@ void run_host_tests() {
     visor::host::Event polled{};
     VISOR_CHECK(!visor::host::try_poll_event(bare, polled));
     VISOR_CHECK_EQ(visor::host::current_time_ms(bare), 0U);
+    VISOR_CHECK(!visor::host::has_clock(bare));
 
-    // Ch2 feed: five events in, the same five out in order, each carrying its
+    // Ch2 feed: six events in, the same six out in order, each carrying its
     // own fields. Everything crosses the table, the only channel the core sees.
     OffscreenHost feeder(4, 4);
     const HostTable fed = feeder.table();
     VISOR_CHECK(fed.poll_event != nullptr);
     VISOR_CHECK(fed.clock_ms != nullptr);
+    VISOR_CHECK(visor::host::has_clock(fed));
     VISOR_CHECK_EQ(visor::host::current_time_ms(fed), 0U);
     VISOR_CHECK(feeder.push_event(visor::host::KeyDown{.code = 30}));
     VISOR_CHECK(feeder.push_event(visor::host::PointerMove{.pos = PointI{5, 6}}));
     VISOR_CHECK(feeder.push_event(visor::host::PointerDown{.button = 1, .pos = PointI{7, 8}}));
     VISOR_CHECK(feeder.push_event(visor::host::KeyUp{.code = 30}));
     VISOR_CHECK(feeder.push_event(visor::host::PointerUp{.button = 1, .pos = PointI{7, 8}}));
+    VISOR_CHECK(feeder.push_event(visor::host::PointerWheel{
+        .dx = 1,
+        .dy = -2,
+        .pos = PointI{9, 10},
+        .modifiers = visor::host::Modifiers{.ctrl = true},
+    }));
 
     VISOR_CHECK(visor::host::try_poll_event(fed, polled));
     VISOR_CHECK(std::holds_alternative<visor::host::KeyDown>(polled));
@@ -122,6 +130,12 @@ void run_host_tests() {
     VISOR_CHECK(std::holds_alternative<visor::host::PointerUp>(polled));
     VISOR_CHECK_EQ(std::get<visor::host::PointerUp>(polled).button, 1U);
     VISOR_CHECK_EQ(std::get<visor::host::PointerUp>(polled).pos, (PointI{7, 8}));
+    VISOR_CHECK(visor::host::try_poll_event(fed, polled));
+    VISOR_CHECK(std::holds_alternative<visor::host::PointerWheel>(polled));
+    VISOR_CHECK_EQ(std::get<visor::host::PointerWheel>(polled).dx, 1);
+    VISOR_CHECK_EQ(std::get<visor::host::PointerWheel>(polled).dy, -2);
+    VISOR_CHECK_EQ(std::get<visor::host::PointerWheel>(polled).pos, (PointI{9, 10}));
+    VISOR_CHECK(std::get<visor::host::PointerWheel>(polled).modifiers.ctrl);
 
     // Drained queue: poll refuses, the host keeps answering.
     VISOR_CHECK(!visor::host::try_poll_event(fed, polled));
@@ -160,7 +174,7 @@ void run_host_tests() {
     {
         using Patch = Canvas<SizeI{.w = 12, .h = 2}>;
         Patch patch;
-        const Pen patch_brush{patch, Color::On};
+        const Pen patch_brush{patch, true};
         patch_brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 12, .h = 1}});
         patch_brush.plot(PointI{5, 1});
         OffscreenHost wide(24, 4);
@@ -174,8 +188,8 @@ void run_host_tests() {
             }
         }
         // Outside the region stays dark: the copy stopped at its own width.
-        VISOR_CHECK_EQ(wide.get(PointI{7, 1}), Color::Off);
-        VISOR_CHECK_EQ(wide.get(PointI{20, 1}), Color::Off);
+        VISOR_CHECK_EQ(wide.get(PointI{7, 1}), false);
+        VISOR_CHECK_EQ(wide.get(PointI{20, 1}), false);
     }
 
     // The fast path's tail: a width that ends mid-byte copies only its live
@@ -185,12 +199,12 @@ void run_host_tests() {
     {
         using Half = Canvas<SizeI{.w = 10, .h = 1}>;
         Half bar;
-        const Pen bar_brush{bar, Color::On};
+        const Pen bar_brush{bar, true};
         bar_brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}});
         OffscreenHost lit(16, 1);
         using Full = Canvas<SizeI{.w = 16, .h = 1}>;
         Full ground;
-        const Pen ground_brush{ground, Color::On};
+        const Pen ground_brush{ground, true};
         ground_brush.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 16, .h = 1}});
         VISOR_CHECK(visor::host::submit_frame(lit.table(), ground)); // all lit
         VISOR_CHECK(visor::host::submit_region(
@@ -200,7 +214,7 @@ void run_host_tests() {
         // not about ink, it is about the tail bits at x 10..15 surviving an
         // overwrite whose source byte is zero there.
         for (int x = 0; x < 16; ++x) {
-            VISOR_CHECK_EQ(lit.get(PointI{x, 0}), Color::On);
+            VISOR_CHECK_EQ(lit.get(PointI{x, 0}), true);
         }
         // And a dark bar proves the live bits did land: same submit, dark
         // source, only x 0..9 may change.
@@ -211,10 +225,10 @@ void run_host_tests() {
             second.table(), RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 1}},
             dark.pixels().data(), Half::kStrideBytes));
         for (int x = 0; x < 10; ++x) {
-            VISOR_CHECK_EQ(second.get(PointI{x, 0}), Color::Off);
+            VISOR_CHECK_EQ(second.get(PointI{x, 0}), false);
         }
         for (int x = 10; x < 16; ++x) {
-            VISOR_CHECK_EQ(second.get(PointI{x, 0}), Color::On);
+            VISOR_CHECK_EQ(second.get(PointI{x, 0}), true);
         }
     }
 
@@ -222,16 +236,16 @@ void run_host_tests() {
     {
         using Sliver = Canvas<SizeI{.w = 5, .h = 2}>;
         Sliver mark;
-        const Pen mark_brush{mark, Color::On};
+        const Pen mark_brush{mark, true};
         mark_brush.plot(PointI{0, 0});
         mark_brush.plot(PointI{4, 1});
         OffscreenHost odd(13, 5);
         VISOR_CHECK(visor::host::submit_region(
             odd.table(), RectI{.pos = PointI{3, 2}, .size = SizeI{.w = 5, .h = 2}},
             mark.pixels().data(), Sliver::kStrideBytes));
-        VISOR_CHECK(odd.get(PointI{3, 2}) == Color::On);
-        VISOR_CHECK(odd.get(PointI{7, 3}) == Color::On);
-        VISOR_CHECK(odd.get(PointI{4, 2}) == Color::Off);
-        VISOR_CHECK(odd.get(PointI{3, 3}) == Color::Off);
+        VISOR_CHECK(odd.get(PointI{3, 2}) == true);
+        VISOR_CHECK(odd.get(PointI{7, 3}) == true);
+        VISOR_CHECK(odd.get(PointI{4, 2}) == false);
+        VISOR_CHECK(odd.get(PointI{3, 3}) == false);
     }
 }

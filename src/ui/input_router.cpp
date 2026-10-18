@@ -1,5 +1,6 @@
 #include "visor/ui/input_router.hpp"
 
+#include <cstdint>
 #include <variant>
 
 #include "visor/bindings/events.hpp"
@@ -27,7 +28,7 @@ void deliver(Widget& root, Widget*& press_owner, const host::PointerDown& word) 
             }
             press_owner->set_focused(true);
         }
-        press_owner->on_pointer_down(word.pos);
+        press_owner->on_pointer_down(word.pos, word.modifiers);
     }
 }
 
@@ -53,6 +54,15 @@ void deliver(Widget& root, Widget*& press_owner, const host::PointerMove& word) 
     }
 }
 
+void deliver(Widget& root, [[maybe_unused]] Widget*& press_owner,
+             const host::PointerWheel& word) noexcept {
+    // A wheel is a hover word, not part of the press session: it goes to the
+    // topmost widget under the pointer and never changes who owns the press.
+    if (Widget* receiver = root.hit_test(word.pos); receiver != nullptr) {
+        receiver->on_pointer_wheel(word);
+    }
+}
+
 // Tab is the tree's own semantic, so the dispatcher keeps it. Every other code
 // goes to the focused widget verbatim: the control decides what it consumes
 // against the codes events.hpp names, the core never decodes the rest.
@@ -63,7 +73,7 @@ void deliver(Widget& root, [[maybe_unused]] Widget*& press_owner,
         return;
     }
     if (Widget* holder = root.focused_widget(); holder != nullptr) {
-        holder->on_key_down(word.code);
+        holder->on_key_down(word.code, word.modifiers);
     }
 }
 
@@ -73,13 +83,14 @@ void deliver(Widget& root, [[maybe_unused]] Widget*& press_owner,
 void deliver(Widget& root, [[maybe_unused]] Widget*& press_owner,
              const host::KeyUp& word) noexcept {
     if (Widget* holder = root.focused_widget(); holder != nullptr) {
-        holder->on_key_up(word.code);
+        holder->on_key_up(word.code, word.modifiers);
     }
 }
 
 } // namespace
 
-void dispatch_event(Widget& root, InputRouter& input, const host::Event& event) noexcept {
+void dispatch_event(Widget& root, InputRouter& input, const host::Event& event,
+                    [[maybe_unused]] std::uint64_t now_ms) noexcept {
     std::visit([&root, &input](const auto& word) { deliver(root, input.press_owner_, word); },
                event);
 }

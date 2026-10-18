@@ -313,8 +313,8 @@ bool X11WindowHost::poll_one(Event& out) noexcept {
                 std::array<char, 8> buffer{};
                 XLookupString(&raw.xkey, buffer.data(), static_cast<int>(buffer.size()), &keysym,
                               nullptr);
-                const auto word =
-                    translate_key(static_cast<std::uint32_t>(keysym), raw.type == KeyPress);
+                const auto word = translate_key(static_cast<std::uint32_t>(keysym),
+                                                raw.type == KeyPress, raw.xkey.state);
                 if (word.has_value()) {
                     out = *word;
                     return true;

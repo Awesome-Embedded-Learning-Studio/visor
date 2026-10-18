@@ -9,6 +9,7 @@ int main() {
     run_choice_tests();
     run_control_tests();
     run_diff_tests();
+    run_event_tests();
     run_font_tests();
     run_gesture_tests();
     run_host_tests();

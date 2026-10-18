@@ -5,7 +5,6 @@
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
-#include "visor/canvas/color.hpp"
 #include "visor/canvas/mono_canvas.hpp"
 #include "visor/ui/input_router.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
@@ -53,8 +52,8 @@ void run_run_loop_tests() {
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1);
         VISOR_CHECK(button.pressed());
         // Pressed paints Off on top of the panel's On: the flip is visible.
-        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), visor::canvas::Color::Off);
-        VISOR_CHECK_EQ(screen.get(PointI{15, 15}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), false);
+        VISOR_CHECK_EQ(screen.get(PointI{15, 15}), true);
     }
 
     // The timing story, flipped from B6's deferral: one key event per round,
@@ -81,11 +80,11 @@ void run_run_loop_tests() {
         VISOR_CHECK(button.focused());
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // Enter down
         VISOR_CHECK(button.pressed());
-        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), visor::canvas::Color::Off); // the press frame
-        VISOR_CHECK_EQ(fired, 0);                                            // not yet
-        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1);   // Enter up
+        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), false);                   // the press frame
+        VISOR_CHECK_EQ(fired, 0);                                          // not yet
+        VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // Enter up
         VISOR_CHECK(!button.pressed());
-        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(screen.get(PointI{4, 4}), true);
         VISOR_CHECK_EQ(fired, 1); // the release completed the activation
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // the move drains
     }
@@ -162,8 +161,8 @@ void run_run_loop_tests() {
         VISOR_CHECK(two.focused());
         // The ring is real pixels: two's border went dark inside the lit
         // panel, one's corner went back to plain lit.
-        VISOR_CHECK_EQ(screen.get(PointI{10, 10}), visor::canvas::Color::Off);
-        VISOR_CHECK_EQ(screen.get(PointI{2, 2}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(screen.get(PointI{10, 10}), false);
+        VISOR_CHECK_EQ(screen.get(PointI{2, 2}), true);
     }
 
     // Tab over a tree without a single focusable widget: consumed, counted,
@@ -192,8 +191,8 @@ void run_run_loop_tests() {
         Canvas<SizeI{.w = 20, .h = 20}> frame;
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 2);
         VISOR_CHECK(box.checked());
-        VISOR_CHECK_EQ(screen.get(PointI{8, 8}), visor::canvas::Color::On);
-        VISOR_CHECK_EQ(screen.get(PointI{0, 0}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(screen.get(PointI{8, 8}), true);
+        VISOR_CHECK_EQ(screen.get(PointI{0, 0}), true);
     }
 
     // Keyboard activation: Tab lands the focus on the checkbox, Enter flips it
@@ -216,12 +215,12 @@ void run_run_loop_tests() {
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // Enter
         VISOR_CHECK(box.checked());
         // (7,7) is the selected face; unchecking clears it back to the background.
-        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::On);
+        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), true);
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
         VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = 42}));
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // Space
         VISOR_CHECK(!box.checked());
-        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), visor::canvas::Color::Off);
+        VISOR_CHECK_EQ(screen.get(PointI{7, 7}), false);
         VISOR_CHECK_EQ(visor::ui::run_once(host, panel, input, frame), 1); // 42, claimed by nobody
     }
 

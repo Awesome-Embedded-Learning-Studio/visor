@@ -25,9 +25,10 @@ class Checkbox : public Widget {
     /// the state already held changes nothing, the radio's quiet
     /// re-selection.
     void set_checked(bool on) noexcept;
-    void on_pointer_down([[maybe_unused]] base::PointI at) noexcept override;
+    void on_pointer_down([[maybe_unused]] base::PointI at,
+                         [[maybe_unused]] host::Modifiers modifiers) noexcept override;
     /// Enter and Space flip the box, the keyboard's press; other codes pass.
-    void on_key_down(std::uint32_t code) noexcept override;
+    void on_key_down(std::uint32_t code, host::Modifiers modifiers) noexcept override;
 
   protected:
     void on_draw(const Painter& painter) const noexcept override;

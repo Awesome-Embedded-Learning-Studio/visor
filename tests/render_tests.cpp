@@ -25,7 +25,7 @@ using visor::base::PointI;
 using visor::base::RectI;
 using visor::base::SizeI;
 using visor::canvas::Canvas;
-using visor::canvas::Color;
+using visor::canvas::ColorRole;
 using visor::ui::DirtyRegions;
 using visor::ui::Rectangle;
 using visor::ui::Widget;
@@ -45,7 +45,7 @@ class GateScene {
         VISOR_CHECK(root.add_child(&hole));
         VISOR_CHECK(root.add_child(&tail_dot));
         VISOR_CHECK(root.add_child(&head_dot));
-        hole.fill = Color::Off; // Rectangle defaults On; the dark hole is the point
+        hole.fill = visor::canvas::ColorRole::Background; // the dark hole is the point
         tail_dot.set_visible(false);
         head_dot.set_visible(false);
     }
@@ -71,11 +71,11 @@ void compare_integral_vs_strips(Widget& root, int& integral_flushes, int& strip_
     visor::host::OffscreenHost striped(20, 20);
 
     GateCanvas frame;
-    frame.set_clear(Color::Off);
+    frame.set_clear(false);
     visor::ui::render_window(root, frame, kWholeScreen, integral.table());
 
     StripCanvas strip;
-    strip.set_clear(Color::Off);
+    strip.set_clear(false);
     visor::ui::render_strips(root, strip, kScreenSize, striped.table());
 
     std::size_t mismatches = 0;
@@ -116,33 +116,34 @@ void run_render_tests() {
     // The window: a painter whose buffer stores one scene rectangle. Strokes
     // inside land shifted by the window origin, strokes outside vanish.
     Canvas<SizeI{.w = 20, .h = 20}> buffer;
-    buffer.set_clear(Color::Off);
+    buffer.set_clear(false);
     const RectI window{.pos = PointI{5, 5}, .size = SizeI{.w = 10, .h = 10}};
     const visor::ui::CanvasPainter painter{buffer, window};
-    painter.fill(kWholeScreen, Color::On);
-    VISOR_CHECK(buffer.get(PointI{0, 0}) == Color::On);    // scene (5, 5)
-    VISOR_CHECK(buffer.get(PointI{9, 9}) == Color::On);    // scene (14, 14), last covered
-    VISOR_CHECK(buffer.get(PointI{10, 10}) == Color::Off); // scene (15, 15), outside
-    VISOR_CHECK(buffer.get(PointI{19, 19}) == Color::Off);
-    VISOR_CHECK(buffer.get(PointI{4, 4}) == Color::On); // scene (9, 9), inside the window
+    painter.fill(kWholeScreen, visor::canvas::ColorRole::Foreground);
+    VISOR_CHECK(buffer.get(PointI{0, 0}) == true);    // scene (5, 5)
+    VISOR_CHECK(buffer.get(PointI{9, 9}) == true);    // scene (14, 14), last covered
+    VISOR_CHECK(buffer.get(PointI{10, 10}) == false); // scene (15, 15), outside
+    VISOR_CHECK(buffer.get(PointI{19, 19}) == false);
+    VISOR_CHECK(buffer.get(PointI{4, 4}) == true); // scene (9, 9), inside the window
     // A plot outside the window vanishes the same way a Pen plot off-canvas does.
-    buffer.set_clear(Color::Off);
-    painter.plot(PointI{4, 5}, Color::On); // scene x < 5, clipped
-    VISOR_CHECK(buffer.get(PointI{0, 0}) == Color::Off);
-    painter.plot(PointI{5, 5}, Color::On); // the window's first scene pixel
-    VISOR_CHECK(buffer.get(PointI{0, 0}) == Color::On);
+    buffer.set_clear(false);
+    painter.plot(PointI{4, 5}, visor::canvas::ColorRole::Foreground); // scene x < 5, clipped
+    VISOR_CHECK(buffer.get(PointI{0, 0}) == false);
+    painter.plot(PointI{5, 5},
+                 visor::canvas::ColorRole::Foreground); // the window's first scene pixel
+    VISOR_CHECK(buffer.get(PointI{0, 0}) == true);
 
     // The tail window: smaller than its buffer. The canvas stores up to eight
     // rows but the window only owns four, so the surplus rows stay untouched.
     Canvas<SizeI{.w = 20, .h = 8}> tail_buffer;
-    tail_buffer.set_clear(Color::Off);
+    tail_buffer.set_clear(false);
     const visor::ui::CanvasPainter tail_painter{
         tail_buffer, RectI{.pos = PointI{0, 16}, .size = SizeI{.w = 20, .h = 4}}};
-    tail_painter.fill(kWholeScreen, Color::On);
-    VISOR_CHECK(tail_buffer.get(PointI{0, 0}) == Color::On);  // scene row 16
-    VISOR_CHECK(tail_buffer.get(PointI{19, 3}) == Color::On); // scene row 19
-    VISOR_CHECK(tail_buffer.get(PointI{0, 4}) == Color::Off); // below the window
-    VISOR_CHECK(tail_buffer.get(PointI{19, 7}) == Color::Off);
+    tail_painter.fill(kWholeScreen, visor::canvas::ColorRole::Foreground);
+    VISOR_CHECK(tail_buffer.get(PointI{0, 0}) == true);  // scene row 16
+    VISOR_CHECK(tail_buffer.get(PointI{19, 3}) == true); // scene row 19
+    VISOR_CHECK(tail_buffer.get(PointI{0, 4}) == false); // below the window
+    VISOR_CHECK(tail_buffer.get(PointI{19, 7}) == false);
 
     // The collector: overlapping pushes merge, disjoint ones stay separate.
     // Region order on file is not part of the contract, only coverage is.
@@ -222,7 +223,7 @@ void run_render_tests() {
 
         visor::host::OffscreenHost patched(20, 20);
         Canvas<SizeI{.w = 20, .h = 8}> strip;
-        strip.set_clear(Color::Off);
+        strip.set_clear(false);
         visor::ui::render_strips(scene.root, strip, kScreenSize, patched.table());
         VISOR_CHECK_EQ(patched.flush_count(), 3); // v1 arrives in full
 
@@ -232,7 +233,7 @@ void run_render_tests() {
 
         visor::host::OffscreenHost integral(20, 20);
         Canvas<SizeI{.w = 20, .h = 20}> frame;
-        frame.set_clear(Color::Off);
+        frame.set_clear(false);
         visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
 
         DirtyRegions moved;
@@ -249,7 +250,7 @@ void run_render_tests() {
         const GateScene scene;
         visor::host::OffscreenHost striped(20, 20);
         Canvas<SizeI{.w = 20, .h = 8}> strip;
-        strip.set_clear(Color::Off);
+        strip.set_clear(false);
         DirtyRegions everything;
         everything.push(kWholeScreen);
         visor::ui::render_strips(scene.root, strip, kScreenSize, striped.table(), everything);
@@ -265,10 +266,10 @@ void run_render_tests() {
         visor::host::OffscreenHost integral(20, 20);
         visor::host::OffscreenHost striped(20, 20);
         Canvas<SizeI{.w = 20, .h = 20}> frame;
-        frame.set_clear(Color::Off);
+        frame.set_clear(false);
         visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
         Canvas<SizeI{.w = 20, .h = 8}> strip;
-        strip.set_clear(Color::Off);
+        strip.set_clear(false);
         DirtyRegions scattered;
         for (int i = 0; i < 9; ++i) {
             scattered.push(RectI{.pos = PointI{i * 2, i * 2}, .size = SizeI{.w = 1, .h = 1}});
@@ -290,19 +291,19 @@ void run_render_tests() {
         scene.tail_dot.set_visible(true);
         visor::host::OffscreenHost integral(20, 20);
         Canvas<SizeI{.w = 20, .h = 20}> frame;
-        frame.set_clear(Color::Off);
+        frame.set_clear(false);
         visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
 
         visor::host::OffscreenHost batched(20, 20);
         Canvas<SizeI{.w = 20, .h = 16}> half;
-        half.set_clear(Color::Off);
+        half.set_clear(false);
         visor::ui::render_strips(scene.root, half, kScreenSize, batched.table());
         VISOR_CHECK_EQ(batched.flush_count(), 2); // 16 + 4
         compare_hosts(integral, batched);
 
         visor::host::OffscreenHost fine(20, 20);
         Canvas<SizeI{.w = 20, .h = 5}> slim;
-        slim.set_clear(Color::Off);
+        slim.set_clear(false);
         visor::ui::render_strips(scene.root, slim, kScreenSize, fine.table());
         VISOR_CHECK_EQ(fine.flush_count(), 4);
         compare_hosts(integral, fine);
@@ -316,28 +317,28 @@ void run_render_tests() {
         const GateScene scene;
         visor::host::OffscreenHost integral(20, 20);
         Canvas<SizeI{.w = 20, .h = 20}> frame;
-        frame.set_clear(Color::Off);
+        frame.set_clear(false);
         visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
 
         // The patched host first holds a full frame (it plays a screen with
         // last round's pixels), then replays one small window over it.
         visor::host::OffscreenHost patched(20, 20);
         Canvas<SizeI{.w = 20, .h = 20}> whole;
-        whole.set_clear(Color::Off);
+        whole.set_clear(false);
         visor::ui::render_window(scene.root, whole, kWholeScreen, patched.table());
         VISOR_CHECK_EQ(patched.flush_count(), 1);
 
         Canvas<SizeI{.w = 8, .h = 4}> patch;
-        patch.set_clear(Color::Off);
+        patch.set_clear(false);
         const RectI patch_window{.pos = PointI{3, 5}, .size = SizeI{.w = 7, .h = 3}};
         visor::ui::render_window(scene.root, patch, patch_window, patched.table());
         // The painter shifted scene (3, 5) to buffer (0, 0) and scene (4, 6),
         // the hole's first dark pixel, to buffer (1, 1); column 7 and row 3
         // are surplus the 7x3 window never owns.
-        VISOR_CHECK(patch.get(PointI{0, 0}) == Color::On);
-        VISOR_CHECK(patch.get(PointI{1, 1}) == Color::Off);
-        VISOR_CHECK(patch.get(PointI{7, 0}) == Color::Off);
-        VISOR_CHECK(patch.get(PointI{0, 3}) == Color::Off);
+        VISOR_CHECK(patch.get(PointI{0, 0}) == true);
+        VISOR_CHECK(patch.get(PointI{1, 1}) == false);
+        VISOR_CHECK(patch.get(PointI{7, 0}) == false);
+        VISOR_CHECK(patch.get(PointI{0, 3}) == false);
         VISOR_CHECK_EQ(patched.flush_count(), 2);
         compare_hosts(integral, patched);
     }
@@ -367,7 +368,7 @@ void run_render_tests() {
 
         visor::host::OffscreenHost screen(20, 20);
         Canvas<SizeI{.w = 20, .h = 8}> strip;
-        strip.set_clear(Color::Off);
+        strip.set_clear(false);
         // The first frame is the caller's job: run_dirty only repaints
         // what a report names, so it starts from a full render_strips.
         visor::ui::render_strips(ground, strip, kScreenSize, screen.table());
@@ -381,7 +382,7 @@ void run_render_tests() {
         VISOR_CHECK_EQ(debts.count(), std::size_t{0}); // retired with the rebuild
         VISOR_CHECK(box.focused());
         VISOR_CHECK(!box.checked());
-        VISOR_CHECK(screen.get(PointI{2, 2}) == Color::Off); // the ring went out
+        VISOR_CHECK(screen.get(PointI{2, 2}) == false); // the ring went out
         // The state assertion distinguishes checking from focus before later pixel checks.
 
         // Round two: Space checks the checkbox. The mark report is the same
@@ -391,7 +392,7 @@ void run_render_tests() {
             visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 5);
         VISOR_CHECK(box.checked());
-        VISOR_CHECK(screen.get(PointI{2, 2}) == Color::Off); // frame and ring both dark
+        VISOR_CHECK(screen.get(PointI{2, 2}) == false); // frame and ring both dark
 
         // Round three: Tab walks to the tail button. The checkbox un-ring
         // report and the button ring report live in different strips, so
@@ -402,9 +403,9 @@ void run_render_tests() {
         VISOR_CHECK_EQ(screen.flush_count(), 7);
         VISOR_CHECK(tail_button.focused());
         VISOR_CHECK(!box.focused());
-        VISOR_CHECK(screen.get(PointI{12, 16}) == Color::Off); // the ring moved to the button
-        VISOR_CHECK(screen.get(PointI{2, 2}) == Color::On);    // the box corner is plain again
-        VISOR_CHECK(screen.get(PointI{5, 5}) == Color::On);    // the checked face stays put
+        VISOR_CHECK(screen.get(PointI{12, 16}) == false); // the ring moved to the button
+        VISOR_CHECK(screen.get(PointI{2, 2}) == true);    // the box corner is plain again
+        VISOR_CHECK(screen.get(PointI{5, 5}) == true);    // the checked face stays put
 
         // Rounds four and five: Enter presses the focused button, its up
         // releases and fires. Each round rebuilds exactly the button's strip.
@@ -413,14 +414,14 @@ void run_render_tests() {
             visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 8);
         VISOR_CHECK(tail_button.pressed());
-        VISOR_CHECK(screen.get(PointI{13, 17}) == Color::Off); // the press frame went out
-        VISOR_CHECK_EQ(fired, 0);                              // down never fires
+        VISOR_CHECK(screen.get(PointI{13, 17}) == false); // the press frame went out
+        VISOR_CHECK_EQ(fired, 0);                         // down never fires
         VISOR_CHECK(screen.push_event(visor::host::KeyUp{.code = visor::host::kKeyEnter}));
         VISOR_CHECK_EQ(
             visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 1);
         VISOR_CHECK_EQ(screen.flush_count(), 9);
         VISOR_CHECK(!tail_button.pressed());
-        VISOR_CHECK(screen.get(PointI{13, 17}) == Color::On);
+        VISOR_CHECK(screen.get(PointI{13, 17}) == true);
         VISOR_CHECK_EQ(fired, 1); // the release completed the activation
 
         // Round six, idle: no events, no debts, nothing submitted.

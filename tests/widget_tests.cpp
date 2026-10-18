@@ -27,25 +27,25 @@ class RecordingPainter final : public visor::ui::Painter {
   public:
     struct Fill {
         visor::base::RectI area;
-        visor::canvas::Color ink;
+        visor::canvas::ColorRole ink;
     };
     struct Plotted {
         visor::base::PointI at;
-        visor::canvas::Color ink;
+        visor::canvas::ColorRole ink;
     };
     struct BitmapDrawn {
         visor::base::PointI at;
         int scale = 1;
     };
 
-    void fill(visor::base::RectI area, visor::canvas::Color ink) const noexcept override {
+    void fill(visor::base::RectI area, visor::canvas::ColorRole ink) const noexcept override {
         fills_.push_back(Fill{.area = area, .ink = ink});
     }
-    void plot(visor::base::PointI p, visor::canvas::Color ink) const noexcept override {
+    void plot(visor::base::PointI p, visor::canvas::ColorRole ink) const noexcept override {
         plots_.push_back(Plotted{.at = p, .ink = ink});
     }
     void draw_bitmap(visor::base::PointI at, const visor::draw::MonoBitmap& source,
-                     visor::canvas::Color ink, int scale) const noexcept override {
+                     visor::canvas::ColorRole ink, int scale) const noexcept override {
         static_cast<void>(source);
         static_cast<void>(ink);
         bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
@@ -54,7 +54,7 @@ class RecordingPainter final : public visor::ui::Painter {
     [[nodiscard]] const std::vector<Fill>& fills() const noexcept { return fills_; }
     [[nodiscard]] const std::vector<Plotted>& plots() const noexcept { return plots_; }
     void
-    fill_rounded(visor::base::RectI area, visor::canvas::Color ink,
+    fill_rounded(visor::base::RectI area, visor::canvas::ColorRole ink,
                  [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {
         fills_.push_back(Fill{.area = area, .ink = ink});
     }
@@ -92,6 +92,7 @@ void run_widget_tests() {
     using visor::base::PointI;
     using visor::base::RectI;
     using visor::base::SizeI;
+    using visor::canvas::ColorRole;
     using visor::ui::Widget;
 
     const RectI root_bounds{.pos = PointI{0, 0}, .size = SizeI{.w = 20, .h = 20}};
@@ -158,52 +159,52 @@ void run_widget_tests() {
 
     // Rectangle paints exactly its own bounds with its ink, nothing else.
     visor::ui::Rectangle rect(left_bounds);
-    rect.fill = visor::canvas::Color::Off;
+    rect.fill = ColorRole::Background;
     rect.draw(painter);
     VISOR_CHECK_EQ(painter.fills().size(), 1U);
     VISOR_CHECK_EQ(painter.fills()[0].area, left_bounds);
-    VISOR_CHECK_EQ(painter.fills()[0].ink, visor::canvas::Color::Off);
+    VISOR_CHECK_EQ(painter.fills()[0].ink, ColorRole::Background);
 
     // Button: the state flip and the ink flip agree on both edges of a press.
     visor::ui::Button button(left_bounds);
     VISOR_CHECK(!button.pressed());
     button.draw(painter);
     VISOR_CHECK_EQ(painter.fills().size(), 2U);
-    VISOR_CHECK_EQ(painter.fills()[1].ink, visor::canvas::Color::On);
-    button.on_pointer_down(PointI{5, 5});
+    VISOR_CHECK_EQ(painter.fills()[1].ink, ColorRole::Accent);
+    button.on_pointer_down(PointI{5, 5}, {});
     VISOR_CHECK(button.pressed());
     button.draw(painter);
     VISOR_CHECK_EQ(painter.fills().size(), 4U);
-    VISOR_CHECK_EQ(painter.fills()[2].ink, visor::canvas::Color::On);
-    VISOR_CHECK_EQ(painter.fills()[3].ink, visor::canvas::Color::Off);
+    VISOR_CHECK_EQ(painter.fills()[2].ink, ColorRole::Border);
+    VISOR_CHECK_EQ(painter.fills()[3].ink, ColorRole::Background);
     button.on_pointer_up(PointI{5, 5});
     VISOR_CHECK(!button.pressed());
     button.draw(painter);
     VISOR_CHECK_EQ(painter.fills().size(), 5U);
-    VISOR_CHECK_EQ(painter.fills()[4].ink, visor::canvas::Color::On);
+    VISOR_CHECK_EQ(painter.fills()[4].ink, ColorRole::Accent);
 
     // The same story on real pixels: unpressed lights its bounds, pressed
     // clears them again.
     visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> frame;
     const visor::ui::CanvasPainter frame_painter{frame};
-    frame.set_clear(visor::canvas::Color::Off);
+    frame.set_clear(false);
     button.draw(frame_painter);
-    VISOR_CHECK(frame.get(PointI{4, 4}) == visor::canvas::Color::On);
-    button.on_pointer_down(PointI{5, 5});
-    frame.set_clear(visor::canvas::Color::Off);
+    VISOR_CHECK(frame.get(PointI{4, 4}) == true);
+    button.on_pointer_down(PointI{5, 5}, {});
+    frame.set_clear(false);
     button.draw(frame_painter);
-    VISOR_CHECK(frame.get(PointI{4, 4}) == visor::canvas::Color::Off);
+    VISOR_CHECK(frame.get(PointI{4, 4}) == false);
 
     // Replay contract: a panel with a pressed button on top, drawn twice,
     // must leave identical bytes -- draw reads state and touches nothing.
     visor::ui::Rectangle panel(root_bounds);
     visor::ui::Button redial(left_bounds);
     VISOR_CHECK(panel.add_child(&redial));
-    redial.on_pointer_down(PointI{5, 5});
+    redial.on_pointer_down(PointI{5, 5}, {});
     visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> replay_first;
     visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> replay_second;
-    replay_first.set_clear(visor::canvas::Color::Off);
-    replay_second.set_clear(visor::canvas::Color::Off);
+    replay_first.set_clear(false);
+    replay_second.set_clear(false);
     panel.draw(visor::ui::CanvasPainter{replay_first});
     panel.draw(visor::ui::CanvasPainter{replay_second});
     VISOR_CHECK(std::equal(replay_first.pixels().begin(), replay_first.pixels().end(),
@@ -249,47 +250,47 @@ void run_widget_tests() {
     // interior stays lit, and dropping the focus restores the plain fill.
     visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> ring_frame;
     const visor::ui::CanvasPainter ring_painter{ring_frame};
-    ring_frame.set_clear(visor::canvas::Color::Off);
+    ring_frame.set_clear(false);
     alpha.set_focused(true);
     alpha.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::Off);
-    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == visor::canvas::Color::On);
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == false);
+    VISOR_CHECK(ring_frame.get(PointI{2, 2}) == true);
     alpha.set_focused(false);
-    ring_frame.set_clear(visor::canvas::Color::Off);
+    ring_frame.set_clear(false);
     alpha.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::On);
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == true);
 
     // A checked checkbox has a visible cut-out check; unchecked is an empty outline.
     visor::ui::Checkbox toggle(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 14, .h = 14}});
     VISOR_CHECK(!toggle.checked());
-    toggle.on_pointer_down(PointI{5, 5});
+    toggle.on_pointer_down(PointI{5, 5}, {});
     VISOR_CHECK(toggle.checked());
-    ring_frame.set_clear(visor::canvas::Color::Off);
+    ring_frame.set_clear(false);
     toggle.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == visor::canvas::Color::On);  // outline
-    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On);  // filled face
-    VISOR_CHECK(ring_frame.get(PointI{3, 7}) == visor::canvas::Color::Off); // check starts here
-    toggle.on_pointer_down(PointI{5, 5});
-    ring_frame.set_clear(visor::canvas::Color::Off);
+    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == true);  // outline
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == true);  // filled face
+    VISOR_CHECK(ring_frame.get(PointI{3, 7}) == false); // check starts here
+    toggle.on_pointer_down(PointI{5, 5}, {});
+    ring_frame.set_clear(false);
     toggle.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == visor::canvas::Color::On);
-    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::Off); // empty face
-    toggle.on_pointer_down(PointI{5, 5});
+    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == true);
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == false); // empty face
+    toggle.on_pointer_down(PointI{5, 5}, {});
     toggle.set_focused(true);
-    ring_frame.set_clear(visor::canvas::Color::Off);
+    ring_frame.set_clear(false);
     toggle.draw(ring_painter);
-    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == visor::canvas::Color::Off);
-    VISOR_CHECK(ring_frame.get(PointI{1, 0}) == visor::canvas::Color::On);  // dotted focus
-    VISOR_CHECK(ring_frame.get(PointI{1, 1}) == visor::canvas::Color::Off); // gap
-    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == visor::canvas::Color::On);  // outline
-    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == visor::canvas::Color::On);  // checked face
+    VISOR_CHECK(ring_frame.get(PointI{0, 0}) == false);
+    VISOR_CHECK(ring_frame.get(PointI{1, 0}) == true);  // dotted focus
+    VISOR_CHECK(ring_frame.get(PointI{1, 1}) == false); // gap
+    VISOR_CHECK(ring_frame.get(PointI{3, 2}) == true);  // outline
+    VISOR_CHECK(ring_frame.get(PointI{4, 4}) == true);  // checked face
 
     // The replay promise now covers focus and a toggled control too: a panel
     // with a pressed button and a checked, focused checkbox, drawn twice,
     // still leaves identical bytes.
     visor::ui::Checkbox replay_toggle(left_bounds);
     VISOR_CHECK(panel.add_child(&replay_toggle));
-    replay_toggle.on_pointer_down(PointI{5, 5});
+    replay_toggle.on_pointer_down(PointI{5, 5}, {});
     replay_toggle.set_focused(true);
     panel.draw(visor::ui::CanvasPainter{replay_first});
     panel.draw(visor::ui::CanvasPainter{replay_second});
@@ -304,7 +305,7 @@ void run_widget_tests() {
     visor::ui::Button wired_one(left_bounds);
     VISOR_CHECK(wired_panel.add_child(&wired_one));
     wired_panel.set_dirty_sink(&reports);
-    wired_one.on_pointer_down(PointI{5, 5}); // a control reports its own bounds
+    wired_one.on_pointer_down(PointI{5, 5}, {}); // a control reports its own bounds
     VISOR_CHECK_EQ(reports.count(), std::size_t{1});
     VISOR_CHECK_EQ(reports.at(0), left_bounds);
     reports.clear();
@@ -319,7 +320,7 @@ void run_widget_tests() {
     reports.clear();
     visor::ui::Button late(RectI{.pos = PointI{12, 12}, .size = SizeI{.w = 4, .h = 4}});
     VISOR_CHECK(wired_panel.add_child(&late)); // the adoptee inherits the sink
-    late.on_pointer_down(PointI{5, 5});
+    late.on_pointer_down(PointI{5, 5}, {});
     VISOR_CHECK_EQ(reports.count(), std::size_t{1});
     VISOR_CHECK_EQ(reports.at(0), late.bounds());
     reports.clear();

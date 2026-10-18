@@ -87,4 +87,11 @@ template <typename CanvasT>
  */
 [[nodiscard]] std::uint64_t current_time_ms(const HostTable& host) noexcept;
 
+/**
+ * @brief Whether the host wired a clock. current_time_ms cannot tell a real
+ *        zero from a missing entry, so gesture layers that need a time base
+ *        ask this before trusting a zero.
+ */
+[[nodiscard]] bool has_clock(const HostTable& host) noexcept;
+
 } // namespace visor::host

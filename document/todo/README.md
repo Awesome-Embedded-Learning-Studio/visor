@@ -11,6 +11,7 @@
 | 第四站 Cinux 与桌面层 | [stage-4-cinux.md](stage-4-cinux.md)               | visor 侧已毕（B17），适配层在 CinuxOS 仓 |
 | 梯队外 PC 窗口宿主    | [stage-x-pc-window.md](stage-x-pc-window.md)       | 主线先行（2026-10-14）         |
 | 交叉清单（不绑站）    | [crosscutting.md](crosscutting.md)                 | 基本清空，余两项挂起           |
+| 跨仓引导（vesper）    | [vesper-brief.md](vesper-brief.md)                 | 2026-10-17 新增，待消化        |
 
 ## 分叉与留档
 

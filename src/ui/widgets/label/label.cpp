@@ -13,9 +13,9 @@
 namespace visor::ui {
 
 Label::Label(base::PointI origin, std::string_view text, const draw::MonoFont& font,
-             canvas::Color ink, int scale) noexcept
+             canvas::ColorRole role, int scale) noexcept
     : Widget{base::RectI{.pos = origin, .size = draw::measure_text(font, text, scale)}},
-      text_{text}, font_{font}, ink_{ink}, scale_{scale} {}
+      text_{text}, font_{font}, role_{role}, scale_{scale} {}
 
 void Label::set_text(std::string_view text) noexcept {
     if (text == text_) {
@@ -37,8 +37,7 @@ base::RectI Label::measured_bounds(base::PointI origin) const noexcept {
 }
 
 void Label::on_draw(const Painter& painter) const noexcept {
-    draw_text(painter, bounds().pos, font_, text_, theme() != nullptr ? theme()->foreground : ink_,
-              scale_);
+    draw_text(painter, bounds().pos, font_, text_, role_, scale_);
 }
 
 } // namespace visor::ui

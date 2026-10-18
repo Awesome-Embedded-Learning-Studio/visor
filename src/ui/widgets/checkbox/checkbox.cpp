@@ -26,12 +26,14 @@ void Checkbox::set_checked(bool on) noexcept {
     invalidate(bounds());
 }
 
-void Checkbox::on_pointer_down([[maybe_unused]] base::PointI at) noexcept {
+void Checkbox::on_pointer_down([[maybe_unused]] base::PointI at,
+                               [[maybe_unused]] host::Modifiers modifiers) noexcept {
     checked_ = !checked_;
     invalidate(bounds());
 }
 
-void Checkbox::on_key_down(std::uint32_t code) noexcept {
+void Checkbox::on_key_down(std::uint32_t code,
+                           [[maybe_unused]] host::Modifiers modifiers) noexcept {
     // Activation is the keyboard's press: the two named keys flip the box
     // exactly as a pointer press does -- Space in its code-point form
     // included, a text host types 0x20 -- and every other code is none of
@@ -43,12 +45,13 @@ void Checkbox::on_key_down(std::uint32_t code) noexcept {
 }
 
 void Checkbox::on_draw(const Painter& painter) const noexcept {
-    const canvas::Color fg = theme() != nullptr ? theme()->foreground : canvas::Color::On;
-    const canvas::Color bg = theme() != nullptr ? theme()->background : canvas::Color::Off;
+    const auto frame = canvas::ColorRole::Border;
+    const auto ground = canvas::ColorRole::Background;
     const base::RectI box = base::inset(bounds(), 2);
     painter.fill_rounded(
-        box, fg, CornerRadius{.top_left = 1, .top_right = 1, .bottom_right = 1, .bottom_left = 1});
-    painter.fill(base::inset(box, 1), checked_ ? fg : bg);
+        box, frame,
+        CornerRadius{.top_left = 1, .top_right = 1, .bottom_right = 1, .bottom_left = 1});
+    painter.fill(base::inset(box, 1), checked_ ? canvas::ColorRole::Accent : ground);
     if (!checked_ || box.size.w < 3 || box.size.h < 3) {
         return;
     }
@@ -61,7 +64,7 @@ void Checkbox::on_draw(const Painter& painter) const noexcept {
                             (x * (mark.size.h - 1 - (mark.size.h / 2)) / std::max(1, knee))
                       : mark.size.h - 1 -
                             ((x - knee) * (mark.size.h - 1) / std::max(1, mark.size.w - 1 - knee));
-        painter.plot(base::PointI{mark.pos.x + x, mark.pos.y + y}, bg);
+        painter.plot(base::PointI{mark.pos.x + x, mark.pos.y + y}, canvas::ColorRole::OnAccent);
     }
 }
 

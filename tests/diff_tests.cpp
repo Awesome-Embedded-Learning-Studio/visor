@@ -43,7 +43,7 @@ void run_diff_tests() {
     using visor::base::PointI;
     using visor::base::SizeI;
     using visor::canvas::Canvas;
-    using visor::canvas::Color;
+    using visor::canvas::ColorRole;
     using visor::draw::Pen;
     using visor::host::OffscreenHost;
 
@@ -51,7 +51,7 @@ void run_diff_tests() {
 
     // Paint the scene with one pen, five fills.
     GateCanvas canvas;
-    const Pen pen{canvas, Color::On};
+    const Pen pen{canvas, true};
     for (const auto& area : kScene) {
         pen.fill(area);
     }
@@ -68,9 +68,9 @@ void run_diff_tests() {
     std::size_t host_vs_canvas = 0;
     for (int y = 0; y < 64; ++y) {
         for (int x = 0; x < 128; ++x) {
-            const Color from_canvas = canvas.get(PointI{x, y});
-            const Color from_host = mirror.get(PointI{x, y});
-            const Color reference = expected_on(x, y) ? Color::On : Color::Off;
+            const bool from_canvas = canvas.get(PointI{x, y});
+            const bool from_host = mirror.get(PointI{x, y});
+            const bool reference = expected_on(x, y);
             if (from_canvas != reference) {
                 if (canvas_vs_reference == 0) {
                     std::println("canvas first mismatch at ({}, {})", x, y);

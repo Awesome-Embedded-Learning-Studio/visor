@@ -31,7 +31,8 @@ class InputRouter {
   private:
     // dispatch_event is the one writer: ownership changes only as events
     // arrive, never by hand.
-    friend void dispatch_event(Widget& root, InputRouter& input, const host::Event& event) noexcept;
+    friend void dispatch_event(Widget& root, InputRouter& input, const host::Event& event,
+                               std::uint64_t now_ms) noexcept;
 
     Widget* press_owner_ = nullptr;
 };
@@ -45,11 +46,17 @@ class InputRouter {
  * owner; a press that finds nobody owns nothing); moves go to the owner
  * while a press is held and to hit testing's topmost widget otherwise (the
  * hover foundation); the release goes to the owner wherever it lands and
- * retires the ownership. Tab (the one named key code) still moves the focus
- * along the tree; every other key code goes to the focus holder verbatim.
- * The point or key that finds no receiver ends the round unconsumed beyond
- * the count.
+ * retires the ownership. The wheel is a hover word: it goes to the topmost
+ * widget under the pointer and leaves ownership alone. Tab (the one named key
+ * code) still moves the focus along the tree; every other key code goes to
+ * the focus holder verbatim. The point or key that finds no receiver ends the
+ * round unconsumed beyond the count.
+ *
+ * now_ms is the round's clock reading, shared by every event the round
+ * dispatches. It is carried now so later gesture layers (double click) can
+ * use one time base without changing this table again.
  */
-void dispatch_event(Widget& root, InputRouter& input, const host::Event& event) noexcept;
+void dispatch_event(Widget& root, InputRouter& input, const host::Event& event,
+                    std::uint64_t now_ms) noexcept;
 
 } // namespace visor::ui

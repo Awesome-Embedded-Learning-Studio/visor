@@ -4,7 +4,6 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
-#include "visor/canvas/color.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -42,8 +41,8 @@ class OffscreenHost {
     /// Building the channel is not a const act: the table carries mutable access.
     [[nodiscard]] HostTable table() noexcept;
 
-    /// Reads a received pixel; out-of-bounds reads as Off.
-    [[nodiscard]] canvas::Color get(base::PointI p) const noexcept;
+    /// Reads a received pixel; out-of-bounds reads as unlit.
+    [[nodiscard]] bool get(base::PointI p) const noexcept;
 
     /// Successful region receptions, full frames included.
     [[nodiscard]] int flush_count() const noexcept;

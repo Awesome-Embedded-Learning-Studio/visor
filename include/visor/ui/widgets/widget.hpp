@@ -5,6 +5,7 @@
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
+#include "visor/bindings/events.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/theme.hpp"
@@ -80,13 +81,18 @@ class Widget {
     /// assembly, usually on the root; late-added children inherit it too.
     void set_dirty_sink(DirtyRegions* sink) noexcept;
 
-    /// Wires the color scheme for this whole subtree and reports every
-    /// widget's bounds as owed repaint -- switching a theme at runtime is
-    /// this one call, the pixels follow the reports. An unwired tree keeps
-    /// the pre-theme hardcoded polarities (the light scheme's values), so
-    /// nothing changes for trees that never wire one. A same-pointer call
-    /// wires nothing twice.
+    /// Wires the color scheme the render loop reads from this tree's root and
+    /// reports every widget's bounds as owed repaint -- switching a theme at
+    /// runtime is this one call, the pixels follow the reports. The scheme is
+    /// one per frame: a call on a subtree still reports repaint, but the frame
+    /// uses the root's scheme. An unwired tree renders through the light
+    /// preset. A same-pointer call wires nothing twice.
     void set_theme(const Theme* theme) noexcept;
+
+    /// The scheme wired to this tree, null when nobody wired one. The render
+    /// loop reads the root's scheme to build the painter; widgets themselves
+    /// name roles.
+    [[nodiscard]] const Theme* theme() const noexcept { return theme_; }
 
     /// Draws this subtree pre-order, skipping every invisible widget.
     void draw(const Painter& painter) const noexcept;
@@ -102,7 +108,8 @@ class Widget {
     /// pointer it owns wherever it goes, and the press is where tracking
     /// starts (a slider grabs at the press). The default control takes no
     /// input, so an empty body is the honest base.
-    virtual void on_pointer_down([[maybe_unused]] base::PointI at) noexcept {}
+    virtual void on_pointer_down([[maybe_unused]] base::PointI at,
+                                 [[maybe_unused]] host::Modifiers modifiers) noexcept {}
     /// Receives the matching release at the position it landed. Capture routes
     /// the release to the press's owner wherever that is, so unlike the press
     /// the position is the receiver's to judge (a button calls it a click only
@@ -113,19 +120,25 @@ class Widget {
     /// does (hover's foundation), and a move that finds nobody reaches nobody.
     /// The default control ignores movement.
     virtual void on_pointer_move([[maybe_unused]] base::PointI at) noexcept {}
+    /// Receives a wheel word at the position it landed. Wheels route by hover,
+    /// never by press ownership: a wheel while a press is held still goes to
+    /// the widget under the pointer. The default control ignores the wheel.
+    virtual void on_pointer_wheel([[maybe_unused]] const host::PointerWheel& wheel) noexcept {}
 
     /// Receives a key code while this widget holds the focus. The dispatcher
     /// routes every code except Tab here; a control compares against the codes
     /// events.hpp names and ignores the rest. The default control consumes no
     /// keys, so an empty body is the honest base again.
-    virtual void on_key_down([[maybe_unused]] std::uint32_t code) noexcept {}
+    virtual void on_key_down([[maybe_unused]] std::uint32_t code,
+                             [[maybe_unused]] host::Modifiers modifiers) noexcept {}
 
     /// Receives the matching release, if the widget still holds the focus
     /// when it arrives. Release tracking is where keyboard activation
     /// completes (Button presses on down, fires on up); the default control
     /// tracks nothing, so an empty body is the honest base. Codes arrive
     /// verbatim: a release the control never pressed is its to ignore.
-    virtual void on_key_up([[maybe_unused]] std::uint32_t code) noexcept {}
+    virtual void on_key_up([[maybe_unused]] std::uint32_t code,
+                           [[maybe_unused]] host::Modifiers modifiers) noexcept {}
 
     /// Whether Tab traversal may hand this widget the keyboard focus. The
     /// honest base takes no input at all; interactive controls override.
@@ -148,10 +161,6 @@ class Widget {
   protected:
     /// Paints this widget only; the tree walk around it belongs to draw().
     virtual void on_draw(const Painter& painter) const noexcept = 0;
-
-    /// The wired color scheme, null when the tree never set one (the
-    /// controls then keep their hardcoded light polarities).
-    [[nodiscard]] const Theme* theme() const noexcept { return theme_; }
 
     /// Reports an area as owing a repaint. State mutators call this as they
     /// change; with no sink wired the report is dropped, which keeps widgets

@@ -27,8 +27,8 @@ namespace visor::ui {
  */
 class Label : public Widget {
   public:
-    Label(base::PointI origin, std::string_view text, const draw::MonoFont& font, canvas::Color ink,
-          int scale = 1) noexcept;
+    Label(base::PointI origin, std::string_view text, const draw::MonoFont& font,
+          canvas::ColorRole role = canvas::ColorRole::Foreground, int scale = 1) noexcept;
 
     /// Re-measures and resizes at the same origin. An unchanged text
     /// reports nothing, matching set_visible's stance on no-op calls.
@@ -44,7 +44,7 @@ class Label : public Widget {
 
     std::string_view text_;
     draw::MonoFont font_;
-    canvas::Color ink_;
+    canvas::ColorRole role_;
     int scale_;
 };
 

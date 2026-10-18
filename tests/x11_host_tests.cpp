@@ -97,10 +97,7 @@ void compare_readback(Display* display, Window window, const CanvasT& canvas, in
         const std::uint32_t* row = words + (static_cast<std::size_t>(y) *
                                             static_cast<std::size_t>(shot->bytes_per_line / 4));
         for (int x = 0; x < static_cast<int>(CanvasT::kWidth) * scale; ++x) {
-            const auto expected =
-                canvas.get(visor::base::PointI{x / scale, y / scale}) == visor::canvas::Color::On
-                    ? lit
-                    : 0U;
+            const auto expected = canvas.get(visor::base::PointI{x / scale, y / scale}) ? lit : 0U;
             VISOR_CHECK_EQ(row[x], expected);
         }
     }
@@ -123,7 +120,7 @@ void put_back_word(Display* host_display, const XEvent& word) {
 void run_x11_host_tests() {
     using visor::base::PointI;
     using visor::canvas::Canvas;
-    using visor::canvas::Color;
+    using visor::canvas::ColorRole;
     using Frame = Canvas<visor::base::SizeI{.w = kWidth, .h = kHeight}>;
 
     VirtualDisplay const screen(":99");
@@ -152,8 +149,8 @@ void run_x11_host_tests() {
     // word, the dark panel as zero.
     {
         Frame frame;
-        frame.set_clear(Color::Off);
-        const visor::draw::Pen on_pen{frame, Color::On};
+        frame.set_clear(false);
+        const visor::draw::Pen on_pen{frame, true};
         on_pen.fill({.pos = PointI{0, 0}, .size = {.w = kWidth, .h = 32}});
         on_pen.fill({.pos = PointI{100, 40}, .size = {.w = 1, .h = 20}}); // an odd column
         auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight);
@@ -172,8 +169,8 @@ void run_x11_host_tests() {
     // the region's byte edges survive the paint.
     {
         Frame frame;
-        frame.set_clear(Color::Off);
-        const visor::draw::Pen on_pen{frame, Color::On};
+        frame.set_clear(false);
+        const visor::draw::Pen on_pen{frame, true};
         on_pen.fill({.pos = PointI{0, 0}, .size = {.w = kWidth, .h = kHeight}});
         auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight);
         VISOR_CHECK(host.has_value());
@@ -184,7 +181,7 @@ void run_x11_host_tests() {
         XSync(screen.display(), False);
 
         const visor::base::RectI region{.pos = PointI{5, 20}, .size = {.w = 33, .h = 24}};
-        const visor::draw::Pen off_pen{frame, Color::Off};
+        const visor::draw::Pen off_pen{frame, false};
         off_pen.fill(region); // punch a dark hole, byte-unaligned both edges
         // The contract: pixels points at the region's own first byte, not the
         // canvas base -- offset to the region's top row and leading byte.
@@ -293,8 +290,8 @@ void run_x11_host_tests() {
     // restores them from the shadow without the core repainting a thing.
     {
         Frame frame;
-        frame.set_clear(Color::Off);
-        const visor::draw::Pen on_pen{frame, Color::On};
+        frame.set_clear(false);
+        const visor::draw::Pen on_pen{frame, true};
         on_pen.fill({.pos = PointI{10, 10}, .size = {.w = 60, .h = 40}});
         auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight);
         VISOR_CHECK(host.has_value());
@@ -307,7 +304,7 @@ void run_x11_host_tests() {
         XClearWindow(screen.display(), host->window());
         XSync(screen.display(), False);
         Frame blank;
-        blank.set_clear(Color::Off);
+        blank.set_clear(false);
         compare_readback(screen.display(), host->window(), blank); // truly wiped
 
         XEvent word{};
@@ -331,8 +328,8 @@ void run_x11_host_tests() {
     // the canvas it owns and repaints only that corner, heap intact.
     {
         Frame frame;
-        frame.set_clear(Color::Off);
-        const visor::draw::Pen on_pen{frame, Color::On};
+        frame.set_clear(false);
+        const visor::draw::Pen on_pen{frame, true};
         on_pen.fill({.pos = PointI{0, 0}, .size = {.w = 64, .h = 64}});
         auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight);
         VISOR_CHECK(host.has_value());
@@ -364,8 +361,8 @@ void run_x11_host_tests() {
     // An OLED-sized canvas is stamp-sized on a desktop otherwise.
     {
         Frame frame;
-        frame.set_clear(Color::Off);
-        const visor::draw::Pen on_pen{frame, Color::On};
+        frame.set_clear(false);
+        const visor::draw::Pen on_pen{frame, true};
         on_pen.fill({.pos = PointI{0, 0}, .size = {.w = kWidth, .h = 20}});
         on_pen.fill({.pos = PointI{7, 30}, .size = {.w = 3, .h = 10}}); // odd leading column
         auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight, 3);

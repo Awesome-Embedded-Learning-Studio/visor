@@ -14,6 +14,7 @@
 #include "visor/ui/theme.hpp"
 #include "visor/ui/widgets/button/button.hpp"
 #include "visor/ui/widgets/checkbox/checkbox.hpp"
+#include "visor/ui/widgets/knob/knob.hpp"
 #include "visor/ui/widgets/label/label.hpp"
 
 #include <cstddef>
@@ -33,17 +34,18 @@ class RecordingPainter final : public visor::ui::Painter {
     };
 
     void fill([[maybe_unused]] visor::base::RectI area,
-              [[maybe_unused]] visor::canvas::Color ink) const noexcept override {}
+              [[maybe_unused]] visor::canvas::ColorRole ink) const noexcept override {}
     void plot([[maybe_unused]] visor::base::PointI at,
-              [[maybe_unused]] visor::canvas::Color ink) const noexcept override {}
+              [[maybe_unused]] visor::canvas::ColorRole ink) const noexcept override {}
     void draw_bitmap(visor::base::PointI at, [[maybe_unused]] const visor::draw::MonoBitmap& source,
-                     [[maybe_unused]] visor::canvas::Color ink, int scale) const noexcept override {
+                     [[maybe_unused]] visor::canvas::ColorRole ink,
+                     int scale) const noexcept override {
         bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
     }
 
     void
     fill_rounded([[maybe_unused]] visor::base::RectI area,
-                 [[maybe_unused]] visor::canvas::Color ink,
+                 [[maybe_unused]] visor::canvas::ColorRole ink,
                  [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {}
 
     [[nodiscard]] const std::vector<BitmapDrawn>& bitmaps() const noexcept { return bitmaps_; }
@@ -109,7 +111,7 @@ void run_control_tests() {
         .glyphs = assets::label_font::kGlyphs,
         .bits = assets::label_font::kBits,
     };
-    visor::ui::Label label(PointI{2, 3}, "ab", label_font, visor::canvas::Color::On);
+    visor::ui::Label label(PointI{2, 3}, "ab", label_font, visor::canvas::ColorRole::Foreground);
     VISOR_CHECK_EQ(label.bounds(), (RectI{.pos = PointI{2, 3}, .size = SizeI{.w = 6, .h = 4}}));
     VISOR_CHECK(!label.focusable());
     label.draw(painter);
@@ -140,17 +142,18 @@ void run_control_tests() {
     // The same story on real pixels: 'a' blocks and 'b' columns at their pens,
     // the advance gap between them stays dark.
     visor::canvas::Canvas<visor::base::SizeI{.w = 16, .h = 8}> label_frame;
-    label_frame.set_clear(visor::canvas::Color::Off);
+    label_frame.set_clear(false);
     label.draw(visor::ui::CanvasPainter{label_frame});
-    VISOR_CHECK(label_frame.get(PointI{2, 3}) == visor::canvas::Color::On);  // first 'a'
-    VISOR_CHECK(label_frame.get(PointI{3, 6}) == visor::canvas::Color::On);  // still the first 'a'
-    VISOR_CHECK(label_frame.get(PointI{5, 3}) == visor::canvas::Color::On);  // second 'a'
-    VISOR_CHECK(label_frame.get(PointI{8, 3}) == visor::canvas::Color::On);  // 'b' left column
-    VISOR_CHECK(label_frame.get(PointI{9, 3}) == visor::canvas::Color::Off); // 'b' right is dark
-    VISOR_CHECK(label_frame.get(PointI{4, 3}) == visor::canvas::Color::Off); // the advance gap
+    VISOR_CHECK(label_frame.get(PointI{2, 3}) == true);  // first 'a'
+    VISOR_CHECK(label_frame.get(PointI{3, 6}) == true);  // still the first 'a'
+    VISOR_CHECK(label_frame.get(PointI{5, 3}) == true);  // second 'a'
+    VISOR_CHECK(label_frame.get(PointI{8, 3}) == true);  // 'b' left column
+    VISOR_CHECK(label_frame.get(PointI{9, 3}) == false); // 'b' right is dark
+    VISOR_CHECK(label_frame.get(PointI{4, 3}) == false); // the advance gap
 
     // The empty text is one empty line: no width, the font's line height.
-    const visor::ui::Label blank(PointI{0, 0}, "", label_font, visor::canvas::Color::On, 1);
+    const visor::ui::Label blank(PointI{0, 0}, "", label_font, visor::canvas::ColorRole::Foreground,
+                                 1);
     VISOR_CHECK_EQ(blank.bounds(), (RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 0, .h = 4}}));
 
     // Button activation, unit level: the handler is a plain function plus a
@@ -162,17 +165,17 @@ void run_control_tests() {
     const auto count_it = [](visor::ui::Button&, void* context) { ++*static_cast<int*>(context); };
     visor::ui::Button keyed(left_bounds);
     keyed.set_on_activate(count_it, &activations);
-    keyed.on_key_down(visor::host::kKeyEnter);
+    keyed.on_key_down(visor::host::kKeyEnter, {});
     VISOR_CHECK(keyed.pressed());
-    keyed.on_key_up(42); // a stray up matches no held key
+    keyed.on_key_up(42, {}); // a stray up matches no held key
     VISOR_CHECK(keyed.pressed());
     VISOR_CHECK_EQ(activations, 0);
-    keyed.on_key_down(visor::host::kKeySpace); // a second key while held changes nothing
+    keyed.on_key_down(visor::host::kKeySpace, {}); // a second key while held changes nothing
     VISOR_CHECK(keyed.pressed());
-    keyed.on_key_up(visor::host::kKeyEnter);
+    keyed.on_key_up(visor::host::kKeyEnter, {});
     VISOR_CHECK(!keyed.pressed());
     VISOR_CHECK_EQ(activations, 1);
-    keyed.on_key_up(visor::host::kKeySpace); // the unheld Space up is nobody's
+    keyed.on_key_up(visor::host::kKeySpace, {}); // the unheld Space up is nobody's
     VISOR_CHECK(!keyed.pressed());
     VISOR_CHECK_EQ(activations, 1);
 
@@ -180,20 +183,20 @@ void run_control_tests() {
     // and the visual stays dark while either source still holds.
     visor::ui::Button both(left_bounds);
     both.set_on_activate(count_it, &activations);
-    both.on_pointer_down(PointI{5, 5});
-    both.on_key_down(visor::host::kKeyEnter);
+    both.on_pointer_down(PointI{5, 5}, {});
+    both.on_key_down(visor::host::kKeyEnter, {});
     VISOR_CHECK(both.pressed());
     both.on_pointer_up(PointI{5, 5});
     VISOR_CHECK(both.pressed());    // the key still holds the visual
     VISOR_CHECK_EQ(activations, 2); // the pointer press fired its own release
-    both.on_key_up(visor::host::kKeyEnter);
+    both.on_key_up(visor::host::kKeyEnter, {});
     VISOR_CHECK(!both.pressed());
     VISOR_CHECK_EQ(activations, 3);
 
     // A button with no handler stays quiet: the release path fires nothing.
     visor::ui::Button quiet(left_bounds);
-    quiet.on_key_down(visor::host::kKeyEnter);
-    quiet.on_key_up(visor::host::kKeyEnter);
+    quiet.on_key_down(visor::host::kKeyEnter, {});
+    quiet.on_key_up(visor::host::kKeyEnter, {});
     VISOR_CHECK(!quiet.pressed());
 
     // The code-point space presses the same key: a text host types the space
@@ -201,24 +204,24 @@ void run_control_tests() {
     // press reads the same under both.
     visor::ui::Button typed(left_bounds);
     typed.set_on_activate(count_it, &activations);
-    typed.on_key_down(visor::host::kCharSpace);
+    typed.on_key_down(visor::host::kCharSpace, {});
     VISOR_CHECK(typed.pressed());
-    typed.on_key_up(visor::host::kCharSpace);
+    typed.on_key_up(visor::host::kCharSpace, {});
     VISOR_CHECK(!typed.pressed());
     VISOR_CHECK_EQ(activations, 4);
 
     // Checkbox has no release vocabulary to adopt: Enter's down toggles, an
     // up changes nothing (its flip is its press, the B6 reasoning stands).
     visor::ui::Checkbox upproof(left_bounds);
-    upproof.on_key_down(visor::host::kKeyEnter);
+    upproof.on_key_down(visor::host::kKeyEnter, {});
     VISOR_CHECK(upproof.checked());
-    upproof.on_key_up(visor::host::kKeyEnter);
+    upproof.on_key_up(visor::host::kKeyEnter, {});
     VISOR_CHECK(upproof.checked());
 
     // The code-point space flips too: the same duality as the button's
     // press, a text host types 0x20 for the space bar.
     visor::ui::Checkbox typed_box(left_bounds);
-    typed_box.on_key_down(visor::host::kCharSpace);
+    typed_box.on_key_down(visor::host::kCharSpace, {});
     VISOR_CHECK(typed_box.checked());
 
     // The state door: set_checked writes the mark directly and owes the
@@ -237,4 +240,79 @@ void run_control_tests() {
     stateful.set_checked(false);
     VISOR_CHECK(!stateful.checked());
     VISOR_CHECK_EQ(state_reports.count(), std::size_t{1}); // the flip owes its area
+
+    // Knob: a 270-degree face the pointer aims at. The value door clamps,
+    // stays quiet on a rewrite, and the keyboard steps it one at a time.
+    int knob_changes = 0;
+    const auto count_knob = [](visor::ui::Knob&, void* context) { ++*static_cast<int*>(context); };
+    visor::ui::Knob knob(left_bounds, 0, 100, 50);
+    knob.set_on_value(count_knob, &knob_changes);
+    VISOR_CHECK(knob.focusable());
+    VISOR_CHECK_EQ(knob.value(), 50);
+    VISOR_CHECK_EQ(knob.minimum(), 0);
+    VISOR_CHECK_EQ(knob.maximum(), 100);
+    visor::ui::DirtyRegions knob_reports;
+    knob.set_dirty_sink(&knob_reports);
+    knob.set_value(120);
+    VISOR_CHECK_EQ(knob.value(), 100);
+    VISOR_CHECK_EQ(knob_changes, 1);
+    VISOR_CHECK_EQ(knob_reports.count(), std::size_t{1});
+    knob.set_value(100); // the quiet rewrite
+    VISOR_CHECK_EQ(knob_changes, 1);
+    knob.set_value(-5);
+    VISOR_CHECK_EQ(knob.value(), 0);
+    VISOR_CHECK_EQ(knob_changes, 2);
+    // Keyboard: the horizontal and vertical arrows step the value one at a
+    // time, in the same direction as the dial's turn.
+    knob.on_key_down(visor::host::kKeyRight, {});
+    VISOR_CHECK_EQ(knob.value(), 1);
+    knob.on_key_down(visor::host::kKeyLeft, {});
+    VISOR_CHECK_EQ(knob.value(), 0);
+    // The dial follows the pointer's angle: east is 160 of the face's 192
+    // steps, south lands in the gap's max half, west is 32, north is 96.
+    knob.set_value(50);
+    knob.on_pointer_down(PointI{9, 5}, {});
+    VISOR_CHECK_EQ(knob.value(), 83);
+    knob.on_pointer_move(PointI{5, 9});
+    VISOR_CHECK_EQ(knob.value(), 100);
+    knob.on_pointer_move(PointI{1, 5});
+    VISOR_CHECK_EQ(knob.value(), 16);
+    knob.on_pointer_move(PointI{5, 1});
+    VISOR_CHECK_EQ(knob.value(), 50);
+    knob.on_pointer_up(PointI{5, 1});
+    const int knob_released = knob.value();
+    knob.on_pointer_move(PointI{9, 5}); // released: moves change nothing
+    VISOR_CHECK_EQ(knob.value(), knob_released);
+    // A square corner is a direction, not a dead corner: the top-left corner
+    // points at 225 degrees, on the low side of the face.
+    knob.set_value(50);
+    knob.on_pointer_down(PointI{0, 0}, {});
+    VISOR_CHECK(knob.value() < 50);
+    knob.on_pointer_up(PointI{0, 0});
+    // The exact pivot has no angle; a press there leaves the value alone, and
+    // a move out to the east turns it.
+    knob.set_value(50);
+    knob.on_pointer_down(PointI{5, 5}, {});
+    VISOR_CHECK_EQ(knob.value(), 50);
+    knob.on_pointer_move(PointI{9, 5});
+    VISOR_CHECK_EQ(knob.value(), 83);
+    knob.on_pointer_up(PointI{9, 5});
+
+    // The face paints: a ring with a lit hub and enough ink for a dial, all
+    // within its bounds (the theme test replays it through strips).
+    const visor::ui::Knob drawable(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 20, .h = 20}}, 0,
+                                   100, 50);
+    visor::canvas::Canvas<visor::base::SizeI{.w = 20, .h = 20}> knob_frame;
+    knob_frame.set_clear(false);
+    drawable.draw(visor::ui::CanvasPainter{knob_frame});
+    int lit = 0;
+    for (int y = 0; y < 20; ++y) {
+        for (int x = 0; x < 20; ++x) {
+            if (knob_frame.get(PointI{x, y})) {
+                ++lit;
+            }
+        }
+    }
+    VISOR_CHECK(lit > 40);
+    VISOR_CHECK(knob_frame.get(PointI{10, 10}) == true); // the hub
 }

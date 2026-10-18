@@ -159,14 +159,14 @@ void run_layout_tests() {
     // A hollow thumb stays distinct from the thin track on both polarities.
     {
         visor::ui::Rectangle panel(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 32, .h = 16}});
-        panel.fill = visor::canvas::Color::Off;
+        panel.fill = visor::canvas::ColorRole::Background;
         visor::ui::Slider knob(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 24, .h = 12}});
         VISOR_CHECK(panel.add_child(&knob));
         knob.set_value(6);
         visor::canvas::Canvas<SizeI{.w = 32, .h = 16}> canvas;
         panel.draw(visor::ui::CanvasPainter{canvas});
-        const auto on = visor::canvas::Color::On;
-        const auto off = visor::canvas::Color::Off;
+        const auto on = true;
+        const auto off = false;
         VISOR_CHECK(canvas.get(PointI{2, 8}) == on);   // track start
         VISOR_CHECK(canvas.get(PointI{25, 8}) == on);  // track end
         VISOR_CHECK(canvas.get(PointI{8, 7}) == on);   // thumb outline
@@ -175,9 +175,9 @@ void run_layout_tests() {
         VISOR_CHECK(canvas.get(PointI{15, 8}) == on);
         VISOR_CHECK(canvas.get(PointI{8, 2}) == off); // outside the thumb
         knob.set_focused(true);
-        knob.on_key_down(visor::host::kKeyRight);
+        knob.on_key_down(visor::host::kKeyRight, {});
         VISOR_CHECK_EQ(knob.value(), 7);
-        knob.on_key_down(visor::host::kKeyLeft);
+        knob.on_key_down(visor::host::kKeyLeft, {});
         VISOR_CHECK_EQ(knob.value(), 6);
         visor::ui::Slider tiny(RectI{.pos = {0, 0}, .size = {.w = 2, .h = 2}});
         VISOR_CHECK_EQ(tiny.max(), 0);

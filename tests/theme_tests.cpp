@@ -15,6 +15,7 @@
 #include "visor/ui/widgets/button/button.hpp"
 #include "visor/ui/widgets/checkbox/checkbox.hpp"
 #include "visor/ui/widgets/dropdown/dropdown.hpp"
+#include "visor/ui/widgets/knob/knob.hpp"
 #include "visor/ui/widgets/label/label.hpp"
 #include "visor/ui/widgets/radio/radio.hpp"
 #include "visor/ui/widgets/slider/slider.hpp"
@@ -30,13 +31,13 @@ void run_theme_tests() {
     using visor::base::RectI;
     using visor::base::SizeI;
     using visor::canvas::Canvas;
-    using visor::canvas::Color;
+    using visor::canvas::ColorRole;
 
     // The rounded fill, radius 2 on a 7x5: the zone table says row 0 insets
     // two from each side, rows 1 and 3 inset one, the middle row is whole.
     {
         Canvas<SizeI{.w = 9, .h = 7}> canvas;
-        canvas.set_clear(Color::Off);
+        canvas.set_clear(false);
         const visor::ui::CanvasPainter painter{canvas};
         const visor::ui::CornerRadius all{
             .top_left = 2,
@@ -44,25 +45,25 @@ void run_theme_tests() {
             .bottom_right = 2,
             .bottom_left = 2,
         };
-        painter.fill_rounded(RectI{.pos = PointI{1, 1}, .size = SizeI{.w = 7, .h = 5}}, Color::On,
-                             all);
+        painter.fill_rounded(RectI{.pos = PointI{1, 1}, .size = SizeI{.w = 7, .h = 5}},
+                             ColorRole::Foreground, all);
         // Row 0 (y=1): span x 3..5 -- the corners' whole zone rows are dark.
-        VISOR_CHECK(canvas.get(PointI{3, 1}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{5, 1}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{2, 1}) == Color::Off);
-        VISOR_CHECK(canvas.get(PointI{6, 1}) == Color::Off);
+        VISOR_CHECK(canvas.get(PointI{3, 1}) == true);
+        VISOR_CHECK(canvas.get(PointI{5, 1}) == true);
+        VISOR_CHECK(canvas.get(PointI{2, 1}) == false);
+        VISOR_CHECK(canvas.get(PointI{6, 1}) == false);
         // Row 1 (y=2): inset one each side, the zone's (1,1) pixels survive.
-        VISOR_CHECK(canvas.get(PointI{2, 2}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{6, 2}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{1, 2}) == Color::Off);
-        VISOR_CHECK(canvas.get(PointI{7, 2}) == Color::Off);
+        VISOR_CHECK(canvas.get(PointI{2, 2}) == true);
+        VISOR_CHECK(canvas.get(PointI{6, 2}) == true);
+        VISOR_CHECK(canvas.get(PointI{1, 2}) == false);
+        VISOR_CHECK(canvas.get(PointI{7, 2}) == false);
         // The middle row (y=3) is whole.
-        VISOR_CHECK(canvas.get(PointI{1, 3}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{7, 3}) == Color::On);
+        VISOR_CHECK(canvas.get(PointI{1, 3}) == true);
+        VISOR_CHECK(canvas.get(PointI{7, 3}) == true);
         // Rows 4 and 5 (y=5, y=6) mirror rows 1 and 0.
-        VISOR_CHECK(canvas.get(PointI{2, 4}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{2, 5}) == Color::Off);
-        VISOR_CHECK(canvas.get(PointI{3, 5}) == Color::On);
+        VISOR_CHECK(canvas.get(PointI{2, 4}) == true);
+        VISOR_CHECK(canvas.get(PointI{2, 5}) == false);
+        VISOR_CHECK(canvas.get(PointI{3, 5}) == true);
     }
 
     // Per-corner: only the top-left rounds, the other three corners stay
@@ -70,7 +71,7 @@ void run_theme_tests() {
     // else.
     {
         Canvas<SizeI{.w = 9, .h = 7}> canvas;
-        canvas.set_clear(Color::Off);
+        canvas.set_clear(false);
         const visor::ui::CanvasPainter painter{canvas};
         const visor::ui::CornerRadius one{
             .top_left = 3,
@@ -78,19 +79,19 @@ void run_theme_tests() {
             .bottom_right = 0,
             .bottom_left = 0,
         };
-        painter.fill_rounded(RectI{.pos = PointI{1, 1}, .size = SizeI{.w = 7, .h = 5}}, Color::On,
-                             one);
+        painter.fill_rounded(RectI{.pos = PointI{1, 1}, .size = SizeI{.w = 7, .h = 5}},
+                             ColorRole::Foreground, one);
         // The 5-tall rect clamps the radius to 2, so the zone table is the
         // radius-2 one: row 0 insets two, row 1 insets one.
-        VISOR_CHECK(canvas.get(PointI{4, 1}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{3, 1}) == Color::On); // after a 2-inset
-        VISOR_CHECK(canvas.get(PointI{2, 1}) == Color::Off);
-        VISOR_CHECK(canvas.get(PointI{2, 2}) == Color::On); // after a 1-inset
-        VISOR_CHECK(canvas.get(PointI{1, 2}) == Color::Off);
+        VISOR_CHECK(canvas.get(PointI{4, 1}) == true);
+        VISOR_CHECK(canvas.get(PointI{3, 1}) == true); // after a 2-inset
+        VISOR_CHECK(canvas.get(PointI{2, 1}) == false);
+        VISOR_CHECK(canvas.get(PointI{2, 2}) == true); // after a 1-inset
+        VISOR_CHECK(canvas.get(PointI{1, 2}) == false);
         // The other three corners are square.
-        VISOR_CHECK(canvas.get(PointI{7, 1}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{1, 5}) == Color::On);
-        VISOR_CHECK(canvas.get(PointI{7, 5}) == Color::On);
+        VISOR_CHECK(canvas.get(PointI{7, 1}) == true);
+        VISOR_CHECK(canvas.get(PointI{1, 5}) == true);
+        VISOR_CHECK(canvas.get(PointI{7, 5}) == true);
     }
 
     // Radius zero is the plain fill, pixel for pixel; an oversized radius
@@ -101,8 +102,8 @@ void run_theme_tests() {
         const visor::ui::CanvasPainter square_painter{square};
         const visor::ui::CanvasPainter rounded_painter{rounded};
         const RectI area{.pos = PointI{1, 1}, .size = SizeI{.w = 7, .h = 5}};
-        square_painter.fill_rounded(area, Color::On, {});
-        rounded_painter.fill(area, Color::On);
+        square_painter.fill_rounded(area, ColorRole::Foreground, {});
+        rounded_painter.fill(area, ColorRole::Foreground);
         for (int y = 0; y < 7; ++y) {
             for (int x = 0; x < 9; ++x) {
                 VISOR_CHECK(square.get(PointI{x, y}) == rounded.get(PointI{x, y}));
@@ -120,10 +121,10 @@ void run_theme_tests() {
             .bottom_right = 2,
             .bottom_left = 2,
         };
-        square.set_clear(Color::Off);
-        rounded.set_clear(Color::Off);
-        square_painter.fill_rounded(area, Color::On, huge);
-        rounded_painter.fill_rounded(area, Color::On, two);
+        square.set_clear(false);
+        rounded.set_clear(false);
+        square_painter.fill_rounded(area, ColorRole::Foreground, huge);
+        rounded_painter.fill_rounded(area, ColorRole::Foreground, two);
         for (int y = 0; y < 7; ++y) {
             for (int x = 0; x < 9; ++x) {
                 VISOR_CHECK(square.get(PointI{x, y}) == rounded.get(PointI{x, y}));
@@ -145,10 +146,10 @@ void run_theme_tests() {
 
         using Frame = Canvas<SizeI{.w = 20, .h = 10}>;
         Frame unwired;
-        unwired.set_clear(Color::Off);
+        unwired.set_clear(false);
         panel.draw(visor::ui::CanvasPainter{unwired});
-        VISOR_CHECK_EQ(unwired.get(PointI{3, 3}), Color::On);  // the button's light ink
-        VISOR_CHECK_EQ(unwired.get(PointI{13, 4}), Color::On); // the checkbox frame
+        VISOR_CHECK_EQ(unwired.get(PointI{3, 3}), true);  // the button's light ink
+        VISOR_CHECK_EQ(unwired.get(PointI{13, 4}), true); // the checkbox frame
 
         // Wiring the light scheme: pixels identical to the hardcoded
         // polarity, and the walk reports every widget (the pointer changed
@@ -159,8 +160,8 @@ void run_theme_tests() {
         // one region covering it.
         VISOR_CHECK_EQ(debts.count(), std::size_t{1});
         Frame light;
-        light.set_clear(Color::Off);
-        panel.draw(visor::ui::CanvasPainter{light});
+        light.set_clear(false);
+        panel.draw(visor::ui::CanvasPainter{light, *panel.theme()});
         for (int y = 0; y < 10; ++y) {
             for (int x = 0; x < 20; ++x) {
                 VISOR_CHECK(light.get(PointI{x, y}) == unwired.get(PointI{x, y}));
@@ -172,16 +173,16 @@ void run_theme_tests() {
         panel.set_theme(&visor::ui::kDarkTheme);
         VISOR_CHECK_EQ(debts.count(), std::size_t{1}); // merged the same way
         Frame dark;
-        dark.set_clear(Color::Off);
-        panel.draw(visor::ui::CanvasPainter{dark});
-        VISOR_CHECK_EQ(dark.get(PointI{3, 3}), Color::Off);  // the button's dark ink
-        VISOR_CHECK_EQ(dark.get(PointI{13, 4}), Color::Off); // the frame flips with the theme
+        dark.set_clear(false);
+        panel.draw(visor::ui::CanvasPainter{dark, *panel.theme()});
+        VISOR_CHECK_EQ(dark.get(PointI{3, 3}), false);  // the button's dark ink
+        VISOR_CHECK_EQ(dark.get(PointI{13, 4}), false); // the frame flips with the theme
         // A late child inherits the scheme of the parent it joins.
         visor::ui::Button late(RectI{.pos = PointI{2, 6}, .size = SizeI{.w = 6, .h = 3}});
         VISOR_CHECK(panel.add_child(&late));
-        dark.set_clear(Color::Off);
-        panel.draw(visor::ui::CanvasPainter{dark});
-        VISOR_CHECK_EQ(dark.get(PointI{3, 7}), Color::Off); // dark ink without its own wiring
+        dark.set_clear(false);
+        panel.draw(visor::ui::CanvasPainter{dark, *panel.theme()});
+        VISOR_CHECK_EQ(dark.get(PointI{3, 7}), false); // dark ink without its own wiring
         // Same pointer again wires nothing twice.
         debts.clear();
         panel.set_theme(&visor::ui::kDarkTheme);
@@ -192,22 +193,22 @@ void run_theme_tests() {
     // its corners stay the panel's ink.
     {
         const visor::ui::Theme rounded_light{
-            .background = Color::Off,
-            .foreground = Color::On,
+            .background = visor::canvas::Ink::black(),
+            .foreground = visor::canvas::Ink::white(),
             .corner_radius = {.top_left = 2, .top_right = 2, .bottom_right = 2, .bottom_left = 2},
         };
         visor::ui::Rectangle panel(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 20, .h = 10}});
-        panel.fill = Color::Off; // dark ground, so the corner cut reads
+        panel.fill = ColorRole::Background; // dark ground, so the corner cut reads
         visor::ui::Button button(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 7, .h = 5}});
         VISOR_CHECK(panel.add_child(&button));
         panel.set_theme(&rounded_light);
         Canvas<SizeI{.w = 20, .h = 10}> canvas;
-        canvas.set_clear(Color::Off);
-        panel.draw(visor::ui::CanvasPainter{canvas});
-        VISOR_CHECK(canvas.get(PointI{2, 2}) == Color::Off); // the rounded-off corner
-        VISOR_CHECK(canvas.get(PointI{4, 2}) == Color::On);  // the row's span
-        VISOR_CHECK(canvas.get(PointI{2, 3}) == Color::Off); // the side inset row (v=1)
-        VISOR_CHECK(canvas.get(PointI{3, 3}) == Color::On);  // the body
+        canvas.set_clear(false);
+        panel.draw(visor::ui::CanvasPainter{canvas, rounded_light});
+        VISOR_CHECK(canvas.get(PointI{2, 2}) == false); // the rounded-off corner
+        VISOR_CHECK(canvas.get(PointI{4, 2}) == true);  // the row's span
+        VISOR_CHECK(canvas.get(PointI{2, 3}) == false); // the side inset row (v=1)
+        VISOR_CHECK(canvas.get(PointI{3, 3}) == true);  // the body
     }
     // Every control honors scheme polarity, stays within its dirty bounds,
     // and produces identical pixels when replayed through five-row strips.
@@ -224,22 +225,23 @@ void run_theme_tests() {
         visor::ui::Slider slider(RectI{.pos = {40, 2}, .size = {.w = 20, .h = 12}});
         slider.set_value(6);
         visor::ui::TextBox textbox(RectI{.pos = {2, 20}, .size = {.w = 22, .h = 12}}, font,
-                                   Color::On);
+                                   ColorRole::Foreground);
         textbox.set_text("aaaaaaaaaaaaaaaa");
         textbox.set_focused(true);
         visor::ui::RadioGroup radio(RectI{.pos = {28, 20}, .size = {.w = 32, .h = 20}}, font,
-                                    Color::On);
+                                    ColorRole::Foreground);
         VISOR_CHECK(radio.add_option("aaaaaaaaaaaaaaaaaaaa"));
         VISOR_CHECK(radio.add_option("a"));
         radio.select(1);
         visor::ui::Dropdown dropdown(RectI{.pos = {2, 36}, .size = {.w = 24, .h = 12}}, font,
-                                     Color::On);
+                                     ColorRole::Foreground);
         VISOR_CHECK(dropdown.add_option("aaaaaaaaaaaaaaaaaaaa"));
         VISOR_CHECK(dropdown.add_option("a"));
         dropdown.select(0);
-        visor::ui::Label label(PointI{32, 52}, "aa", font, Color::On);
-        const std::array<visor::ui::Widget*, 7> controls{
-            &button, &checkbox, &slider, &textbox, &radio, &dropdown, &label,
+        visor::ui::Knob knob(RectI{.pos = {40, 42}, .size = {.w = 20, .h = 20}}, 0, 100, 50);
+        visor::ui::Label label(PointI{32, 52}, "aa", font, ColorRole::Foreground);
+        const std::array<visor::ui::Widget*, 8> controls{
+            &button, &checkbox, &slider, &textbox, &radio, &dropdown, &knob, &label,
         };
         for (auto* control : controls) {
             VISOR_CHECK(panel.add_child(control));
@@ -247,24 +249,24 @@ void run_theme_tests() {
         using Frame = Canvas<SizeI{.w = 64, .h = 64}>;
         for (int state = 0; state < 3; ++state) {
             if (state == 1) {
-                button.on_pointer_down({3, 3});
-                checkbox.on_key_down(visor::host::kKeyEnter);
+                button.on_pointer_down({3, 3}, {});
+                checkbox.on_key_down(visor::host::kKeyEnter, {});
                 dropdown.set_open(true);
             } else if (state == 2) {
                 button.on_pointer_up({3, 3});
                 button.set_outlined(true);
-                dropdown.on_key_down(visor::host::kKeyDown);
+                dropdown.on_key_down(visor::host::kKeyDown, {});
             }
             Frame light;
             Frame dark;
             const auto render = [&](const visor::ui::Theme& scheme, Frame& full) {
-                panel.fill = scheme.background;
+                panel.fill = ColorRole::Background;
                 panel.set_theme(&scheme);
-                panel.draw(visor::ui::CanvasPainter{full});
+                panel.draw(visor::ui::CanvasPainter{full, scheme});
                 for (int top = 0; top < 64; top += 5) {
                     Canvas<SizeI{.w = 64, .h = 5}> strip;
                     panel.draw(visor::ui::CanvasPainter{
-                        strip, RectI{.pos = {0, top}, .size = {.w = 64, .h = 5}}});
+                        strip, RectI{.pos = {0, top}, .size = {.w = 64, .h = 5}}, scheme});
                     for (int y = 0; y < 5 && top + y < 64; ++y) {
                         for (int x = 0; x < 64; ++x) {
                             VISOR_CHECK_EQ(strip.get(PointI{x, y}), full.get(PointI{x, top + y}));
@@ -273,12 +275,13 @@ void run_theme_tests() {
                 }
                 for (const auto* control : controls) {
                     Frame isolated;
-                    isolated.set_clear(scheme.background);
-                    control->draw(visor::ui::CanvasPainter{isolated});
+                    isolated.set_clear(visor::canvas::mono_ink(scheme.background));
+                    control->draw(visor::ui::CanvasPainter{isolated, scheme});
                     for (int y = 0; y < 64; ++y) {
                         for (int x = 0; x < 64; ++x) {
                             if (!control->bounds().contains(PointI{x, y})) {
-                                VISOR_CHECK_EQ(isolated.get(PointI{x, y}), scheme.background);
+                                VISOR_CHECK_EQ(isolated.get(PointI{x, y}),
+                                               visor::canvas::mono_ink(scheme.background));
                             }
                         }
                     }
@@ -314,13 +317,13 @@ void run_theme_tests() {
         Canvas<SizeI{.w = 24, .h = 24}> full;
         Canvas<SizeI{.w = 24, .h = 24}> clipped;
         const RectI clip{.pos = {5, 5}, .size = {.w = 7, .h = 7}};
-        visor::ui::draw_text(visor::ui::CanvasPainter{full}, {6, 6}, font, "aa\naa", Color::On, 2);
+        visor::ui::draw_text(visor::ui::CanvasPainter{full}, {6, 6}, font, "aa\naa",
+                             ColorRole::Foreground, 2);
         visor::ui::draw_text_clipped(visor::ui::CanvasPainter{clipped}, clip, {6, 6}, font,
-                                     "aa\naa", Color::On, 2);
+                                     "aa\naa", ColorRole::Foreground, 2);
         for (int y = 0; y < 24; ++y) {
             for (int x = 0; x < 24; ++x) {
-                const auto expected =
-                    clip.contains(PointI{x, y}) ? full.get(PointI{x, y}) : Color::Off;
+                const auto expected = clip.contains(PointI{x, y}) ? full.get(PointI{x, y}) : false;
                 VISOR_CHECK_EQ(clipped.get(PointI{x, y}), expected);
             }
         }

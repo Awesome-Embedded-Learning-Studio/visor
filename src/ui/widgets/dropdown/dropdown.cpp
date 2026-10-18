@@ -19,8 +19,8 @@
 
 namespace visor::ui {
 
-Dropdown::Dropdown(base::RectI bounds, const draw::MonoFont& font, canvas::Color ink) noexcept
-    : Widget{bounds}, closed_bounds_{bounds}, font_{&font}, ink_{ink} {}
+Dropdown::Dropdown(base::RectI bounds, const draw::MonoFont& font, canvas::ColorRole role) noexcept
+    : Widget{bounds}, closed_bounds_{bounds}, font_{&font}, role_{role} {}
 
 bool Dropdown::add_option(std::string_view label) noexcept {
     if (count_ == static_cast<std::size_t>(kDropdownCapacity)) {
@@ -98,7 +98,8 @@ void Dropdown::changed() noexcept {
     }
 }
 
-void Dropdown::on_pointer_down(base::PointI at) noexcept {
+void Dropdown::on_pointer_down(base::PointI at,
+                               [[maybe_unused]] host::Modifiers modifiers) noexcept {
     if (!open_) {
         set_open(true);
         return;
@@ -110,7 +111,8 @@ void Dropdown::on_pointer_down(base::PointI at) noexcept {
     }
 }
 
-void Dropdown::on_key_down(std::uint32_t code) noexcept {
+void Dropdown::on_key_down(std::uint32_t code,
+                           [[maybe_unused]] host::Modifiers modifiers) noexcept {
     if (!open_) {
         // Space also opens as its code point: a text host types 0x20 for the
         // space bar, the same press under either number.
@@ -142,10 +144,10 @@ void Dropdown::on_key_down(std::uint32_t code) noexcept {
 }
 
 void Dropdown::on_draw(const Painter& painter) const noexcept {
-    const auto fg = theme() != nullptr ? theme()->foreground : ink_;
-    const auto bg = control_background(theme(), ink_);
+    const auto text = role_;
     const auto corners = theme() != nullptr ? theme()->corner_radius : CornerRadius{};
-    paint_outline(painter, bounds(), fg, bg, corners);
+    paint_outline(painter, bounds(), canvas::ColorRole::Border, canvas::ColorRole::Background,
+                  corners);
     if (!open_) {
         const base::RectI content{
             .pos = {bounds().pos.x + 4, bounds().pos.y + 1},
@@ -160,7 +162,7 @@ void Dropdown::on_draw(const Painter& painter) const noexcept {
                 painter, content,
                 {content.pos.x,
                  bounds().pos.y + ((row_height() - static_cast<int>(font_->line_height)) / 2)},
-                *font_, labels_[selected_], fg, 1);
+                *font_, labels_[selected_], text, 1);
         }
         if (bounds().size.w >= 12 && bounds().size.h >= 7) {
             const int x = bounds().pos.x + bounds().size.w - 9;
@@ -168,7 +170,7 @@ void Dropdown::on_draw(const Painter& painter) const noexcept {
             for (int step = 0; step < 3; ++step) {
                 painter.fill(
                     base::RectI{.pos = {x + step, y + step}, .size = {.w = 5 - (2 * step), .h = 1}},
-                    fg);
+                    text);
             }
         }
         return;
@@ -180,11 +182,11 @@ void Dropdown::on_draw(const Painter& painter) const noexcept {
             .pos = {bounds().pos.x + 2, y + 2},
             .size = {.w = std::max(0, bounds().size.w - 4), .h = std::max(0, row_height() - 4)},
         };
-        painter.fill(row, highlighted ? fg : bg);
+        painter.fill(row, highlighted ? canvas::ColorRole::Accent : canvas::ColorRole::Background);
         draw_text_clipped(
             painter, row,
             {row.pos.x + 2, y + ((row_height() - static_cast<int>(font_->line_height)) / 2)},
-            *font_, labels_[i], highlighted ? bg : fg, 1);
+            *font_, labels_[i], highlighted ? canvas::ColorRole::OnAccent : text, 1);
     }
 }
 

@@ -42,7 +42,8 @@ class Dropdown : public Widget {
     ///        set_on_change, given back untouched.
     using SelectHandler = void (*)(Dropdown& self, void* context);
 
-    Dropdown(base::RectI bounds, const draw::MonoFont& font, canvas::Color ink) noexcept;
+    Dropdown(base::RectI bounds, const draw::MonoFont& font,
+             canvas::ColorRole role = canvas::ColorRole::Foreground) noexcept;
 
     /// Adds an option; false when the capacity is full. Labels are views:
     /// the storage behind them outlives the control.
@@ -70,8 +71,8 @@ class Dropdown : public Widget {
     /// walk the open list, Enter picks.
     [[nodiscard]] bool focusable() const noexcept override { return true; }
 
-    void on_pointer_down(base::PointI at) noexcept override;
-    void on_key_down(std::uint32_t code) noexcept override;
+    void on_pointer_down(base::PointI at, host::Modifiers modifiers) noexcept override;
+    void on_key_down(std::uint32_t code, host::Modifiers modifiers) noexcept override;
 
   protected:
     void on_draw(const Painter& painter) const noexcept override;
@@ -96,7 +97,7 @@ class Dropdown : public Widget {
     int highlighted_ = -1;
     bool open_ = false;
     const draw::MonoFont* font_;
-    canvas::Color ink_;
+    canvas::ColorRole role_;
     SelectHandler on_change_ = nullptr;
     void* change_context_ = nullptr;
 };

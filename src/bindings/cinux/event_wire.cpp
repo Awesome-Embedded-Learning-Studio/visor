@@ -57,10 +57,15 @@ std::optional<host::Event> translate_event(const WireEvent& wire) noexcept {
             } else {
                 return std::nullopt;
             }
+            const host::Modifiers modifiers{
+                .shift = wire.key.shift,
+                .ctrl = wire.key.ctrl,
+                .alt = wire.key.alt,
+            };
             if (wire.type == WireType::KeyDown) {
-                return host::Event{host::KeyDown{.code = code}};
+                return host::Event{host::KeyDown{.code = code, .modifiers = modifiers}};
             }
-            return host::Event{host::KeyUp{.code = code}};
+            return host::Event{host::KeyUp{.code = code, .modifiers = modifiers}};
         }
     }
     return std::nullopt; // a type out of the wire's range

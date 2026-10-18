@@ -13,7 +13,7 @@
 void set_focused(bool on) noexcept;
 ```
 
-「至多一个」这条不变量谁来守？`set_focused` 是公开的，单看它守不住，调用方完全可以点亮两个。守它的是移动焦点的那一个函数 `advance_focus`，它先把旧的熄掉，再把新的点亮，两步之间不变量不悬空。这与第九章孩子容量的口径一致：函数负责维持承诺，不指望每个调用方都记得。
+「至多一个」这条不变量谁来守？`set_focused` 是公开的，单看它守不住，调用方完全可以点亮两个。守它的是移动焦点的那一个函数 `advance_focus`，它先把旧的熄掉，再把新的点亮，两步之间不变量不悬空。这与第九章孩子表的做法一致：函数负责维持承诺，不指望每个调用方都记得。
 
 哪类控件能接焦点，是控件自己的事，所以是一个虚函数，默认拒绝：
 
@@ -53,9 +53,8 @@ Widget* Widget::find_focusable_after(Widget& node, Widget* current, bool& seen_c
     if (&node == current) {
         seen_current = true;
     }
-    for (std::size_t i = 0; i < node.child_count_; ++i) {
-        if (Widget* next = find_focusable_after(*node.children_[i], current, seen_current);
-            next != nullptr) {
+    for (Widget* child = node.first_child_; child != nullptr; child = child->next_sibling_) {
+        if (Widget* next = find_focusable_after(*child, current, seen_current); next != nullptr) {
             return next;
         }
     }

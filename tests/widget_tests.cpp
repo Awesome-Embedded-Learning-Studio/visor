@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <iterator>
 #include <vector>
 
 #include "cases.hpp"
@@ -428,18 +429,45 @@ void run_widget_tests() {
     VISOR_CHECK_EQ(root.hit_test((PointI{5, 5})), static_cast<Widget*>(nullptr));
     root.set_visible(true);
 
-    // Child capacity is a compile-time fact: the child past kMaxChildren is
-    // refused, the tree keeps the ones it took.
+    // The child list has no capacity bound: a dozen siblings are all adopted,
+    // child() walks them in add order, and a middle removal relinks the rest
+    // without disturbing that order.
     Tracer hoard(root_bounds, 9, widget_order);
-    std::size_t taken = 0;
-    for (std::size_t i = 0; i < visor::ui::kMaxChildren + 1; ++i) {
-        Tracer slot(root_bounds, 100 + static_cast<int>(i), widget_order);
-        if (hoard.add_child(&slot)) {
-            ++taken;
-        }
+    std::array<Tracer, 12> slots = {
+        Tracer(root_bounds, 100, widget_order), Tracer(root_bounds, 101, widget_order),
+        Tracer(root_bounds, 102, widget_order), Tracer(root_bounds, 103, widget_order),
+        Tracer(root_bounds, 104, widget_order), Tracer(root_bounds, 105, widget_order),
+        Tracer(root_bounds, 106, widget_order), Tracer(root_bounds, 107, widget_order),
+        Tracer(root_bounds, 108, widget_order), Tracer(root_bounds, 109, widget_order),
+        Tracer(root_bounds, 110, widget_order), Tracer(root_bounds, 111, widget_order),
+    };
+    constexpr std::size_t slot_count = std::size(slots);
+    for (Tracer& slot : slots) {
+        VISOR_CHECK(hoard.add_child(&slot));
     }
-    VISOR_CHECK_EQ(taken, visor::ui::kMaxChildren);
-    VISOR_CHECK_EQ(hoard.child_count(), visor::ui::kMaxChildren);
+    VISOR_CHECK_EQ(hoard.child_count(), slot_count);
+    VISOR_CHECK_EQ(hoard.child(0), static_cast<Widget*>(slots.data()));
+    VISOR_CHECK_EQ(hoard.child(7), static_cast<Widget*>(&slots[7]));
+    VISOR_CHECK_EQ(hoard.child(slot_count - 1), static_cast<Widget*>(&slots[slot_count - 1]));
+    VISOR_CHECK_EQ(hoard.child(slot_count), static_cast<Widget*>(nullptr));
+
+    VISOR_CHECK(hoard.remove_child(&slots[6]));
+    VISOR_CHECK_EQ(hoard.child_count(), slot_count - 1);
+    VISOR_CHECK_EQ(hoard.child(5), static_cast<Widget*>(&slots[5]));
+    VISOR_CHECK_EQ(hoard.child(6), static_cast<Widget*>(&slots[7]));
+    VISOR_CHECK_EQ(hoard.child(slot_count - 2), static_cast<Widget*>(&slots[slot_count - 1]));
+
+    // raise() and lower() walk the same long list, and their edge checks hold.
+    VISOR_CHECK(slots[0].raise());
+    VISOR_CHECK_EQ(hoard.child(slot_count - 2), static_cast<Widget*>(slots.data()));
+    VISOR_CHECK(slots[0].lower());
+    VISOR_CHECK_EQ(hoard.child(0), static_cast<Widget*>(slots.data()));
+
+    // A cycle is refused: no widget may become its own ancestor, and the
+    // walk-based checks leave the list untouched.
+    VISOR_CHECK(!hoard.add_child(&hoard));
+    VISOR_CHECK(!slots[0].add_child(&hoard));
+    VISOR_CHECK_EQ(hoard.child_count(), slot_count - 1);
     // A widget already owned by a parent cannot be adopted twice: the old
     // parent's order would silently disagree with the new one.
     VISOR_CHECK(!root.add_child(&left));

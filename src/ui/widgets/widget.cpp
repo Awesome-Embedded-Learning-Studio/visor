@@ -82,8 +82,8 @@ void Widget::set_visible(bool on) noexcept {
 // NOLINTNEXTLINE(misc-no-recursion) -- same shape and same reason as draw().
 void Widget::set_dirty_sink(DirtyRegions* sink) noexcept {
     dirty_ = sink;
-    for (std::size_t i = 0; i < child_count_; ++i) {
-        children_[i]->set_dirty_sink(sink);
+    for (Widget* child = first_child_; child != nullptr; child = child->next_sibling_) {
+        child->set_dirty_sink(sink);
     }
 }
 
@@ -96,18 +96,34 @@ void Widget::set_theme(const Theme* theme) noexcept {
     // A switched scheme flips pixels everywhere a control consults it, so
     // every widget reports its own bounds -- runtime switching is this call.
     invalidate(bounds_);
-    for (std::size_t i = 0; i < child_count_; ++i) {
-        children_[i]->set_theme(theme);
+    for (Widget* child = first_child_; child != nullptr; child = child->next_sibling_) {
+        child->set_theme(theme);
     }
 }
 
 bool Widget::add_child(Widget* child) noexcept {
-    if (child == nullptr || child_count_ == kMaxChildren || child->parent_ != nullptr) {
+    if (child == nullptr || child->parent_ != nullptr) {
         return false;
     }
-    children_[child_count_] = child;
-    ++child_count_;
+    // A widget cannot become its own descendant: the walk would never reach a
+    // leaf again. Walking the parent chain is the cheap way to see the ancestry.
+    for (const Widget* ancestor = this; ancestor != nullptr; ancestor = ancestor->parent_) {
+        if (ancestor == child) {
+            return false;
+        }
+    }
+    // Append at the tail: later siblings paint over earlier ones and hit_test()
+    // asks them first, so add order is stacking order.
     child->parent_ = this;
+    child->prev_sibling_ = last_child_;
+    child->next_sibling_ = nullptr;
+    if (last_child_ != nullptr) {
+        last_child_->next_sibling_ = child;
+    } else {
+        first_child_ = child;
+    }
+    last_child_ = child;
+    ++child_count_;
     // The adopted subtree reports into the same sink and paints under the
     // same scheme, whenever either is wired.
     child->set_dirty_sink(dirty_);
@@ -119,19 +135,20 @@ bool Widget::remove_child(Widget* child) noexcept {
     if (child == nullptr || child->parent_ != this) {
         return false;
     }
-    std::size_t index = 0;
-    while (index < child_count_ && children_[index] != child) {
-        ++index;
+    if (child->prev_sibling_ != nullptr) {
+        child->prev_sibling_->next_sibling_ = child->next_sibling_;
+    } else {
+        first_child_ = child->next_sibling_;
     }
-    if (index == child_count_) {
-        return false; // A parent link without a slot owns nothing to remove.
-    }
-    for (std::size_t i = index; i + 1 < child_count_; ++i) {
-        children_[i] = children_[i + 1];
+    if (child->next_sibling_ != nullptr) {
+        child->next_sibling_->prev_sibling_ = child->prev_sibling_;
+    } else {
+        last_child_ = child->prev_sibling_;
     }
     --child_count_;
-    children_[child_count_] = nullptr;
     child->parent_ = nullptr;
+    child->prev_sibling_ = nullptr;
+    child->next_sibling_ = nullptr;
     // The pixels the child covered now belong to whatever is beneath it. A
     // hidden child painted nothing, so it owes nothing on the way out.
     if (child->visible_) {
@@ -152,10 +169,12 @@ std::size_t Widget::child_count() const noexcept {
 }
 
 Widget* Widget::child(std::size_t index) noexcept {
-    if (index >= child_count_) {
-        return nullptr;
+    Widget* walk = first_child_;
+    while (walk != nullptr && index > 0) {
+        walk = walk->next_sibling_;
+        --index;
     }
-    return children_[index];
+    return walk;
 }
 
 bool Widget::raise() noexcept {
@@ -171,30 +190,40 @@ bool Widget::move_to_edge(bool to_top) noexcept {
         return false;
     }
     Widget* parent = parent_;
-    std::size_t index = 0;
-    while (index < parent->child_count_ && parent->children_[index] != this) {
-        ++index;
+    // Already at the asked-for end: nothing moves, so nothing owes repaint.
+    if (to_top ? parent->last_child_ == this : parent->first_child_ == this) {
+        return false;
     }
-    if (index == parent->child_count_) {
-        return false; // A stale parent link owns no order to change.
-    }
-    const std::size_t last = parent->child_count_ - 1;
-    if (to_top) {
-        if (index == last) {
-            return false;
-        }
-        for (std::size_t i = index; i < last; ++i) {
-            parent->children_[i] = parent->children_[i + 1];
-        }
-        parent->children_[last] = this;
+    // Close the gap first, so both ends of the list stay correct while this
+    // widget is out of it.
+    if (prev_sibling_ != nullptr) {
+        prev_sibling_->next_sibling_ = next_sibling_;
     } else {
-        if (index == 0) {
-            return false;
+        parent->first_child_ = next_sibling_;
+    }
+    if (next_sibling_ != nullptr) {
+        next_sibling_->prev_sibling_ = prev_sibling_;
+    } else {
+        parent->last_child_ = prev_sibling_;
+    }
+    if (to_top) {
+        prev_sibling_ = parent->last_child_;
+        next_sibling_ = nullptr;
+        if (prev_sibling_ != nullptr) {
+            prev_sibling_->next_sibling_ = this;
+        } else {
+            parent->first_child_ = this;
         }
-        for (std::size_t i = index; i > 0; --i) {
-            parent->children_[i] = parent->children_[i - 1];
+        parent->last_child_ = this;
+    } else {
+        next_sibling_ = parent->first_child_;
+        prev_sibling_ = nullptr;
+        if (next_sibling_ != nullptr) {
+            next_sibling_->prev_sibling_ = this;
+        } else {
+            parent->last_child_ = this;
         }
-        parent->children_[0] = this;
+        parent->first_child_ = this;
     }
     // Only this box changes owner. The overlap the widget now covers (raised)
     // or uncovers (lowered) lies inside it, and every pixel outside it keeps
@@ -219,8 +248,8 @@ void Widget::draw(const Painter& painter) const noexcept {
     if (focused_) {
         paint_focus_border(painter, bounds_);
     }
-    for (std::size_t i = 0; i < child_count_; ++i) {
-        children_[i]->draw(painter);
+    for (const Widget* child = first_child_; child != nullptr; child = child->next_sibling_) {
+        child->draw(painter);
     }
 }
 
@@ -232,8 +261,8 @@ Widget* Widget::hit_test(base::PointI at) noexcept {
     // Reverse walk: the child added last paints on top of its siblings, so it is
     // asked first. A child that accepts the point ends the search; a child that
     // declines hands the point back to the remaining siblings and finally here.
-    for (std::size_t i = child_count_; i > 0; --i) {
-        if (Widget* hit = children_[i - 1]->hit_test(at); hit != nullptr) {
+    for (Widget* child = last_child_; child != nullptr; child = child->prev_sibling_) {
+        if (Widget* hit = child->hit_test(at); hit != nullptr) {
             return hit;
         }
     }
@@ -263,8 +292,8 @@ Widget* Widget::find_focused_in(Widget& node) noexcept {
     if (node.focused_) {
         return &node;
     }
-    for (std::size_t i = 0; i < node.child_count_; ++i) {
-        if (Widget* found = find_focused_in(*node.children_[i]); found != nullptr) {
+    for (Widget* child = node.first_child_; child != nullptr; child = child->next_sibling_) {
+        if (Widget* found = find_focused_in(*child); found != nullptr) {
             return found;
         }
     }
@@ -282,9 +311,8 @@ Widget* Widget::find_focusable_after(Widget& node, Widget* current, bool& seen_c
     if (&node == current) {
         seen_current = true;
     }
-    for (std::size_t i = 0; i < node.child_count_; ++i) {
-        if (Widget* next = find_focusable_after(*node.children_[i], current, seen_current);
-            next != nullptr) {
+    for (Widget* child = node.first_child_; child != nullptr; child = child->next_sibling_) {
+        if (Widget* next = find_focusable_after(*child, current, seen_current); next != nullptr) {
             return next;
         }
     }
@@ -299,8 +327,8 @@ bool Widget::holds_widget(const Widget& node, const Widget* target) noexcept {
     if (&node == target) {
         return true;
     }
-    for (std::size_t i = 0; i < node.child_count_; ++i) {
-        if (holds_widget(*node.children_[i], target)) {
+    for (const Widget* child = node.first_child_; child != nullptr; child = child->next_sibling_) {
+        if (holds_widget(*child, target)) {
             return true;
         }
     }
@@ -312,8 +340,8 @@ void Widget::release_focus_in(Widget& node) noexcept {
     if (node.focused_) {
         node.set_focused(false);
     }
-    for (std::size_t i = 0; i < node.child_count_; ++i) {
-        release_focus_in(*node.children_[i]);
+    for (Widget* child = node.first_child_; child != nullptr; child = child->next_sibling_) {
+        release_focus_in(*child);
     }
 }
 

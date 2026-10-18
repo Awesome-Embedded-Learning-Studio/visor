@@ -23,7 +23,7 @@
 |---|---|---|
 | A 事件 ABI | PointerWheel 滚轮（你仓 x11/event_wire.cpp 注释自认预留「until a scroll layer exists」）加 KeyDown 修饰位（cinux 线 WireKey 三旗已有、translate_event 丢弃处补齐） | 一刀提，最早 |
 | B 树语义 | 弹层挂载、窗口焦点域（find_focusable_after 子树边界）、Z 序 raise 与 lower | vesper D1 前 |
-| C 手势与容量 | 双击手势（events.hpp 注释明说手势是五事件之上的将来层）、kMaxChildren 容量（倾向嵌套容器，KDE Containment 判例） | vesper D2 前 |
+| C 手势与容量 | 双击手势（events.hpp 注释明说手势是五事件之上的将来层）、kMaxChildren 容量（2026-10-18 已解：子件表改侵入式兄弟链表，无上限、零分配，见教程 09） | vesper D2 前 |
 | D 像素层 | pixel_traits 模板化、PixelFormat 枚举扩员 RGB565 与 XRGB8888、转换矩阵补齐、i.MX6ULL 交叉编译判例 | RGB565 站立项时 |
 | E 后到件 | 滚动视口、多行编辑、列表视图（vesper 先建后回捐） | 各自消费者立项时 |
 
@@ -34,7 +34,7 @@
 1. 控件功能面对照：拿 GTK 与 Qt 的基础件清单对照现有八控件，还有哪些基础件该进库、哪些永远留在应用侧？vesper 列了弹层、视口、多行编辑、列表四件，请独立核对这张清单的边界与取舍对不对。
 2. 事件 ABI 的连锁面：PointerWheel 与修饰键进 variant 后，x11、cinux、offscreen 三处翻译与判例各要动哪里？有没有第四个消费者（比如手势层）需要一起想？
 3. 像素层模板化对你仓的影响：Canvas 与 Painter 模板化后，Mono1 现有判例的编译组织怎么收口，构建时间怎么控，与第三站 SPI 彩屏的既有计划怎么咬合（注意 SPI 彩屏可能还有 RGB565 之外的帧格式，traits 的档位划分要给它留座）。
-4. 定容纪律的边界：多行编辑与列表在无堆定容下能做到什么程度？kMaxChildren 式「一个常量治理一件」的治理方式怎么延续到行缓冲与列表容量？
+4. 定容纪律的边界：多行编辑与列表在无堆定容下能做到什么程度？孩子表的定容已于 2026-10-18 改成无上限链表，这一问剩下的部分在行缓冲与列表容量。
 5. 你仓视角的补充：还有哪些 vesper 没看到的缺件或风险，包括你仓 roadmap 已有、但优先级值得因桌面仓而提前的？
 
 结论写回你仓自己的批次规划。需要 vesper 侧出判例或对接的，在本文末尾追加一节即可。

@@ -41,13 +41,11 @@ class Painter {
 
 ## Widget 基类：一棵树两种走法
 
-`include/visor/ui/widgets/widget.hpp` 里是基类的全部声明，实现在 `src/ui/widgets/widget.cpp`。每个控件三样东西：一块边界矩形、一个可见开关、一张固定容量的孩子表。控件的家园按类分目录：交互控件一组源码住 `ui/widgets/` 下的自己的子目录（按钮在 `ui/widgets/button/`），非交互的展示物归 `ui/primitives/`（矩形在 `ui/primitives/rectangle/`），painter、run_loop 这些公共件留 `ui/` 根上，它们不是控件，是控件脚下的地板。
+`include/visor/ui/widgets/widget.hpp` 里是基类的全部声明，实现在 `src/ui/widgets/widget.cpp`。每个控件三样东西：一块边界矩形、一个可见开关、一张孩子链表。控件的家园按类分目录：交互控件一组源码住 `ui/widgets/` 下的自己的子目录（按钮在 `ui/widgets/button/`），非交互的展示物归 `ui/primitives/`（矩形在 `ui/primitives/rectangle/`），painter、run_loop 这些公共件留 `ui/` 根上，它们不是控件，是控件脚下的地板。
 
-```cpp
-inline constexpr std::size_t kMaxChildren = 8;
-```
+孩子表是一条双向链表。每个控件记着头一个孩子、末一个孩子、前一个兄弟、后一个兄弟，孩子仍由使用者构造和持有，树只把它们的地址挂成一串，不加分配，也没有数量上限。`add_child` 拒绝三件事：空指针、已经有父控件的控件、以及会把控件挂成自己祖先的调用，成环的树递归走不完。调用方自己看着办，核心不终止。
 
-孩子表是 `std::array<Widget*, kMaxChildren>`，装的是指针，孩子由使用者构造和持有，树只记地址不加分配。`add_child` 在容量满或者传来空指针时返回 false，调用方自己看着办，核心不终止。容量先统一一个常量，等真实控件提出不同需求，再把它变成模板参数。
+末一个孩子和前一个兄弟这两个指针是给命中测试留的。绘制从头往后画，命中要从后往前问，单向链表反着走不动。
 
 同一棵树有两种走法，方向相反。
 
@@ -59,8 +57,8 @@ void Widget::draw(const Painter& painter) const noexcept {
         return;
     }
     on_draw(painter);
-    for (std::size_t i = 0; i < child_count_; ++i) {
-        children_[i]->draw(painter);
+    for (const Widget* child = first_child_; child != nullptr; child = child->next_sibling_) {
+        child->draw(painter);
     }
 }
 ```
@@ -68,8 +66,8 @@ void Widget::draw(const Painter& painter) const noexcept {
 命中测试走逆序：从最后加入的孩子问起，谁接住就归谁，谁都不接才轮到父节点自己。道理和绘制是同一条——后画的在上层，点击自然先落在上层。
 
 ```cpp
-for (std::size_t i = child_count_; i > 0; --i) {
-    if (Widget* hit = children_[i - 1]->hit_test(at); hit != nullptr) {
+for (Widget* child = last_child_; child != nullptr; child = child->prev_sibling_) {
+    if (Widget* hit = child->hit_test(at); hit != nullptr) {
         return hit;
     }
 }
@@ -192,18 +190,6 @@ ctest --test-dir build --output-on-failure
 ./build/tests/visor.tests && echo ok
 ```
 
-红绿实验做一次命中顺序的。打开 `src/ui/widgets/widget.cpp`，把 `hit_test` 里的逆序遍历改成先序——把这一行
-
-```cpp
-for (std::size_t i = child_count_; i > 0; --i) {
-```
-
-换成
-
-```cpp
-for (std::size_t i = 0; i < child_count_; ++i) {
-```
-
-重新构建再跑，`widget_tests` 里两处命中断言转红：`{5, 5}` 落在三个重叠控件上，逆序时后加者赢，先序时先加者先接住。看完改回来，绿。
+红绿实验做一次命中顺序的。打开 `src/ui/widgets/widget.cpp`，把 `hit_test` 里的逆序遍历改成先序，起头处把 `last_child_` 换成 `first_child_`，推进处把 `prev_sibling_` 换成 `next_sibling_`。重新构建再跑，`widget_tests` 里两处命中断言转红：`{5, 5}` 落在三个重叠控件上，逆序时后加者赢，先序时先加者先接住。看完改回来，绿。
 
 想再看一条的话，把 `run_loop_tests` 第二回合里按下事件的坐标从 `{4, 4}` 挪到 `{15, 15}`（面板上、按钮外），按钮收不到按下，`pressed()` 断言转红。命中分发「命中的才消费」这件事，红一次比读十遍清楚。

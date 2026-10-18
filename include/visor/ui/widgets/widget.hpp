@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -13,14 +12,9 @@
 
 namespace visor::ui {
 
-/// Fixed child capacity every widget shares. One compile-time constant keeps the
-/// tree allocation-free; if a real control ever needs a different bound, this
-/// becomes a template parameter then, with the first demand in hand.
-inline constexpr std::size_t kMaxChildren = 8;
-
 /**
- * @brief Base class of every control: a bounding box, a visibility switch and a
- *        fixed-capacity child list.
+ * @brief Base class of every control: a bounding box, a visibility switch and an
+ *        unbounded child list linked through sibling pointers.
  *
  * Widgets are runtime objects by spec: their state changes as events arrive, and
  * templating the whole scene would rebuild the program for every layout. What
@@ -71,13 +65,14 @@ class Widget {
     [[nodiscard]] bool visible() const noexcept;
     void set_visible(bool on) noexcept;
 
-    /// Adopts a child; returns false when the capacity is full, child is null,
-    /// or child already belongs to another parent. An adopted subtree inherits
-    /// this widget's dirty sink, so wiring the root before or after assembly
-    /// both reach every widget.
+    /// Adopts a child; returns false when child is null, already belongs to
+    /// another parent, or would become this widget's own ancestor (a cycle no
+    /// walk could finish). There is no capacity bound: the list is links, not
+    /// storage. An adopted subtree inherits this widget's dirty sink, so wiring
+    /// the root before or after assembly both reach every widget.
     [[nodiscard]] bool add_child(Widget* child) noexcept;
 
-    /// Removes a direct child and shifts later siblings down. Returns false
+    /// Removes a direct child and closes the gap around it. Returns false
     /// when child is null or is not a direct child. The child is detached, not
     /// destroyed: its parent link clears, its subtree stops reporting into
     /// this tree's dirty sink, and any focus it holds is released so a later
@@ -89,8 +84,10 @@ class Widget {
 
     [[nodiscard]] std::size_t child_count() const noexcept;
 
-    /// The child at index, null past the count. The layout walks read their
-    /// children through this door; ownership and order belong to add_child.
+    /// The child at index in add order, null past the count. Costs one link hop
+    /// per index, so it is a walking door for layout, not a spot query. The
+    /// layout walks read their children through this door; ownership and order
+    /// belong to add_child.
     [[nodiscard]] Widget* child(std::size_t index) noexcept;
 
     /// Moves this widget to the top of its parent's child list, where draw()
@@ -244,7 +241,14 @@ class Widget {
     std::uint32_t id_;
     bool visible_ = true;
     bool focused_ = false;
-    std::array<Widget*, kMaxChildren> children_{};
+    // Children are an intrusive doubly linked list. The tree borrows them from
+    // whoever constructed them, so there is no storage, no allocation and no
+    // cap; both ends are kept because draw() walks forward and hit_test()
+    // walks backward.
+    Widget* first_child_ = nullptr;
+    Widget* last_child_ = nullptr;
+    Widget* prev_sibling_ = nullptr;
+    Widget* next_sibling_ = nullptr;
     std::size_t child_count_ = 0;
     Widget* parent_ = nullptr;
     DirtyRegions* dirty_ = nullptr;

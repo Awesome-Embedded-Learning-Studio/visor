@@ -13,3 +13,8 @@ add_test(NAME visor.signal.selftest COMMAND signal --self-test)
 add_executable(snake snake.cpp)
 target_link_libraries(snake PRIVATE visor.host.x11 visor.host.offscreen visor.host visor.ui)
 add_test(NAME visor.snake.selftest COMMAND snake --self-test)
+
+# The popup layer's consumer: a dropdown whose list hangs past its card.
+add_executable(popup popup.cpp)
+target_link_libraries(popup PRIVATE visor.host.x11 visor.host visor.ui)
+add_test(NAME visor.popup.selftest COMMAND popup --self-test)

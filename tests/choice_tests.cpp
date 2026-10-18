@@ -11,6 +11,7 @@
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/input_router.hpp"
+#include "visor/ui/popup_layer.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/run_loop.hpp"
 #include "visor/ui/widgets/dropdown/dropdown.hpp"
@@ -255,5 +256,79 @@ void run_choice_tests() {
         debts.clear();
         list.set_open(false); // already closed, nothing owed
         VISOR_CHECK_EQ(debts.count(), std::size_t{0});
+    }
+
+    // With a popup layer, the open list is a member mounted on the layer:
+    // the dropdown's own bounds stay closed, the list hangs past its window,
+    // an outside press dismisses, and a row press or Enter picks.
+    {
+        int changes = 0;
+        visor::ui::Rectangle root(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 64, .h = 64}});
+        visor::ui::Rectangle window(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 30, .h = 14}});
+        visor::ui::Dropdown list(RectI{.pos = PointI{4, 4}, .size = SizeI{.w = 20, .h = 6}},
+                                 kChoiceFont, visor::canvas::ColorRole::Foreground);
+        visor::ui::PopupLayer layer(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 64, .h = 64}});
+        root.fill = ColorRole::Background;
+        window.fill = ColorRole::Background;
+        VISOR_CHECK(root.add_child(&window));
+        VISOR_CHECK(window.add_child(&list));
+        VISOR_CHECK(root.add_child(&layer));
+        list.set_popup(&layer);
+        VISOR_CHECK(list.add_option("hi"));
+        VISOR_CHECK(list.add_option("ho"));
+        VISOR_CHECK(list.add_option("oh"));
+        list.set_on_change(
+            [](visor::ui::Dropdown&, void* context) { ++*static_cast<int*>(context); }, &changes);
+        const RectI closed{.pos = PointI{4, 4}, .size = SizeI{.w = 20, .h = 6}};
+
+        list.set_open(true);
+        VISOR_CHECK(list.open());
+        VISOR_CHECK(layer.is_open());
+        VISOR_CHECK_EQ(list.bounds(), closed); // no in-tree growth
+        VISOR_CHECK(layer.content() != nullptr);
+        if (layer.content() != nullptr) {
+            VISOR_CHECK_EQ(layer.content()->bounds(),
+                           (RectI{.pos = PointI{4, 10}, .size = SizeI{.w = 20, .h = 18}}));
+        }
+        VISOR_CHECK_EQ(root.hit_test(PointI{10, 12}), layer.content());
+
+        Canvas<SizeI{.w = 64, .h = 64}> canvas;
+        root.draw(visor::ui::CanvasPainter{canvas});
+        VISOR_CHECK(canvas.get(PointI{20, 12}) == true);  // first row highlighted
+        VISOR_CHECK(canvas.get(PointI{20, 18}) == false); // second row plain
+
+        visor::ui::InputRouter input;
+        visor::ui::dispatch_event(
+            root, input,
+            visor::host::Event{visor::host::PointerDown{.button = 1, .pos = PointI{50, 50}}}, 0,
+            true);
+        visor::ui::dispatch_event(
+            root, input,
+            visor::host::Event{visor::host::PointerUp{.button = 1, .pos = PointI{50, 50}}}, 0,
+            true);
+        VISOR_CHECK(!list.open());
+        VISOR_CHECK(!layer.is_open());
+        VISOR_CHECK_EQ(list.bounds(), closed);
+
+        list.set_open(true);
+        list.on_key_down(visor::host::kKeyDown, {});
+        list.on_key_down(visor::host::kKeyEnter, {});
+        VISOR_CHECK(!list.open());
+        VISOR_CHECK_EQ(list.selected(), 1);
+        VISOR_CHECK_EQ(changes, 1);
+
+        list.set_open(true);
+        visor::ui::dispatch_event(
+            root, input,
+            visor::host::Event{visor::host::PointerDown{.button = 1, .pos = PointI{10, 25}}}, 10,
+            true);
+        visor::ui::dispatch_event(
+            root, input,
+            visor::host::Event{visor::host::PointerUp{.button = 1, .pos = PointI{10, 25}}}, 10,
+            true);
+        VISOR_CHECK(!list.open());
+        VISOR_CHECK_EQ(list.selected(), 2);
+        VISOR_CHECK_EQ(changes, 2);
+        VISOR_CHECK_EQ(list.bounds(), closed);
     }
 }

@@ -7,6 +7,7 @@
 #include "visor/bindings/events.hpp"
 #include "visor/ui/input_router.hpp"
 #include "visor/ui/painter.hpp"
+#include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 #include <cstdint>
@@ -183,4 +184,60 @@ void run_event_tests() {
     visor::ui::dispatch_event(root, input, Event{PointerMove{.pos = PointI{12, 12}}}, 90);
     VISOR_CHECK_EQ(second.pointer_moves, 1);
     VISOR_CHECK_EQ(second.last_move, (PointI{12, 12}));
+
+    // The router owns Tab's focus domain. A window scope keeps the walk inside
+    // one subtree; clearing it restores the root domain; a scope that no
+    // longer names a member falls back to the root domain.
+    {
+        visor::ui::Rectangle scoped_root(
+            RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 40, .h = 10}});
+        visor::ui::Rectangle window_a(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 10}});
+        visor::ui::Rectangle window_b(RectI{.pos = PointI{12, 0}, .size = SizeI{.w = 10, .h = 10}});
+        Probe a1(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 4, .h = 4}});
+        Probe a2(RectI{.pos = PointI{6, 0}, .size = SizeI{.w = 4, .h = 4}});
+        Probe b1(RectI{.pos = PointI{12, 0}, .size = SizeI{.w = 4, .h = 4}});
+        Probe b2(RectI{.pos = PointI{18, 0}, .size = SizeI{.w = 4, .h = 4}});
+        VISOR_CHECK(scoped_root.add_child(&window_a));
+        VISOR_CHECK(scoped_root.add_child(&window_b));
+        VISOR_CHECK(window_a.add_child(&a1));
+        VISOR_CHECK(window_a.add_child(&a2));
+        VISOR_CHECK(window_b.add_child(&b1));
+        VISOR_CHECK(window_b.add_child(&b2));
+
+        InputRouter scoped_input;
+        const auto tab = [&scoped_root, &scoped_input](std::uint64_t now) {
+            visor::ui::dispatch_event(scoped_root, scoped_input,
+                                      Event{KeyDown{.code = visor::host::kKeyTab, .modifiers = {}}},
+                                      now);
+        };
+
+        scoped_input.set_focus_scope(&window_a);
+        tab(100);
+        VISOR_CHECK(a1.focused());
+        tab(110);
+        VISOR_CHECK(a2.focused());
+        tab(120);
+        VISOR_CHECK(a1.focused()); // wrapped inside window A
+
+        scoped_input.set_focus_scope(&window_b);
+        tab(130);
+        VISOR_CHECK(b1.focused());
+        VISOR_CHECK(!a1.focused());
+        tab(140);
+        VISOR_CHECK(b2.focused());
+        tab(150);
+        VISOR_CHECK(b1.focused());
+
+        scoped_input.set_focus_scope(nullptr);
+        tab(160);
+        VISOR_CHECK(b2.focused()); // root domain continues past B's first
+
+        // A scope pointing outside the dispatched tree is ignored, and the
+        // root domain takes over again: from B's last, Tab wraps to A's first.
+        Probe outsider(RectI{.pos = PointI{30, 0}, .size = SizeI{.w = 4, .h = 4}});
+        scoped_input.set_focus_scope(&outsider);
+        tab(170);
+        VISOR_CHECK(a1.focused());
+        VISOR_CHECK(!outsider.focused());
+    }
 }

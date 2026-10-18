@@ -96,15 +96,48 @@ void Widget::set_theme(const Theme* theme) noexcept {
 }
 
 bool Widget::add_child(Widget* child) noexcept {
-    if (child == nullptr || child_count_ == kMaxChildren) {
+    if (child == nullptr || child_count_ == kMaxChildren || child->parent_ != nullptr) {
         return false;
     }
     children_[child_count_] = child;
     ++child_count_;
+    child->parent_ = this;
     // The adopted subtree reports into the same sink and paints under the
     // same scheme, whenever either is wired.
     child->set_dirty_sink(dirty_);
     child->set_theme(theme_);
+    return true;
+}
+
+bool Widget::remove_child(Widget* child) noexcept {
+    if (child == nullptr || child->parent_ != this) {
+        return false;
+    }
+    std::size_t index = 0;
+    while (index < child_count_ && children_[index] != child) {
+        ++index;
+    }
+    if (index == child_count_) {
+        return false; // A parent link without a slot owns nothing to remove.
+    }
+    for (std::size_t i = index; i + 1 < child_count_; ++i) {
+        children_[i] = children_[i + 1];
+    }
+    --child_count_;
+    children_[child_count_] = nullptr;
+    child->parent_ = nullptr;
+    // The pixels the child covered now belong to whatever is beneath it. A
+    // hidden child painted nothing, so it owes nothing on the way out.
+    if (child->visible_) {
+        invalidate(child->bounds());
+    }
+    // A detached subtree cannot hold this tree's focus. Releasing the ring
+    // before the sink is unwired also catches a holder that drew outside the
+    // child's own box.
+    release_focus_in(*child);
+    // The subtree must stop reporting into a collector it is no longer part
+    // of; adopting it again wires the sink the same way add_child does.
+    child->set_dirty_sink(nullptr);
     return true;
 }
 
@@ -117,6 +150,54 @@ Widget* Widget::child(std::size_t index) noexcept {
         return nullptr;
     }
     return children_[index];
+}
+
+bool Widget::raise() noexcept {
+    return move_to_edge(true);
+}
+
+bool Widget::lower() noexcept {
+    return move_to_edge(false);
+}
+
+bool Widget::move_to_edge(bool to_top) noexcept {
+    if (parent_ == nullptr) {
+        return false;
+    }
+    Widget* parent = parent_;
+    std::size_t index = 0;
+    while (index < parent->child_count_ && parent->children_[index] != this) {
+        ++index;
+    }
+    if (index == parent->child_count_) {
+        return false; // A stale parent link owns no order to change.
+    }
+    const std::size_t last = parent->child_count_ - 1;
+    if (to_top) {
+        if (index == last) {
+            return false;
+        }
+        for (std::size_t i = index; i < last; ++i) {
+            parent->children_[i] = parent->children_[i + 1];
+        }
+        parent->children_[last] = this;
+    } else {
+        if (index == 0) {
+            return false;
+        }
+        for (std::size_t i = index; i > 0; --i) {
+            parent->children_[i] = parent->children_[i - 1];
+        }
+        parent->children_[0] = this;
+    }
+    // Only this box changes owner. The overlap the widget now covers (raised)
+    // or uncovers (lowered) lies inside it, and every pixel outside it keeps
+    // the same topmost painter, so one report is the whole debt. A hidden
+    // widget owns no pixels; showing it later reports the box again.
+    if (visible_) {
+        invalidate(bounds_);
+    }
+    return true;
 }
 
 // The recursive walk is the tree's honest shape: a real scene nests only a few
@@ -204,22 +285,56 @@ Widget* Widget::find_focusable_after(Widget& node, Widget* current, bool& seen_c
     return nullptr;
 }
 
-bool Widget::advance_focus() noexcept {
-    Widget* current = find_focused_in(*this);
-    bool seen_current = (current == nullptr);
-    Widget* target = find_focusable_after(*this, current, seen_current);
-    if (target == nullptr && current != nullptr) {
-        // Wrap: nothing focusable after the holder, restart from the top. The
-        // restart may land back on the holder itself, which is the tree saying
-        // it has exactly one focusable widget, and focus stays there.
-        seen_current = true;
-        target = find_focusable_after(*this, nullptr, seen_current);
-    }
+// NOLINTNEXTLINE(misc-no-recursion) -- same shape and same reason as draw().
+bool Widget::holds_widget(const Widget& node, const Widget* target) noexcept {
     if (target == nullptr) {
         return false;
     }
-    if (current != nullptr && current != target) {
-        current->set_focused(false);
+    if (&node == target) {
+        return true;
+    }
+    for (std::size_t i = 0; i < node.child_count_; ++i) {
+        if (holds_widget(*node.children_[i], target)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// NOLINTNEXTLINE(misc-no-recursion) -- same shape and same reason as draw().
+void Widget::release_focus_in(Widget& node) noexcept {
+    if (node.focused_) {
+        node.set_focused(false);
+    }
+    for (std::size_t i = 0; i < node.child_count_; ++i) {
+        release_focus_in(*node.children_[i]);
+    }
+}
+
+bool Widget::advance_focus(Widget* scope) noexcept {
+    // A scope that is not a live member of this subtree is treated as the
+    // root domain. The membership walk only compares the pointer against live
+    // nodes, so a scope left behind by a torn-down window is never followed.
+    Widget* domain = (scope != nullptr && holds_widget(*this, scope)) ? scope : this;
+    Widget* holder = find_focused_in(*this);
+    Widget* current = find_focused_in(*domain);
+    bool seen_current = (current == nullptr);
+    Widget* target = find_focusable_after(*domain, current, seen_current);
+    if (target == nullptr && current != nullptr) {
+        // Wrap: nothing focusable after the holder, restart from the top of
+        // the domain. The restart may land back on the holder itself, which is
+        // the domain saying it has exactly one focusable widget.
+        seen_current = true;
+        target = find_focusable_after(*domain, nullptr, seen_current);
+    }
+    if (target == nullptr) {
+        // An empty domain moves nobody: a holder outside it keeps its focus.
+        return false;
+    }
+    // At most one widget holds focus per tree. A holder outside the domain is
+    // still cleared, otherwise switching windows would leave two rings lit.
+    if (holder != nullptr && holder != target) {
+        holder->set_focused(false);
     }
     target->set_focused(true);
     return true;

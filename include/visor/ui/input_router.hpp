@@ -21,12 +21,29 @@ namespace visor::ui {
  * home would do. The single-pointer assumption is the spec's world (one
  * event queue, one consumer); one press session exists at a time, whatever
  * button id carried the down.
+ *
+ * Tab's focus domain lives here for the same reason. Null (the default) is
+ * the root domain, the whole dispatched tree, which keeps the historical Tab
+ * behavior. A window that wants Tab to cycle inside itself names its subtree
+ * with set_focus_scope; changing the active window is that one call. The
+ * pointer is a non-owning hint: advance_focus() compares it against the live
+ * tree and falls back to the root domain when it no longer names a member, so
+ * a window torn down without clearing the scope degrades safely instead of
+ * steering the walk into freed memory. Clearing or replacing the hint when a
+ * window closes is still the caller's job, because only the caller knows the
+ * window is gone.
  */
 class InputRouter {
   public:
     /// The widget the current press landed on, null while no press is held
     /// (including a press that hit nobody).
     [[nodiscard]] Widget* press_owner() const noexcept { return press_owner_; }
+
+    /// Names the subtree Tab traversal stays inside. Null restores the root
+    /// domain. The pointer is not owned and is never dereferenced unless it is
+    /// still a member of the dispatched tree.
+    void set_focus_scope(Widget* scope) noexcept { focus_scope_ = scope; }
+    [[nodiscard]] Widget* focus_scope() const noexcept { return focus_scope_; }
 
   private:
     // dispatch_event is the one writer: ownership changes only as events
@@ -35,6 +52,7 @@ class InputRouter {
                                std::uint64_t now_ms) noexcept;
 
     Widget* press_owner_ = nullptr;
+    Widget* focus_scope_ = nullptr;
 };
 
 /**
@@ -48,9 +66,10 @@ class InputRouter {
  * hover foundation); the release goes to the owner wherever it lands and
  * retires the ownership. The wheel is a hover word: it goes to the topmost
  * widget under the pointer and leaves ownership alone. Tab (the one named key
- * code) still moves the focus along the tree; every other key code goes to
- * the focus holder verbatim. The point or key that finds no receiver ends the
- * round unconsumed beyond the count.
+ * code) still moves the focus along the tree, bounded by the router's focus
+ * scope when one is set; every other key code goes to the focus holder
+ * verbatim. The point or key that finds no receiver ends the round unconsumed
+ * beyond the count.
  *
  * now_ms is the round's clock reading, shared by every event the round
  * dispatches. It is carried now so later gesture layers (double click) can

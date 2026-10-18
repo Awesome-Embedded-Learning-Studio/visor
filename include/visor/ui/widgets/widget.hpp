@@ -28,11 +28,14 @@ inline constexpr std::size_t kMaxChildren = 8;
  * Two walking orders live on one tree. draw() goes pre-order -- parent first,
  * children on top of it -- because later pixels overwrite earlier ones. hit_test()
  * walks the same tree backwards so the widget that paints last is the one that
- * receives the click.
+ * receives the click. raise() and lower() move a child within its parent's
+ * list, so both walks follow a new stacking order without either one changing.
  *
  * Focus lives here too: at most one widget holds the keyboard focus at a time,
  * draw() paints the one-pixel ring for the holder, and advance_focus() walks
- * draw order to hand it on when Tab arrives.
+ * draw order to hand it on when Tab arrives. That walk can be bounded to a
+ * focus domain (a window subtree) without changing the default whole-tree
+ * behavior.
  *
  * Repaint debts are reported, never polled. State mutators push their owed
  * areas into the DirtyRegions the tree was wired with; the renderer asks the
@@ -59,15 +62,41 @@ class Widget {
     [[nodiscard]] bool visible() const noexcept;
     void set_visible(bool on) noexcept;
 
-    /// Adopts a child; returns false when the capacity is full or child is null.
-    /// An adopted subtree inherits this widget's dirty sink, so wiring the root
-    /// before or after assembly both reach every widget.
+    /// Adopts a child; returns false when the capacity is full, child is null,
+    /// or child already belongs to another parent. An adopted subtree inherits
+    /// this widget's dirty sink, so wiring the root before or after assembly
+    /// both reach every widget.
     [[nodiscard]] bool add_child(Widget* child) noexcept;
+
+    /// Removes a direct child and shifts later siblings down. Returns false
+    /// when child is null or is not a direct child. The child is detached, not
+    /// destroyed: its parent link clears, its subtree stops reporting into
+    /// this tree's dirty sink, and any focus it holds is released so a later
+    /// adoption cannot resurrect a stale ring. A visible child reports its own
+    /// box as owing repaint, because the pixels it covered now belong to
+    /// whatever is beneath it. raise() and lower() only reorder, so this is
+    /// the one door a child leaves through.
+    [[nodiscard]] bool remove_child(Widget* child) noexcept;
+
     [[nodiscard]] std::size_t child_count() const noexcept;
 
     /// The child at index, null past the count. The layout walks read their
     /// children through this door; ownership and order belong to add_child.
     [[nodiscard]] Widget* child(std::size_t index) noexcept;
+
+    /// Moves this widget to the top of its parent's child list, where draw()
+    /// paints it last and hit_test() asks it first. Returns false when the
+    /// widget has no parent or already sits on top. A visible widget reports
+    /// its own box as owing repaint: the overlap it now covers and the overlap
+    /// it uncovers both sit inside that box, and every pixel outside it keeps
+    /// the same topmost painter. A hidden widget owns no pixels, so it reports
+    /// nothing; showing it later reports the box again.
+    bool raise() noexcept;
+
+    /// The mirror of raise(): moves this widget to the bottom of its parent's
+    /// child list, painting it first and hit testing it last. The same return,
+    /// hidden and repaint rules apply: false when there is nowhere lower to go.
+    bool lower() noexcept;
 
     /// Replaces the bounding box and reports both boxes as owing repaint: a
     /// widget that moved or resized leaves pixels standing in the old box and
@@ -155,8 +184,19 @@ class Widget {
 
     /// Moves focus to the next focusable widget in draw order, wrapping past
     /// the end. Hidden branches take no part, matching draw() and hit_test().
-    /// Returns false when nothing in the subtree is focusable; focus stays.
-    bool advance_focus() noexcept;
+    /// Returns false when the domain holds no visible focusable widget; focus
+    /// stays where it is.
+    ///
+    /// @param scope The focus domain. Null (the default) or this widget means
+    ///        the whole subtree rooted here, which is the historical Tab
+    ///        behavior. A descendant narrows the walk to that subtree, so Tab
+    ///        cycles inside one window and never crosses into a sibling. Any
+    ///        other pointer -- a window that was torn down or detached -- falls
+    ///        back to this subtree. The pointer is compared against live nodes
+    ///        only and is never followed when it is not found, so a stale scope
+    ///        cannot steer the walk into freed memory. The scope is not stored;
+    ///        it is the caller's non-owning hint for the duration of the call.
+    bool advance_focus(Widget* scope = nullptr) noexcept;
 
   protected:
     /// Paints this widget only; the tree walk around it belongs to draw().
@@ -174,12 +214,19 @@ class Widget {
   private:
     static Widget* find_focused_in(Widget& node) noexcept;
     static Widget* find_focusable_after(Widget& node, Widget* current, bool& seen_current) noexcept;
+    static bool holds_widget(const Widget& node, const Widget* target) noexcept;
+    static void release_focus_in(Widget& node) noexcept;
+
+    /// Shared body of raise() and lower(): moves this widget to one end of its
+    /// parent's child list and reports the repaint debt.
+    bool move_to_edge(bool to_top) noexcept;
 
     base::RectI bounds_;
     bool visible_ = true;
     bool focused_ = false;
     std::array<Widget*, kMaxChildren> children_{};
     std::size_t child_count_ = 0;
+    Widget* parent_ = nullptr;
     DirtyRegions* dirty_ = nullptr;
     const Theme* theme_ = nullptr;
 };

@@ -86,6 +86,287 @@ class Tracer final : public visor::ui::Widget {
 /// Shared draw-order log; every Tracer appends its tag when painted.
 std::vector<int> widget_order;
 
+void run_z_order_cases() {
+    using visor::base::PointI;
+    using visor::base::RectI;
+    using visor::base::SizeI;
+    using visor::ui::Widget;
+
+    const RectI root_bounds{.pos = PointI{0, 0}, .size = SizeI{.w = 20, .h = 20}};
+    const RectI left_bounds{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 10}};
+    const RecordingPainter painter;
+
+    // Z order: raise() and lower() move a child within its parent's list, and
+    // both walks follow. Three children share one box, so the last one in the
+    // list paints last and wins the hit. Raising the middle one changes both;
+    // lowering it changes both again. Only the moved box owes repaint.
+    {
+        visor::ui::DirtyRegions stack_reports;
+        Tracer stack_root(root_bounds, 20, widget_order);
+        Tracer stack_bottom(left_bounds, 21, widget_order);
+        Tracer stack_middle(left_bounds, 22, widget_order);
+        Tracer stack_top(left_bounds, 23, widget_order);
+        VISOR_CHECK(stack_root.add_child(&stack_bottom));
+        VISOR_CHECK(stack_root.add_child(&stack_middle));
+        VISOR_CHECK(stack_root.add_child(&stack_top));
+        stack_root.set_dirty_sink(&stack_reports);
+        VISOR_CHECK_EQ(stack_root.hit_test(PointI{5, 5}), static_cast<Widget*>(&stack_top));
+
+        // raise(): the middle child goes to the top of the list.
+        VISOR_CHECK(stack_middle.raise());
+        VISOR_CHECK_EQ(stack_root.child(0), static_cast<Widget*>(&stack_bottom));
+        VISOR_CHECK_EQ(stack_root.child(1), static_cast<Widget*>(&stack_top));
+        VISOR_CHECK_EQ(stack_root.child(2), static_cast<Widget*>(&stack_middle));
+        VISOR_CHECK_EQ(stack_root.hit_test(PointI{5, 5}), static_cast<Widget*>(&stack_middle));
+        widget_order.clear();
+        stack_root.draw(painter);
+        const std::array<int, 4> raised_order{20, 21, 23, 22};
+        VISOR_CHECK_EQ(widget_order.size(), raised_order.size());
+        for (std::size_t i = 0; i < raised_order.size(); ++i) {
+            VISOR_CHECK_EQ(widget_order[i], raised_order[i]);
+        }
+        VISOR_CHECK_EQ(stack_reports.count(), std::size_t{1});
+        VISOR_CHECK_EQ(stack_reports.at(0), left_bounds);
+        stack_reports.clear();
+        // Already on top: no order change, no debt.
+        VISOR_CHECK(!stack_middle.raise());
+        VISOR_CHECK_EQ(stack_reports.count(), std::size_t{0});
+
+        // lower(): the middle child goes to the bottom, so the top child is
+        // asked first again.
+        VISOR_CHECK(stack_middle.lower());
+        VISOR_CHECK_EQ(stack_root.child(0), static_cast<Widget*>(&stack_middle));
+        VISOR_CHECK_EQ(stack_root.child(1), static_cast<Widget*>(&stack_bottom));
+        VISOR_CHECK_EQ(stack_root.child(2), static_cast<Widget*>(&stack_top));
+        VISOR_CHECK_EQ(stack_root.hit_test(PointI{5, 5}), static_cast<Widget*>(&stack_top));
+        widget_order.clear();
+        stack_root.draw(painter);
+        const std::array<int, 4> lowered_order{20, 22, 21, 23};
+        VISOR_CHECK_EQ(widget_order.size(), lowered_order.size());
+        for (std::size_t i = 0; i < lowered_order.size(); ++i) {
+            VISOR_CHECK_EQ(widget_order[i], lowered_order[i]);
+        }
+        VISOR_CHECK_EQ(stack_reports.count(), std::size_t{1});
+        VISOR_CHECK_EQ(stack_reports.at(0), left_bounds);
+        VISOR_CHECK(!stack_middle.lower());
+        // A widget outside any parent has no order to change.
+        Tracer stack_orphan(left_bounds, 24, widget_order);
+        VISOR_CHECK(!stack_orphan.raise());
+        VISOR_CHECK(!stack_orphan.lower());
+
+        // Half-open boxes: the right and bottom edges belong to the parent,
+        // not to the children that end there.
+        VISOR_CHECK_EQ(stack_root.hit_test(PointI{10, 5}), static_cast<Widget*>(&stack_root));
+        VISOR_CHECK_EQ(stack_root.hit_test(PointI{5, 10}), static_cast<Widget*>(&stack_root));
+        VISOR_CHECK_EQ(stack_root.hit_test(PointI{20, 5}), static_cast<Widget*>(nullptr));
+
+        // A hidden top child neither paints nor hits; the next visible child
+        // in the stack takes the point.
+        stack_top.set_visible(false);
+        VISOR_CHECK_EQ(stack_root.hit_test(PointI{5, 5}), static_cast<Widget*>(&stack_bottom));
+        widget_order.clear();
+        stack_root.draw(painter);
+        const std::array<int, 3> hidden_order{20, 22, 21};
+        VISOR_CHECK_EQ(widget_order.size(), hidden_order.size());
+        for (std::size_t i = 0; i < hidden_order.size(); ++i) {
+            VISOR_CHECK_EQ(widget_order[i], hidden_order[i]);
+        }
+        // A hidden widget can still be reordered, but it owns no pixels yet,
+        // so the move reports nothing.
+        stack_reports.clear();
+        VISOR_CHECK(stack_top.lower());
+        VISOR_CHECK_EQ(stack_root.child(0), static_cast<Widget*>(&stack_top));
+        VISOR_CHECK_EQ(stack_reports.count(), std::size_t{0});
+        stack_top.set_visible(true);
+    }
+}
+
+void run_focus_domain_cases() {
+    using visor::base::PointI;
+    using visor::base::RectI;
+    using visor::base::SizeI;
+
+    const RectI root_bounds{.pos = PointI{0, 0}, .size = SizeI{.w = 20, .h = 20}};
+    const RectI left_bounds{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 10}};
+
+    // Focus domain: an explicit scope bounds the Tab walk to one window
+    // subtree. Each window cycles internally without crossing, the root
+    // domain still wraps across the whole tree, and hidden branches stay out.
+    {
+        visor::ui::Rectangle desktop(root_bounds);
+        visor::ui::Rectangle window_a(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 10}});
+        visor::ui::Rectangle window_b(RectI{.pos = PointI{10, 0}, .size = SizeI{.w = 10, .h = 10}});
+        visor::ui::Rectangle bare_window(
+            RectI{.pos = PointI{0, 10}, .size = SizeI{.w = 10, .h = 10}});
+        visor::ui::Button a1(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 4, .h = 4}});
+        visor::ui::Button a2(RectI{.pos = PointI{6, 0}, .size = SizeI{.w = 4, .h = 4}});
+        visor::ui::Button b1(RectI{.pos = PointI{10, 0}, .size = SizeI{.w = 4, .h = 4}});
+        visor::ui::Button b2(RectI{.pos = PointI{16, 0}, .size = SizeI{.w = 4, .h = 4}});
+        VISOR_CHECK(desktop.add_child(&window_a));
+        VISOR_CHECK(desktop.add_child(&window_b));
+        VISOR_CHECK(desktop.add_child(&bare_window));
+        VISOR_CHECK(window_a.add_child(&a1));
+        VISOR_CHECK(window_a.add_child(&a2));
+        VISOR_CHECK(window_b.add_child(&b1));
+        VISOR_CHECK(window_b.add_child(&b2));
+
+        // The default scope is the root domain: every focusable in draw order,
+        // wrapping past the end.
+        VISOR_CHECK(desktop.advance_focus());
+        VISOR_CHECK(a1.focused());
+        VISOR_CHECK(desktop.advance_focus());
+        VISOR_CHECK(a2.focused());
+        VISOR_CHECK(desktop.advance_focus());
+        VISOR_CHECK(b1.focused());
+        VISOR_CHECK(desktop.advance_focus());
+        VISOR_CHECK(b2.focused());
+
+        // Window A's own scope never crosses into Window B and wraps at its
+        // own last focusable.
+        VISOR_CHECK(desktop.advance_focus(&window_a));
+        VISOR_CHECK(a1.focused());
+        VISOR_CHECK(!b2.focused());
+        VISOR_CHECK(desktop.advance_focus(&window_a));
+        VISOR_CHECK(a2.focused());
+        VISOR_CHECK(desktop.advance_focus(&window_a));
+        VISOR_CHECK(a1.focused());
+
+        // Switching scope to Window B starts at B's first focusable and drops
+        // A's ring, keeping the one-holder invariant.
+        VISOR_CHECK(desktop.advance_focus(&window_b));
+        VISOR_CHECK(b1.focused());
+        VISOR_CHECK(!a1.focused());
+        VISOR_CHECK(desktop.advance_focus(&window_b));
+        VISOR_CHECK(b2.focused());
+        VISOR_CHECK(desktop.advance_focus(&window_b));
+        VISOR_CHECK(b1.focused());
+
+        // Back to the root domain: from B's first, the walk crosses to B's
+        // second and then wraps all the way to A's first.
+        VISOR_CHECK(desktop.advance_focus());
+        VISOR_CHECK(b2.focused());
+        VISOR_CHECK(desktop.advance_focus());
+        VISOR_CHECK(a1.focused());
+
+        // A domain with no visible focusable child answers false and moves
+        // nobody, even when the current holder lives outside it.
+        VISOR_CHECK(!desktop.advance_focus(&bare_window));
+        VISOR_CHECK(a1.focused());
+
+        // A hidden branch is skipped inside its own scope too: hiding A's
+        // second button leaves A's first as the only stop.
+        a2.set_visible(false);
+        VISOR_CHECK(desktop.advance_focus(&window_a));
+        VISOR_CHECK(a1.focused());
+        // A hidden window domain has nothing to hand over, so focus stays in
+        // the visible window.
+        window_b.set_visible(false);
+        VISOR_CHECK(!desktop.advance_focus(&window_b));
+        VISOR_CHECK(a1.focused());
+
+        // A pointer that is not a member of this tree is not followed; the
+        // walk falls back to the root domain, which is how a torn-down
+        // window's scope degrades.
+        visor::ui::Rectangle stranger(left_bounds);
+        window_b.set_visible(true);
+        VISOR_CHECK(desktop.advance_focus(&stranger));
+        VISOR_CHECK(b1.focused());
+        VISOR_CHECK(!a1.focused());
+
+        // Naming this widget itself is the root domain again.
+        VISOR_CHECK(desktop.advance_focus(&desktop));
+        VISOR_CHECK(b2.focused());
+    }
+}
+
+void run_remove_child_cases() {
+    using visor::base::PointI;
+    using visor::base::RectI;
+    using visor::base::SizeI;
+    using visor::ui::Widget;
+
+    const RectI root_bounds{.pos = PointI{0, 0}, .size = SizeI{.w = 20, .h = 20}};
+    const RectI child_bounds{.pos = PointI{0, 0}, .size = SizeI{.w = 10, .h = 10}};
+    const RecordingPainter painter;
+
+    visor::ui::DirtyRegions reports;
+    Tracer root(root_bounds, 40, widget_order);
+    Tracer bottom(child_bounds, 41, widget_order);
+    Tracer middle(child_bounds, 42, widget_order);
+    Tracer top(child_bounds, 43, widget_order);
+    VISOR_CHECK(root.add_child(&bottom));
+    VISOR_CHECK(root.add_child(&middle));
+    VISOR_CHECK(root.add_child(&top));
+    root.set_dirty_sink(&reports);
+
+    // Removing the middle child shifts the later sibling down, reports the
+    // covered box, and clears the parent link so raise/lower have nothing left
+    // to reorder.
+    VISOR_CHECK(root.remove_child(&middle));
+    VISOR_CHECK_EQ(root.child_count(), std::size_t{2});
+    VISOR_CHECK_EQ(root.child(0), static_cast<Widget*>(&bottom));
+    VISOR_CHECK_EQ(root.child(1), static_cast<Widget*>(&top));
+    VISOR_CHECK_EQ(reports.count(), std::size_t{1});
+    VISOR_CHECK_EQ(reports.at(0), child_bounds);
+    VISOR_CHECK(!middle.raise());
+    VISOR_CHECK(!middle.lower());
+
+    // Both walks follow the shortened list.
+    widget_order.clear();
+    root.draw(painter);
+    const std::array<int, 3> after_remove{40, 41, 43};
+    VISOR_CHECK_EQ(widget_order.size(), after_remove.size());
+    for (std::size_t i = 0; i < after_remove.size(); ++i) {
+        VISOR_CHECK_EQ(widget_order[i], after_remove[i]);
+    }
+    VISOR_CHECK_EQ(root.hit_test(PointI{5, 5}), static_cast<Widget*>(&top));
+
+    // Re-adoption is allowed after the link cleared, and the child joins on
+    // top like any other late child.
+    VISOR_CHECK(root.add_child(&middle));
+    VISOR_CHECK_EQ(root.child_count(), std::size_t{3});
+    VISOR_CHECK_EQ(root.child(2), static_cast<Widget*>(&middle));
+    VISOR_CHECK_EQ(root.hit_test(PointI{5, 5}), static_cast<Widget*>(&middle));
+
+    // A null child and a stranger are refused without touching the list.
+    Tracer stranger(child_bounds, 44, widget_order);
+    VISOR_CHECK(!root.remove_child(nullptr));
+    VISOR_CHECK(!root.remove_child(&stranger));
+    VISOR_CHECK_EQ(root.child_count(), std::size_t{3});
+
+    // A second removal of the same child is refused: the first one already
+    // cleared the parent link.
+    VISOR_CHECK(root.remove_child(&middle));
+    VISOR_CHECK(!root.remove_child(&middle));
+    VISOR_CHECK_EQ(root.child_count(), std::size_t{2});
+
+    // A hidden child painted nothing, so leaving owes no repaint.
+    top.set_visible(false);
+    reports.clear();
+    VISOR_CHECK(root.remove_child(&top));
+    VISOR_CHECK_EQ(reports.count(), std::size_t{0});
+
+    // The detached subtree no longer reports into the old collector.
+    reports.clear();
+    middle.set_bounds(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 4, .h = 4}});
+    VISOR_CHECK_EQ(reports.count(), std::size_t{0});
+
+    // A focused widget inside the removed subtree loses focus, so re-adoption
+    // cannot bring back a ring nobody is holding.
+    visor::ui::Rectangle desktop(root_bounds);
+    visor::ui::Rectangle window(root_bounds);
+    visor::ui::Button field(child_bounds);
+    VISOR_CHECK(window.add_child(&field));
+    VISOR_CHECK(desktop.add_child(&window));
+    field.set_focused(true);
+    VISOR_CHECK_EQ(desktop.focused_widget(), static_cast<Widget*>(&field));
+    VISOR_CHECK(desktop.remove_child(&window));
+    VISOR_CHECK_EQ(desktop.focused_widget(), static_cast<Widget*>(nullptr));
+    VISOR_CHECK(!field.focused());
+    VISOR_CHECK(desktop.add_child(&window));
+    VISOR_CHECK(!field.focused());
+}
+
 } // namespace
 
 void run_widget_tests() {
@@ -136,6 +417,9 @@ void run_widget_tests() {
     VISOR_CHECK_EQ(root.hit_test((PointI{5, 5})), static_cast<Widget*>(&right));
     left.set_visible(true);
 
+    run_z_order_cases();
+    run_remove_child_cases();
+
     // The root's own switch turns off the whole tree at once.
     widget_order.clear();
     root.set_visible(false);
@@ -156,6 +440,10 @@ void run_widget_tests() {
     }
     VISOR_CHECK_EQ(taken, visor::ui::kMaxChildren);
     VISOR_CHECK_EQ(hoard.child_count(), visor::ui::kMaxChildren);
+    // A widget already owned by a parent cannot be adopted twice: the old
+    // parent's order would silently disagree with the new one.
+    VISOR_CHECK(!root.add_child(&left));
+    VISOR_CHECK_EQ(root.child_count(), std::size_t{2});
 
     // Rectangle paints exactly its own bounds with its ink, nothing else.
     visor::ui::Rectangle rect(left_bounds);
@@ -245,6 +533,8 @@ void run_widget_tests() {
     // A tree without a single focusable widget refuses and stays put.
     visor::ui::Rectangle bare(left_bounds);
     VISOR_CHECK(!bare.advance_focus());
+
+    run_focus_domain_cases();
 
     // The focus ring on real pixels: the holder's border turns dark, its
     // interior stays lit, and dropping the focus restores the plain fill.

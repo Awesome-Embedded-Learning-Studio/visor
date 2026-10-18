@@ -9,11 +9,13 @@ int main() {
     run_choice_tests();
     run_control_tests();
     run_diff_tests();
+    run_double_click_tests();
     run_evdev_tests();
     run_event_tests();
     run_font_tests();
     run_gesture_tests();
     run_host_tests();
+    run_id_session_tests();
     run_layout_tests();
     run_pen_tests();
     run_point_tests();

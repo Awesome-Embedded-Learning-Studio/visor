@@ -1,8 +1,10 @@
 #include <cstddef>
+#include <cstdint>
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/base/identity/id_session.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
@@ -14,6 +16,10 @@ namespace {
 using visor::base::PointI;
 using visor::base::RectI;
 using visor::canvas::ColorRole;
+
+// One process-wide identity space for every widget. The class owns the atomic
+// and the zero-reservation rule; another subsystem can start its own session.
+constinit visor::base::IdSession<std::uint32_t> widget_ids;
 
 // Alternating ink and ground stays visible on both filled and hollow controls.
 void paint_focus_border(const visor::ui::Painter& painter, const RectI& bounds) noexcept {
@@ -38,7 +44,7 @@ void paint_focus_border(const visor::ui::Painter& painter, const RectI& bounds) 
 
 namespace visor::ui {
 
-Widget::Widget(base::RectI bounds) noexcept : bounds_{bounds} {}
+Widget::Widget(base::RectI bounds) noexcept : bounds_{bounds}, id_{widget_ids.next()} {}
 
 const base::RectI& Widget::bounds() const noexcept {
     return bounds_;

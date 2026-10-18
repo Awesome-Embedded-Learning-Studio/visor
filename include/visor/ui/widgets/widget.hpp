@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
@@ -59,6 +60,14 @@ class Widget {
     Widget& operator=(const Widget&) = delete;
 
     [[nodiscard]] const base::RectI& bounds() const noexcept;
+
+    /// A process-unique identity assigned at construction. Cross-round
+    /// bookkeeping uses it instead of the widget's address, so a destroyed
+    /// widget's entry cannot be revived by a new widget that happens to land
+    /// on the same address. 32 bits; a session would have to build four
+    /// billion widgets before one repeats.
+    [[nodiscard]] std::uint32_t id() const noexcept { return id_; }
+
     [[nodiscard]] bool visible() const noexcept;
     void set_visible(bool on) noexcept;
 
@@ -149,6 +158,16 @@ class Widget {
     /// does (hover's foundation), and a move that finds nobody reaches nobody.
     /// The default control ignores movement.
     virtual void on_pointer_move([[maybe_unused]] base::PointI at) noexcept {}
+
+    /// Receives the second release of a primary-click pair that landed on
+    /// this widget inside the router's time window and position slop.
+    /// modifiers are those held at the second press, the release itself
+    /// carries none. The release's own on_pointer_up has already run, so this
+    /// is an additional gesture, not a replacement: a control that treats
+    /// every click as an action has already acted twice. The default control
+    /// ignores it.
+    virtual void on_double_click([[maybe_unused]] base::PointI at,
+                                 [[maybe_unused]] host::Modifiers modifiers) noexcept {}
     /// Receives a wheel word at the position it landed. Wheels route by hover,
     /// never by press ownership: a wheel while a press is held still goes to
     /// the widget under the pointer. The default control ignores the wheel.
@@ -222,6 +241,7 @@ class Widget {
     bool move_to_edge(bool to_top) noexcept;
 
     base::RectI bounds_;
+    std::uint32_t id_;
     bool visible_ = true;
     bool focused_ = false;
     std::array<Widget*, kMaxChildren> children_{};

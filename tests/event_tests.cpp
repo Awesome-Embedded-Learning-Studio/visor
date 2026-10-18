@@ -108,7 +108,7 @@ void run_event_tests() {
                                   .pos = PointI{15, 15},
                                   .modifiers = Modifiers{.alt = true},
                               }},
-                              0);
+                              0, true);
     VISOR_CHECK_EQ(target.wheels, 1);
     VISOR_CHECK_EQ(root.wheels, 0);
     VISOR_CHECK_EQ(target.last_wheel.dx, 1);
@@ -123,7 +123,7 @@ void run_event_tests() {
         root, input,
         Event{
             PointerDown{.button = 1, .pos = PointI{15, 15}, .modifiers = Modifiers{.shift = true}}},
-        10);
+        10, true);
     VISOR_CHECK_EQ(input.press_owner(), &target);
     VISOR_CHECK_EQ(target.pointer_downs, 1);
     VISOR_CHECK(target.down_modifiers.shift);
@@ -131,7 +131,7 @@ void run_event_tests() {
 
     visor::ui::dispatch_event(
         root, input, Event{PointerWheel{.dx = 0, .dy = 1, .pos = PointI{2, 2}, .modifiers = {}}},
-        20);
+        20, true);
     VISOR_CHECK_EQ(root.wheels, 1);
     VISOR_CHECK_EQ(target.wheels, 1);
     VISOR_CHECK_EQ(input.press_owner(), &target);
@@ -139,28 +139,29 @@ void run_event_tests() {
     // A wheel that hits nobody is dropped without disturbing the press.
     visor::ui::dispatch_event(
         root, input,
-        Event{PointerWheel{.dx = 0, .dy = 1, .pos = PointI{200, 200}, .modifiers = {}}}, 30);
+        Event{PointerWheel{.dx = 0, .dy = 1, .pos = PointI{200, 200}, .modifiers = {}}}, 30, true);
     VISOR_CHECK_EQ(root.wheels, 1);
     VISOR_CHECK_EQ(target.wheels, 1);
     VISOR_CHECK_EQ(input.press_owner(), &target);
 
     // The release still follows the press owner wherever it lands.
-    visor::ui::dispatch_event(root, input, Event{PointerUp{.button = 1, .pos = PointI{2, 2}}}, 40);
+    visor::ui::dispatch_event(root, input, Event{PointerUp{.button = 1, .pos = PointI{2, 2}}}, 40,
+                              true);
     VISOR_CHECK_EQ(target.pointer_ups, 1);
     VISOR_CHECK_EQ(input.press_owner(), nullptr);
 
     // Key events reach the focus holder with their modifiers.
     visor::ui::dispatch_event(
         root, input,
-        Event{KeyDown{.code = 65, .modifiers = Modifiers{.shift = true, .ctrl = true}}}, 50);
+        Event{KeyDown{.code = 65, .modifiers = Modifiers{.shift = true, .ctrl = true}}}, 50, true);
     VISOR_CHECK_EQ(target.key_downs, 1);
     VISOR_CHECK_EQ(target.last_key, 65U);
     VISOR_CHECK(target.key_modifiers.ctrl);
     VISOR_CHECK(target.key_modifiers.shift);
     VISOR_CHECK(!target.key_modifiers.alt);
 
-    visor::ui::dispatch_event(root, input,
-                              Event{KeyUp{.code = 65, .modifiers = Modifiers{.ctrl = true}}}, 60);
+    visor::ui::dispatch_event(
+        root, input, Event{KeyUp{.code = 65, .modifiers = Modifiers{.ctrl = true}}}, 60, true);
     VISOR_CHECK_EQ(target.key_ups, 1);
     VISOR_CHECK_EQ(target.last_release, 65U);
     VISOR_CHECK(target.release_modifiers.ctrl);
@@ -168,7 +169,8 @@ void run_event_tests() {
     // Tab still belongs to the tree, modifiers or not.
     visor::ui::dispatch_event(
         root, input,
-        Event{KeyDown{.code = visor::host::kKeyTab, .modifiers = Modifiers{.ctrl = true}}}, 70);
+        Event{KeyDown{.code = visor::host::kKeyTab, .modifiers = Modifiers{.ctrl = true}}}, 70,
+        true);
     VISOR_CHECK_EQ(root.focused_widget(), &second);
     VISOR_CHECK_EQ(second.key_downs, 0);
 
@@ -178,10 +180,10 @@ void run_event_tests() {
         root, input,
         Event{
             PointerDown{.button = 1, .pos = PointI{45, 45}, .modifiers = Modifiers{.super = true}}},
-        80);
+        80, true);
     VISOR_CHECK_EQ(input.press_owner(), &second);
     VISOR_CHECK(second.down_modifiers.super);
-    visor::ui::dispatch_event(root, input, Event{PointerMove{.pos = PointI{12, 12}}}, 90);
+    visor::ui::dispatch_event(root, input, Event{PointerMove{.pos = PointI{12, 12}}}, 90, true);
     VISOR_CHECK_EQ(second.pointer_moves, 1);
     VISOR_CHECK_EQ(second.last_move, (PointI{12, 12}));
 
@@ -208,7 +210,7 @@ void run_event_tests() {
         const auto tab = [&scoped_root, &scoped_input](std::uint64_t now) {
             visor::ui::dispatch_event(scoped_root, scoped_input,
                                       Event{KeyDown{.code = visor::host::kKeyTab, .modifiers = {}}},
-                                      now);
+                                      now, true);
         };
 
         scoped_input.set_focus_scope(&window_a);

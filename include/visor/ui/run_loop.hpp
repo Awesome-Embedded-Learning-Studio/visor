@@ -113,7 +113,7 @@ template <typename CanvasT>
     host::Event event;
     while (host.poll(event)) {
         ++consumed;
-        dispatch_event(root, input, event, now_ms);
+        dispatch_event(root, input, event, now_ms, host.has_clock());
         if (std::holds_alternative<host::KeyDown>(event) ||
             std::holds_alternative<host::KeyUp>(event)) {
             break; // one key event per round: the rhythm rule above
@@ -148,7 +148,7 @@ template <typename CanvasT>
     host::Event event;
     while (host.poll(event)) {
         ++consumed;
-        dispatch_event(root, input, event, now_ms);
+        dispatch_event(root, input, event, now_ms, host.has_clock());
         if (std::holds_alternative<host::KeyDown>(event) ||
             std::holds_alternative<host::KeyUp>(event)) {
             break; // one key event per round: the rhythm rule

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "visor/base/geometry/point.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
@@ -32,9 +33,33 @@ namespace visor::ui {
  * steering the walk into freed memory. Clearing or replacing the hint when a
  * window closes is still the caller's job, because only the caller knows the
  * window is gone.
+ *
+ * The first click of a double click lives here too. A click is a primary press
+ * and release on the same widget, released inside its bounds. Two such clicks
+ * on the same widget, no further apart than kDoubleClickWindowMs and no
+ * farther than kDoubleClickSlopPx per axis, make the second release call the
+ * widget's on_double_click after its own on_pointer_up. The single click is
+ * never delayed: every press/release pair acts immediately, and the double
+ * click is an extra gesture. A clock is required for the comparison; with no
+ * clock the gesture stays off rather than treating now_ms 0 as a time. A
+ * release that is not a qualifying primary click clears the pending first
+ * click: a right click, a drag that ends off the widget, or a press that hit
+ * nobody. A qualifying click on another widget replaces it, so the sequence
+ * starts over on the new widget.
+ *
+ * The pending click stores the widget's id, not its address, so a widget that
+ * leaves the tree cannot be confused with a later one that reuses the same
+ * memory. The second press's modifiers are kept for the callback, because the
+ * release word carries none.
  */
 class InputRouter {
   public:
+    /// The window two clicks may span and still count as a double click.
+    static constexpr std::uint64_t kDoubleClickWindowMs = 500;
+
+    /// The per-axis slop allowed between the two release positions.
+    static constexpr int kDoubleClickSlopPx = 4;
+
     /// The widget the current press landed on, null while no press is held
     /// (including a press that hit nobody).
     [[nodiscard]] Widget* press_owner() const noexcept { return press_owner_; }
@@ -49,10 +74,22 @@ class InputRouter {
     // dispatch_event is the one writer: ownership changes only as events
     // arrive, never by hand.
     friend void dispatch_event(Widget& root, InputRouter& input, const host::Event& event,
-                               std::uint64_t now_ms) noexcept;
+                               std::uint64_t now_ms, bool clock_available) noexcept;
 
     Widget* press_owner_ = nullptr;
     Widget* focus_scope_ = nullptr;
+    // The press in flight carries its button and modifiers so the release
+    // can tell a click from a drag and the double-click callback can see what
+    // was held at the press.
+    std::uint32_t press_button_ = 0;
+    host::Modifiers press_modifiers_;
+    // The pending first click of a double click, identified by the widget id
+    // rather than its address. Zero marks empty; the counter starts at one
+    // and has_last_click_ guards the first comparison.
+    std::uint32_t last_click_id_ = 0;
+    base::PointI last_click_pos_;
+    std::uint64_t last_click_ms_ = 0;
+    bool has_last_click_ = false;
 };
 
 /**
@@ -72,10 +109,11 @@ class InputRouter {
  * beyond the count.
  *
  * now_ms is the round's clock reading, shared by every event the round
- * dispatches. It is carried now so later gesture layers (double click) can
- * use one time base without changing this table again.
+ * dispatches. clock_available is the host table's has_clock() answer for the
+ * same round: with no clock the double-click comparison stays off, because
+ * now_ms 0 is a real time and cannot stand in for "no clock".
  */
 void dispatch_event(Widget& root, InputRouter& input, const host::Event& event,
-                    std::uint64_t now_ms) noexcept;
+                    std::uint64_t now_ms, bool clock_available) noexcept;
 
 } // namespace visor::ui

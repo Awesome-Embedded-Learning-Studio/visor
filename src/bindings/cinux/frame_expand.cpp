@@ -8,7 +8,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 
 namespace visor::host::cinux {
 

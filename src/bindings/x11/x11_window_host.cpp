@@ -8,13 +8,16 @@
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/bindings/x11/event_wire.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/pixel_convert.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
+#include <algorithm>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -39,10 +42,34 @@ int ignore_x_errors([[maybe_unused]] Display* display,     // NOLINT(misc-const-
     return 0;
 }
 
+// NOLINTBEGIN(bugprone-signed-bitwise): the mask arithmetic below is deliberate;
+// the shift counts are plain ints, which the check reads as signed operands.
+// Places one 8-bit channel into a visual's mask field. A TrueColor mask is a
+// contiguous run of bits, so the shift and the width are readable from the mask
+// itself and a visual that orders or widens its channels differently still gets
+// correct words. A zero mask means the visual has no such channel.
+[[nodiscard]] std::uint32_t place_channel(std::uint32_t mask, std::uint32_t channel) noexcept {
+    if (mask == 0) {
+        return 0;
+    }
+    const auto shift = static_cast<unsigned>(std::countr_zero(mask));
+    const auto width = static_cast<unsigned>(std::popcount(mask));
+    const std::uint32_t taken = width >= 8 ? channel : (channel >> (8 - width));
+    return (taken << shift) & mask;
+}
+
+// One 0xAARRGGBB word in the visual's own channel layout.
+[[nodiscard]] std::uint32_t to_visual(std::uint32_t argb, std::uint32_t red_mask,
+                                      std::uint32_t green_mask, std::uint32_t blue_mask) noexcept {
+    return place_channel(red_mask, (argb >> 16) & 0xffU) |
+           place_channel(green_mask, (argb >> 8) & 0xffU) | place_channel(blue_mask, argb & 0xffU);
+}
+// NOLINTEND(bugprone-signed-bitwise)
+
 } // namespace
 
 std::optional<X11WindowHost> X11WindowHost::open(const char* display_name, int width, int height,
-                                                 int scale) noexcept {
+                                                 int scale, PixelFormat format) noexcept {
     if (scale < 1) {
         return std::nullopt;
     }
@@ -78,6 +105,7 @@ std::optional<X11WindowHost> X11WindowHost::open(const char* display_name, int w
     host.wm_protocols_atom_ = wm_protocols;
     host.wm_delete_atom_ = wm_delete;
     host.depth_ = DefaultDepth(display, screen);
+    host.format_ = format;
     const Visual* visual = DefaultVisual(display, screen);
     host.red_mask_ = static_cast<std::uint32_t>(visual->red_mask);
     host.green_mask_ = static_cast<std::uint32_t>(visual->green_mask);
@@ -87,7 +115,7 @@ std::optional<X11WindowHost> X11WindowHost::open(const char* display_name, int w
     host.width_ = width;
     host.height_ = height;
     host.scale_ = scale;
-    const std::size_t stride = (static_cast<std::size_t>(width) + 7) / 8;
+    const std::size_t stride = row_bytes(format, static_cast<std::size_t>(width));
     host.shadow_.assign(stride * static_cast<std::size_t>(height), 0);
     host.expanded_.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
                               static_cast<std::size_t>(scale) * static_cast<std::size_t>(scale),
@@ -112,6 +140,7 @@ X11WindowHost& X11WindowHost::operator=(X11WindowHost&& other) noexcept {
         wm_protocols_atom_ = other.wm_protocols_atom_;
         wm_delete_atom_ = other.wm_delete_atom_;
         depth_ = other.depth_;
+        format_ = other.format_;
         lit_word_ = other.lit_word_;
         red_mask_ = other.red_mask_;
         green_mask_ = other.green_mask_;
@@ -154,7 +183,7 @@ HostTable X11WindowHost::table() noexcept {
     table.context = this;
     table.info = HostInfo{
         .screen = base::SizeI{.w = width_, .h = height_},
-        .format = PixelFormat::Mono1,
+        .format = format_,
     };
     return table;
 }
@@ -180,7 +209,7 @@ Display* X11WindowHost::display() const noexcept {
 }
 
 void X11WindowHost::handle_flush(const FlushRegion& region) noexcept {
-    const bool inside = region.format == PixelFormat::Mono1 && region.pixels != nullptr &&
+    const bool inside = region.format == format_ && region.pixels != nullptr &&
                         !region.rect.is_empty() && region.rect.pos.x >= 0 &&
                         region.rect.pos.y >= 0 &&
                         region.rect.pos.x + region.rect.size.w <= width_ &&
@@ -195,9 +224,26 @@ void X11WindowHost::handle_flush(const FlushRegion& region) noexcept {
 }
 
 void X11WindowHost::paint_shadow(const FlushRegion& region) noexcept {
+    const std::size_t dst_stride = row_bytes(format_, static_cast<std::size_t>(width_));
+    if (format_ != PixelFormat::Mono1) {
+        // A color region is whole bytes per pixel, so the shadow takes a row copy.
+        const std::size_t pixel_bytes = format_ == PixelFormat::RGB565 ? 2U : 4U;
+        const std::size_t row_width = static_cast<std::size_t>(region.rect.size.w) * pixel_bytes;
+        const std::size_t dst_column = static_cast<std::size_t>(region.rect.pos.x) * pixel_bytes;
+        for (int row = 0; row < region.rect.size.h; ++row) {
+            const std::uint8_t* src_row =
+                region.pixels + (static_cast<std::size_t>(row) * region.stride_bytes);
+            std::uint8_t* dst_row =
+                shadow_.data() +
+                ((static_cast<std::size_t>(region.rect.pos.y) + static_cast<std::size_t>(row)) *
+                 dst_stride) +
+                dst_column;
+            std::copy(src_row, src_row + row_width, dst_row);
+        }
+        return;
+    }
     // Pixel-by-pixel, MSB-first, the canvas's own packing. The per-byte fast
     // path lives in the offscreen host; a second shopper is when it moves out.
-    const std::size_t dst_stride = (static_cast<std::size_t>(width_) + 7) / 8;
     const std::size_t first_src_byte = static_cast<std::size_t>(region.rect.pos.x) / 8;
     for (int row = 0; row < region.rect.size.h; ++row) {
         const std::uint8_t* src =
@@ -224,7 +270,7 @@ void X11WindowHost::put_region(base::RectI area) noexcept {
     // scale-by-scale block, then one XPutImage carries them to the window.
     // The XImage describes our buffer; the server reads the masks and byte
     // order from it, nothing is converted on our side.
-    const std::size_t canvas_stride = (static_cast<std::size_t>(width_) + 7) / 8;
+    const std::size_t canvas_stride = row_bytes(format_, static_cast<std::size_t>(width_));
     const std::size_t window_stride =
         static_cast<std::size_t>(width_) * static_cast<std::size_t>(scale_);
     const std::size_t out_x =
@@ -240,9 +286,7 @@ void X11WindowHost::put_region(base::RectI area) noexcept {
             for (int col = 0; col < area.size.w; ++col) {
                 const std::size_t x =
                     static_cast<std::size_t>(area.pos.x) + static_cast<std::size_t>(col);
-                const unsigned mask =
-                    base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(x)).raw;
-                const std::uint32_t word = (src[x / 8] & mask) != 0 ? lit_word_ : 0;
+                const std::uint32_t word = canvas_pixel_word(src, x);
                 for (int stretch = 0; stretch < scale_; ++stretch) {
                     *out++ = word;
                 }
@@ -273,6 +317,24 @@ void X11WindowHost::put_region(base::RectI area) noexcept {
               static_cast<unsigned>(area.size.w) * static_cast<unsigned>(scale_),
               static_cast<unsigned>(area.size.h) * static_cast<unsigned>(scale_));
     XFlush(display_);
+}
+
+std::uint32_t X11WindowHost::canvas_pixel_word(const std::uint8_t* row,
+                                               std::size_t x) const noexcept {
+    switch (format_) {
+        case PixelFormat::Mono1: {
+            const unsigned mask =
+                base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(x)).raw;
+            return (row[x / 8] & mask) != 0 ? lit_word_ : 0U;
+        }
+        case PixelFormat::RGB565:
+            return to_visual(canvas::rgb565_to_xrgb8888(canvas::Rgb565Traits::load(row, x)),
+                             red_mask_, green_mask_, blue_mask_);
+        case PixelFormat::XRGB8888:
+            return to_visual(canvas::Xrgb8888Traits::load(row, x), red_mask_, green_mask_,
+                             blue_mask_);
+    }
+    return 0;
 }
 
 bool X11WindowHost::poll_one(Event& out) noexcept {

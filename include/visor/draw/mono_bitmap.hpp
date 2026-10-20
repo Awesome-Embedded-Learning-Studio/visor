@@ -1,7 +1,7 @@
 #pragma once
 
 #include "visor/base/bit_ops/bitmask.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 
 #include <cstddef>
 #include <cstdint>

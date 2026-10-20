@@ -18,6 +18,7 @@ void run_host_tests();
 void run_id_session_tests();
 void run_layout_tests();
 void run_pen_tests();
+void run_pixel_tests();
 void run_point_tests();
 void run_popup_tests();
 void run_rect_tests();

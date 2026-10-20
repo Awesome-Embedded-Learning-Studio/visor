@@ -44,8 +44,11 @@ class X11WindowHost {
      * final expand. A scale below 1 returns the empty optional, same line
      * as a missing display.
      */
-    [[nodiscard]] static std::optional<X11WindowHost> open(const char* display_name, int width,
-                                                           int height, int scale = 1) noexcept;
+    /// format is the wire format the window accepts; a region in any other
+    /// format is refused and counted, the offscreen host's own line.
+    [[nodiscard]] static std::optional<X11WindowHost>
+    open(const char* display_name, int width, int height, int scale = 1,
+         PixelFormat format = PixelFormat::Mono1) noexcept;
 
     ~X11WindowHost();
     X11WindowHost(X11WindowHost&& other) noexcept;
@@ -84,6 +87,8 @@ class X11WindowHost {
     bool poll_one(Event& out) noexcept;
     void paint_shadow(const FlushRegion& region) noexcept;
     void put_region(base::RectI area) noexcept;
+    [[nodiscard]] std::uint32_t canvas_pixel_word(const std::uint8_t* row,
+                                                  std::size_t x) const noexcept;
     void release() noexcept;
 
     Display* display_ = nullptr;
@@ -92,6 +97,7 @@ class X11WindowHost {
     Atom wm_protocols_atom_ = None;
     Atom wm_delete_atom_ = None;
     int depth_ = 0;
+    PixelFormat format_ = PixelFormat::Mono1;
     std::uint32_t lit_word_ = 0;
     std::uint32_t red_mask_ = 0;
     std::uint32_t green_mask_ = 0;
@@ -102,7 +108,7 @@ class X11WindowHost {
     bool close_requested_ = false;
     int flush_count_ = 0;
     int rejected_count_ = 0;
-    std::vector<std::uint8_t> shadow_;    // the screen's memory, canvas packing
+    std::vector<std::uint8_t> shadow_;    // the screen's memory, format_ packing
     std::vector<std::uint32_t> expanded_; // one region's worth of 32bpp words
 };
 

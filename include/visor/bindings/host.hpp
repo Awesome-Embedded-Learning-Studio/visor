@@ -29,9 +29,12 @@ struct HostTable {
     void* context = nullptr;
     HostInfo info{};
 
-    /// Submits one region; false when the host wired no flush.
+    /// Submits one region; false when the host wired no flush. The format
+    /// defaults to Mono1, which is what every caller before the color chapter
+    /// speaks; a color canvas names its own through kWireFormat.
     [[nodiscard]] bool submit_region(base::RectI rect, const std::uint8_t* pixels,
-                                     std::size_t stride_bytes) const noexcept;
+                                     std::size_t stride_bytes,
+                                     PixelFormat format = PixelFormat::Mono1) const noexcept;
 
     /// Hands a whole canvas to the host; same null stance as submit_region.
     template <typename CanvasT>
@@ -44,7 +47,8 @@ struct HostTable {
                     .h = static_cast<int>(CanvasT::kHeight),
                 },
         };
-        return submit_region(full, canvas.pixels().data(), CanvasT::kStrideBytes);
+        return submit_region(full, canvas.pixels().data(), CanvasT::kStrideBytes,
+                             kWireFormat<typename CanvasT::Traits>);
     }
 
     /// Polls one event; false when the host wired no poll or the queue is empty.

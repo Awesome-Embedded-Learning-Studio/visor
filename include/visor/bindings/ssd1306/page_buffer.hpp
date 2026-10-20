@@ -4,7 +4,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/bindings/display.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 
 #include <array>
 #include <cstddef>

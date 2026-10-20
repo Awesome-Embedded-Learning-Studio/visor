@@ -2,7 +2,7 @@
 
 第三章把位操作词汇备齐了，这一章把它们拼成一件真正的东西：画布。单色 GUI 的一切画面都落在一块 1bpp（bits per pixel，每像素一比特）的画布上，亮或不亮一个比特说了算。这一章要定三件事：墨色的名字、比特在字节里的摆法、填充位的纪律。这一章结束时 `canvas` 全部用例通过，其中有一条 `0xF8` 的字面断言，把奇数宽度的位布局锁定在字节层面。
 
-画布住在 `include/visor/canvas/mono_canvas.hpp` 与 `include/visor/canvas/color.hpp`，命名空间 `visor::canvas`。
+画布住在 `include/visor/canvas/canvas.hpp` 与 `include/visor/canvas/color.hpp`，命名空间 `visor::canvas`。
 
 ## 先给墨色定名：Color，不叫 MonoState
 

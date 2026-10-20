@@ -7,8 +7,9 @@
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/bindings/x11/x11_window_host.hpp"
+#include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 #include "visor/draw/pen.hpp"
 
 #include <X11/X.h>
@@ -196,6 +197,64 @@ void run_x11_host_tests() {
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame); // the hole and the rest
         VISOR_CHECK_EQ(host->flush_count(), 2);
+    }
+
+    // A color window: an RGB565 frame is widened to the visual's channels on
+    // the way out, so white reads back as every channel bit and pure red as the
+    // red mask alone. The masks come from the shot, not from a guess about this
+    // server's visual.
+    {
+        using ColorFrame =
+            Canvas<visor::base::SizeI{.w = kWidth, .h = kHeight}, visor::canvas::Rgb565Traits>;
+        ColorFrame frame;
+        frame.fill(visor::canvas::Rgb565Traits::from_ink(visor::canvas::Ink::white()));
+        auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight, 1,
+                                                          visor::host::PixelFormat::RGB565);
+        VISOR_CHECK(host.has_value());
+        if (!host.has_value()) {
+            return;
+        }
+        VISOR_CHECK(host->table().submit_frame(frame));
+        XSync(screen.display(), False);
+
+        const auto read_word = [&](int x, int y) -> std::uint32_t {
+            XImage* shot =
+                XGetImage(screen.display(), host->window(), x, y, 1, 1, AllPlanes, ZPixmap);
+            if (shot == nullptr) {
+                return 0;
+            }
+            const std::uint32_t word = XGetPixel(shot, 0, 0);
+            XDestroyImage(shot);
+            return word;
+        };
+        XImage* whole =
+            XGetImage(screen.display(), host->window(), 0, 0, kWidth, kHeight, AllPlanes, ZPixmap);
+        VISOR_CHECK(whole != nullptr);
+        if (whole != nullptr) {
+            const std::uint32_t every_channel =
+                whole->red_mask | whole->green_mask | whole->blue_mask;
+            VISOR_CHECK_EQ(read_word(0, 0), every_channel);
+            VISOR_CHECK_EQ(read_word(kWidth - 1, kHeight - 1), every_channel);
+            XDestroyImage(whole);
+        }
+
+        // Two rows of pure red land as the red mask, the other channels dark.
+        frame.fill(visor::canvas::Rgb565Traits::from_ink(visor::canvas::Ink::from_rgb(0xff0000)));
+        VISOR_CHECK(host->table().submit_frame(frame));
+        XSync(screen.display(), False);
+        XImage* red_shot =
+            XGetImage(screen.display(), host->window(), 0, 0, 1, 1, AllPlanes, ZPixmap);
+        VISOR_CHECK(red_shot != nullptr);
+        if (red_shot != nullptr) {
+            VISOR_CHECK_EQ(read_word(0, 0), red_shot->red_mask);
+            VISOR_CHECK_EQ(read_word(kWidth - 1, kHeight - 1), red_shot->red_mask);
+            XDestroyImage(red_shot);
+        }
+
+        // A mono frame to a color window is refused like any other wrong format.
+        const Frame mono_frame;
+        VISOR_CHECK(host->table().submit_frame(mono_frame));
+        VISOR_CHECK_EQ(host->rejected_count(), 1);
     }
 
     // A region leaving the window is refused and counted, nothing crashes.

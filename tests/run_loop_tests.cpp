@@ -5,7 +5,7 @@
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/canvas.hpp"
 #include "visor/ui/input_router.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/run_loop.hpp"

@@ -30,14 +30,18 @@ namespace visor::ui {
  * clipped, strokes inside land shifted by the window origin. A full-frame
  * painter is the window case where the scene rectangle is the whole canvas.
  *
- * The role table is the C shape: seven roles resolved once, so a fill or a
- * plot pays one lookup, never a per-pixel switch. The mono rule here -- any
- * non-black RGB is lit -- is Mono1's trait in embryo; the format chapter moves
- * it behind a traits type without touching the verbs.
+ * The role table is the C shape: seven roles resolved once into the target's
+ * own pixels, so a fill or a plot pays one lookup, never a per-pixel switch.
+ * The translation from Ink to pixel is the canvas's traits table, which is what
+ * makes this painter work for every format: the verbs below hold a Pen over
+ * CanvasT::Pixel and never name a format. A color canvas therefore keeps the
+ * theme's grays, while a mono canvas folds every non-black RGB to lit.
  */
 template <typename CanvasT>
 class CanvasPainter final : public Painter {
   public:
+    using Pixel = CanvasT::Pixel;
+
     /// Whole-canvas window: the canvas is the entire scene, scene pixel (0, 0)
     /// is the canvas corner.
     explicit CanvasPainter(CanvasT& canvas, const Theme& theme = kLightTheme) noexcept
@@ -66,7 +70,7 @@ class CanvasPainter final : public Painter {
         if (visible.is_empty()) {
             return;
         }
-        const draw::Pen<CanvasT, bool> pen{canvas_, pixel(role)};
+        const draw::Pen<CanvasT, Pixel> pen{canvas_, pixel(role)};
         pen.fill(shift_to_buffer(visible));
     }
 
@@ -126,7 +130,7 @@ class CanvasPainter final : public Painter {
         // origins are scale apart), so any order of painting lands the same
         // pixels -- which is what makes strip replays safe here too.
         const int factor = scale < 1 ? 1 : scale;
-        const draw::Pen<CanvasT, bool> pen{canvas_, pixel(role)};
+        const draw::Pen<CanvasT, Pixel> pen{canvas_, pixel(role)};
         for (std::size_t row = 0; row < source.height; ++row) {
             for (std::size_t column = 0; column < source.width; ++column) {
                 if (!source.pixel(column, row)) {
@@ -152,23 +156,26 @@ class CanvasPainter final : public Painter {
         if (!window_.contains(at)) {
             return;
         }
-        const draw::Pen<CanvasT, bool> pen{canvas_, pixel(role)};
+        const draw::Pen<CanvasT, Pixel> pen{canvas_, pixel(role)};
         pen.plot(base::PointI{at.x - window_.pos.x, at.y - window_.pos.y});
     }
 
   private:
     /// Resolves the seven roles into the target's pixels once per painter.
-    /// A new role without a theme entry falls back to Foreground through
-    /// Theme::ink, which keeps the table total while the switch warns.
+    /// The Ink-to-pixel step is the canvas's traits table, so the rule that
+    /// used to live here as mono_ink now belongs to whatever format the canvas
+    /// was instantiated with. A new role without a theme entry falls back to
+    /// Foreground through Theme::ink, which keeps the table total while the
+    /// switch warns.
     void resolve(const Theme& theme) noexcept {
         for (std::size_t i = 0; i < canvas::kColorRoleCount; ++i) {
             const auto role = static_cast<canvas::ColorRole>(i);
             const canvas::Ink ink = theme.ink(role);
-            pixels_[i] = canvas::mono_ink(ink);
+            pixels_[i] = CanvasT::Traits::from_ink(ink);
         }
     }
 
-    [[nodiscard]] bool pixel(canvas::ColorRole role) const noexcept {
+    [[nodiscard]] Pixel pixel(canvas::ColorRole role) const noexcept {
         return pixels_[static_cast<std::size_t>(role)];
     }
 
@@ -181,7 +188,7 @@ class CanvasPainter final : public Painter {
 
     CanvasT& canvas_;
     base::RectI window_;
-    std::array<bool, canvas::kColorRoleCount> pixels_{};
+    std::array<Pixel, canvas::kColorRoleCount> pixels_{};
 };
 
 } // namespace visor::ui

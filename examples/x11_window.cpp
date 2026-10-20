@@ -4,9 +4,12 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/display.hpp"
 #include "visor/bindings/x11/x11_window_host.hpp"
+#include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/pixel_convert.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/control_style.hpp"
 #include "visor/ui/dirty_regions.hpp"
@@ -25,6 +28,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <print>
@@ -171,6 +175,31 @@ class Gallery final : public visor::ui::Widget {
     visor::ui::Dropdown output_{RectI{.pos = {326, 212}, .size = {.w = 118, .h = 23}}, kDemoFont};
     std::string_view status_ = "READY WHEN YOU ARE.";
 };
+
+/// Runs the gallery against a window that speaks one wire format, in a canvas
+/// of that same format. The scene is one tree either way: the format only
+/// decides what a pixel is, so the mono window and the color window draw the
+/// same controls.
+template <typename Frame>
+int run_window(Gallery& panel, visor::host::PixelFormat format) {
+    auto opened = visor::host::x11::X11WindowHost::open(nullptr, kScreen.w, kScreen.h, 2, format);
+    if (!opened.has_value()) {
+        std::println(stderr, "visor: cannot open the display (is DISPLAY set?)");
+        return 1;
+    }
+    auto host = std::move(*opened);
+    visor::ui::InputRouter input;
+    visor::ui::DirtyRegions dirty;
+    panel.set_dirty_sink(&dirty);
+    dirty.push(kScreenBounds);
+    Frame frame;
+    std::println("visor: Tab to navigate, arrows to adjust, Enter to activate; close with X");
+    while (!host.close_requested()) {
+        static_cast<void>(visor::ui::run_dirty(host.table(), panel, input, frame, kScreen, dirty));
+        std::this_thread::sleep_for(std::chrono::milliseconds(15));
+    }
+    return 0;
+}
 } // namespace
 
 int main(int argc, char* const* argv) {
@@ -199,21 +228,44 @@ int main(int argc, char* const* argv) {
         }
         return std::fclose(file) == 0 ? 0 : 1;
     }
-    auto opened = visor::host::x11::X11WindowHost::open(nullptr, kScreen.w, kScreen.h, 2);
-    if (!opened.has_value()) {
-        std::println(stderr, "visor: cannot open the display (is DISPLAY set?)");
-        return 1;
+    // The color scene without an X server either: a PPM the author can open in
+    // any viewer. Same tree, same theme, one 565 canvas.
+    if (argc == 3 && std::strcmp(argv[1], "--snapshot-color") == 0) {
+        using ColorFrame = visor::canvas::Canvas<kScreen, visor::canvas::Rgb565Traits>;
+        ColorFrame frame;
+        panel.set_theme(&visor::ui::kColorTheme);
+        panel.draw(visor::ui::CanvasPainter{frame, visor::ui::kColorTheme});
+        auto* file = std::fopen(argv[2], "wb");
+        if (file == nullptr) {
+            return 1;
+        }
+        std::println(file, "P6\n{} {}\n255", kScreen.w, kScreen.h);
+        bool written = true;
+        for (int y = 0; y < kScreen.h && written; ++y) {
+            for (int x = 0; x < kScreen.w && written; ++x) {
+                const std::uint32_t wide =
+                    visor::canvas::rgb565_to_xrgb8888(frame.get(visor::base::PointI{x, y}));
+                // NOLINTBEGIN(bugprone-signed-bitwise): channel shifts on an
+                // unsigned word; the shift counts are the plain ints the check
+                // reads as signed operands.
+                const std::array<unsigned char, 3> pixel{
+                    static_cast<unsigned char>((wide >> 16) & 0xffU),
+                    static_cast<unsigned char>((wide >> 8) & 0xffU),
+                    static_cast<unsigned char>(wide & 0xffU),
+                };
+                // NOLINTEND(bugprone-signed-bitwise)
+                written = std::fwrite(pixel.data(), 1, pixel.size(), file) == pixel.size();
+            }
+        }
+        return (written && std::fclose(file) == 0) ? 0 : 1;
     }
-    auto host = std::move(*opened);
-    visor::ui::InputRouter input;
-    visor::ui::DirtyRegions dirty;
-    panel.set_dirty_sink(&dirty);
-    dirty.push(kScreenBounds);
-    Frame frame;
-    std::println("visor: Tab to navigate, arrows to adjust, Enter to activate; close with X");
-    while (!host.close_requested()) {
-        static_cast<void>(visor::ui::run_dirty(host.table(), panel, input, frame, kScreen, dirty));
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
+    // --color: the same gallery through an RGB565 canvas and an RGB565 window,
+    // with the color preset. This is the eyeball channel: one flag between the
+    // mono picture and the colored one, no rebuild between them.
+    if (argc == 2 && std::strcmp(argv[1], "--color") == 0) {
+        panel.set_theme(&visor::ui::kColorTheme);
+        return run_window<visor::canvas::Canvas<kScreen, visor::canvas::Rgb565Traits>>(
+            panel, visor::host::PixelFormat::RGB565);
     }
-    return 0;
+    return run_window<Frame>(panel, visor::host::PixelFormat::Mono1);
 }

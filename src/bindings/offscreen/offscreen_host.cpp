@@ -7,8 +7,9 @@
 #include "visor/base/bit_ops/bitmask.hpp"
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/size.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -24,8 +25,12 @@ namespace visor::host {
 // divided the headers: a freestanding build links host.cpp alone and never
 // pulls in the heap-backed double or the file writer.
 OffscreenHost::OffscreenHost(int width, int height)
-    : width_(width), height_(height),
-      frame_(((static_cast<std::size_t>(width) + 7) / 8) * static_cast<std::size_t>(height), 0) {}
+    : OffscreenHost(width, height, PixelFormat::Mono1) {}
+
+OffscreenHost::OffscreenHost(int width, int height, PixelFormat format)
+    : width_(width), height_(height), format_(format),
+      frame_(row_bytes(format, static_cast<std::size_t>(width)) * static_cast<std::size_t>(height),
+             0) {}
 
 HostTable OffscreenHost::table() noexcept {
     return HostTable{
@@ -36,7 +41,7 @@ HostTable OffscreenHost::table() noexcept {
         .info =
             HostInfo{
                 .screen = base::SizeI{.w = width_, .h = height_},
-                .format = PixelFormat::Mono1,
+                .format = format_,
             },
     };
 }
@@ -48,15 +53,37 @@ void OffscreenHost::flush_thunk(void* context, const FlushRegion& region) noexce
 void OffscreenHost::handle_flush(const FlushRegion& region) noexcept {
     // The ch11 contract: any in-bounds region of the right format lands, not
     // just whole frames. A strip and a dirty rectangle are as welcome as the
-    // full canvas; empty regions and out-of-bounds ones are refused and
-    // counted, because both mean a sender that computed its window wrong.
-    const bool acceptable = region.format == PixelFormat::Mono1 && region.pixels != nullptr &&
+    // full canvas; empty regions, out-of-bounds ones and regions in a format
+    // this host does not speak are refused and counted, because each means a
+    // sender that got its window or its format wrong.
+    const bool acceptable = region.format == format_ && region.pixels != nullptr &&
                             !region.rect.is_empty() && region.rect.pos.x >= 0 &&
                             region.rect.pos.y >= 0 &&
                             region.rect.pos.x + region.rect.size.w <= width_ &&
                             region.rect.pos.y + region.rect.size.h <= height_;
     if (!acceptable) {
         ++rejected_count_;
+        return;
+    }
+    if (format_ != PixelFormat::Mono1) {
+        // A color region is whole bytes per pixel, so the copy is a row copy.
+        // The source stride comes from the sender (a strip may be narrower
+        // than the screen); the destination stride is this host's row.
+        const std::size_t dst_stride = row_bytes(format_, static_cast<std::size_t>(width_));
+        const std::size_t pixel_bytes = format_ == PixelFormat::RGB565 ? 2U : 4U;
+        const std::size_t row_width = static_cast<std::size_t>(region.rect.size.w) * pixel_bytes;
+        const std::size_t dst_column = static_cast<std::size_t>(region.rect.pos.x) * pixel_bytes;
+        for (int row = 0; row < region.rect.size.h; ++row) {
+            const std::uint8_t* src_row =
+                region.pixels + (static_cast<std::size_t>(row) * region.stride_bytes);
+            std::uint8_t* dst_row =
+                frame_.data() +
+                ((static_cast<std::size_t>(region.rect.pos.y) + static_cast<std::size_t>(row)) *
+                 dst_stride) +
+                dst_column;
+            std::copy(src_row, src_row + row_width, dst_row);
+        }
+        ++flush_count_;
         return;
     }
     const std::size_t stride = (static_cast<std::size_t>(width_) + 7) / 8;
@@ -164,18 +191,38 @@ std::uint64_t OffscreenHost::clock_thunk(void* context) noexcept {
 }
 
 bool OffscreenHost::get(base::PointI p) const noexcept {
+    return format_ == PixelFormat::Mono1 && get_pixel(p) != 0;
+}
+
+std::uint32_t OffscreenHost::get_pixel(base::PointI p) const noexcept {
     if (p.x < 0 || p.y < 0 || p.x >= width_ || p.y >= height_) {
-        return false;
+        return 0;
     }
     const auto x = static_cast<std::size_t>(p.x);
     const auto y = static_cast<std::size_t>(p.y);
-    const std::size_t stride = (static_cast<std::size_t>(width_) + 7) / 8;
-    const base::bit::BitMask<std::uint8_t> word{frame_[(y * stride) + (x / 8)]};
-    return word.has(base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(x)));
+    const std::uint8_t* row =
+        frame_.data() + (y * row_bytes(format_, static_cast<std::size_t>(width_)));
+    switch (format_) {
+        case PixelFormat::Mono1:
+            // Mono1's pixel is a bool, so the widening is "lit or not".
+            return canvas::Mono1Traits::load(row, x) ? 1U : 0U;
+        case PixelFormat::RGB565:
+            return canvas::Rgb565Traits::load(row, x);
+        case PixelFormat::XRGB8888:
+            return canvas::Xrgb8888Traits::load(row, x);
+    }
+    return 0;
+}
+
+PixelFormat OffscreenHost::format() const noexcept {
+    return format_;
 }
 
 bool OffscreenHost::save_pbm(std::string_view path) const noexcept {
-    const std::size_t stride = (static_cast<std::size_t>(width_) + 7) / 8;
+    if (format_ != PixelFormat::Mono1) {
+        return false;
+    }
+    const std::size_t stride = row_bytes(format_, static_cast<std::size_t>(width_));
     return write_pbm(path, width_, height_, frame_, stride);
 }
 

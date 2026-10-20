@@ -7,8 +7,8 @@
 
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
+#include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
-#include "visor/canvas/mono_canvas.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/input_router.hpp"

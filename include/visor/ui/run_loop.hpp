@@ -36,7 +36,8 @@ void render_window(const Widget& root, CanvasT& buffer, base::RectI window,
     const Theme& scheme = root.theme() != nullptr ? *root.theme() : kLightTheme;
     const CanvasPainter<CanvasT> painter{buffer, window, scheme};
     root.draw(painter);
-    static_cast<void>(host.submit_region(window, buffer.pixels().data(), CanvasT::kStrideBytes));
+    static_cast<void>(host.submit_region(window, buffer.pixels().data(), CanvasT::kStrideBytes,
+                                         host::kWireFormat<typename CanvasT::Traits>));
 }
 
 /**

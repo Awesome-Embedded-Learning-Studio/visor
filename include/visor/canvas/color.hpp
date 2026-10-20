@@ -57,10 +57,4 @@ enum class ColorRole : std::uint8_t {
 /// The number of slots in ColorRole; the paint layer's table size.
 inline constexpr std::size_t kColorRoleCount = static_cast<std::size_t>(ColorRole::Disabled) + 1;
 
-/// Mono1's interim ink rule: any non-black RGB is ink. The format chapter
-/// moves this behind the Mono1 traits; the paint layer asks it once per role.
-[[nodiscard]] constexpr bool mono_ink(Ink ink) noexcept {
-    return (ink.argb & 0x00ffffffU) != 0;
-}
-
 } // namespace visor::canvas

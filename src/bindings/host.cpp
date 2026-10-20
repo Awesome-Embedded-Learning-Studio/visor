@@ -13,11 +13,16 @@ namespace visor::host {
 // degrades to "no events, clock at zero" instead of a crash. The offscreen
 // double lives in offscreen_host.cpp.
 bool HostTable::submit_region(base::RectI rect, const std::uint8_t* pixels,
-                              std::size_t stride_bytes) const noexcept {
+                              std::size_t stride_bytes, PixelFormat format) const noexcept {
     if (flush == nullptr) {
         return false;
     }
-    const FlushRegion region{.rect = rect, .pixels = pixels, .stride_bytes = stride_bytes};
+    const FlushRegion region{
+        .rect = rect,
+        .pixels = pixels,
+        .stride_bytes = stride_bytes,
+        .format = format,
+    };
     flush(context, region);
     return true;
 }

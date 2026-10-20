@@ -31,7 +31,12 @@ namespace visor::host {
  */
 class OffscreenHost {
   public:
+    /// The mono double, unchanged: a Mono1 screen of this size.
     OffscreenHost(int width, int height);
+
+    /// The same double speaking another format. A submission whose format is
+    /// not this host's is refused and counted, same as one out of bounds.
+    OffscreenHost(int width, int height, PixelFormat format);
 
     /// Total ch2 feed capacity. The ring holds one fewer than this (one slot
     /// stays empty to tell full from empty), so the default feed takes fifteen
@@ -42,8 +47,17 @@ class OffscreenHost {
     /// Building the channel is not a const act: the table carries mutable access.
     [[nodiscard]] HostTable table() noexcept;
 
-    /// Reads a received pixel; out-of-bounds reads as unlit.
+    /// Reads a received mono pixel; out-of-bounds reads as unlit, and a color
+    /// host answers false (use get_pixel there).
     [[nodiscard]] bool get(base::PointI p) const noexcept;
+
+    /// Reads a received pixel in this host's own format, widened to 32 bits:
+    /// Mono1 answers 0 or 1, RGB565 the 16-bit word, XRGB8888 the 0xAARRGGBB
+    /// word. Out-of-bounds reads as zero.
+    [[nodiscard]] std::uint32_t get_pixel(base::PointI p) const noexcept;
+
+    /// The format this host accepts.
+    [[nodiscard]] PixelFormat format() const noexcept;
 
     /// Successful region receptions, full frames included.
     [[nodiscard]] int flush_count() const noexcept;
@@ -67,6 +81,8 @@ class OffscreenHost {
     void advance_ms(std::uint64_t delta) noexcept;
 
     /// Writes the received frame as a binary PBM (P4), the debug image format.
+    /// Mono1 only: a color frame has no PBM spelling, so a color host answers
+    /// false rather than writing a misleading picture.
     [[nodiscard]] bool save_pbm(std::string_view path) const noexcept;
 
   private:
@@ -77,12 +93,13 @@ class OffscreenHost {
 
     int width_ = 0;
     int height_ = 0;
+    PixelFormat format_ = PixelFormat::Mono1;
     int flush_count_ = 0;
     int rejected_count_ = 0;
     int dropped_event_count_ = 0;
     std::uint64_t now_ms_ = 0;
     base::container::RingQueue<Event, kFeedCapacity> feed_;
-    std::vector<std::uint8_t> frame_; // same packing as the canvas, MSB first
+    std::vector<std::uint8_t> frame_; // the canvas packing of format_
 };
 
 /// @brief Writes rows as a binary PBM (P4): "P4\n<w> <h>\n", then packed rows.

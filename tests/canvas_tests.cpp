@@ -5,8 +5,8 @@
 #include "testing.hpp"
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
-#include "visor/canvas/mono_canvas.hpp"
 
 void run_canvas_tests() {
     using visor::base::PointI;

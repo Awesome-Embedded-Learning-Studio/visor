@@ -18,6 +18,7 @@ int main() {
     run_id_session_tests();
     run_layout_tests();
     run_pen_tests();
+    run_pixel_tests();
     run_point_tests();
     run_popup_tests();
     run_rect_tests();

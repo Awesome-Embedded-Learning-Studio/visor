@@ -4,8 +4,9 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
-#include "visor/canvas/mono_canvas.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 #include "visor/draw/mono_font.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
@@ -275,13 +276,14 @@ void run_theme_tests() {
                 }
                 for (const auto* control : controls) {
                     Frame isolated;
-                    isolated.set_clear(visor::canvas::mono_ink(scheme.background));
+                    isolated.set_clear(visor::canvas::Mono1Traits::from_ink(scheme.background));
                     control->draw(visor::ui::CanvasPainter{isolated, scheme});
                     for (int y = 0; y < 64; ++y) {
                         for (int x = 0; x < 64; ++x) {
                             if (!control->bounds().contains(PointI{x, y})) {
-                                VISOR_CHECK_EQ(isolated.get(PointI{x, y}),
-                                               visor::canvas::mono_ink(scheme.background));
+                                VISOR_CHECK_EQ(
+                                    isolated.get(PointI{x, y}),
+                                    visor::canvas::Mono1Traits::from_ink(scheme.background));
                             }
                         }
                     }

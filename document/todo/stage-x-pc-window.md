@@ -4,7 +4,7 @@ PC 段先行、以可测试性起步（作者 2026-10-14 拍板）。理由记�
 
 ## 待办
 
-- [ ] 真窗口冒烟：鼠标键盘进、帧出、关闭干净退出（`examples/x11_window`、`examples/signal` 与 `examples/snake` 已备，作者在 WSLg 亲手走，`DISPLAY=:0 ./build/examples/x11_window`；信号台是 `./build/examples/signal`，贪吃蛇是 `./build/examples/snake`）。
+- [x] 真窗口冒烟：鼠标键盘进、帧出、关闭干净退出（`examples/x11_window`、`examples/signal` 与 `examples/snake` 已备，作者在 WSLg 亲手走，`DISPLAY=:0 ./build/examples/x11_window`；信号台是 `./build/examples/signal`，贪吃蛇是 `./build/examples/snake`）。2026-10-20 作者验讫，x11_window 单色与 `--color` 彩色通道都看过。
 - [ ] 提交策略纯逻辑半边：脏区矩形到 X 提交矩形（窗口裁剪、合并坍缩同核心口径），PC 判例先行。B21 的宿主按收到的区域直送，此件等真窗口用出数据后再立批。
 
 ## 留档备忘

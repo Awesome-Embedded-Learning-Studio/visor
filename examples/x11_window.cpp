@@ -179,7 +179,10 @@ class Gallery final : public visor::ui::Widget {
 /// Runs the gallery against a window that speaks one wire format, in a canvas
 /// of that same format. The scene is one tree either way: the format only
 /// decides what a pixel is, so the mono window and the color window draw the
-/// same controls.
+/// same controls. The canvas is the raster profile: pass a full-frame canvas
+/// and every rebuild submits one region, pass a strip canvas and the same
+/// run_dirty covers the screen in bands -- the desktop gets to watch the
+/// small-RAM shape live.
 template <typename Frame>
 int run_window(Gallery& panel, visor::host::PixelFormat format) {
     auto opened = visor::host::x11::X11WindowHost::open(nullptr, kScreen.w, kScreen.h, 2, format);
@@ -193,6 +196,9 @@ int run_window(Gallery& panel, visor::host::PixelFormat format) {
     panel.set_dirty_sink(&dirty);
     dirty.push(kScreenBounds);
     Frame frame;
+    if constexpr (Frame::kHeight < kScreen.h) {
+        std::println("visor: strip raster, {} rows per band", Frame::kHeight);
+    }
     std::println("visor: Tab to navigate, arrows to adjust, Enter to activate; close with X");
     while (!host.close_requested()) {
         static_cast<void>(visor::ui::run_dirty(host.table(), panel, input, frame, kScreen, dirty));
@@ -261,11 +267,34 @@ int main(int argc, char* const* argv) {
     }
     // --color: the same gallery through an RGB565 canvas and an RGB565 window,
     // with the color preset. This is the eyeball channel: one flag between the
-    // mono picture and the colored one, no rebuild between them.
-    if (argc == 2 && std::strcmp(argv[1], "--color") == 0) {
+    // mono picture and the colored one, no rebuild between them. --strip
+    // composes with either picture and swaps the full-frame canvas for a
+    // 64-row strip, the small-RAM raster profile at station size.
+    bool color = false;
+    bool strip = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--color") == 0) {
+            color = true;
+        } else if (std::strcmp(argv[i], "--strip") == 0) {
+            strip = true;
+        } else {
+            std::println(stderr, "visor: unknown flag {}", argv[i]);
+            return 1;
+        }
+    }
+    using MonoStripe = visor::canvas::Canvas<SizeI{.w = kScreen.w, .h = 64}>;
+    using ColorFrame = visor::canvas::Canvas<kScreen, visor::canvas::Rgb565Traits>;
+    using ColorStripe =
+        visor::canvas::Canvas<SizeI{.w = kScreen.w, .h = 64}, visor::canvas::Rgb565Traits>;
+    if (color) {
         panel.set_theme(&visor::ui::kColorTheme);
-        return run_window<visor::canvas::Canvas<kScreen, visor::canvas::Rgb565Traits>>(
-            panel, visor::host::PixelFormat::RGB565);
+        if (strip) {
+            return run_window<ColorStripe>(panel, visor::host::PixelFormat::RGB565);
+        }
+        return run_window<ColorFrame>(panel, visor::host::PixelFormat::RGB565);
+    }
+    if (strip) {
+        return run_window<MonoStripe>(panel, visor::host::PixelFormat::Mono1);
     }
     return run_window<Frame>(panel, visor::host::PixelFormat::Mono1);
 }

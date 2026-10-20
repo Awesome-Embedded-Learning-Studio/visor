@@ -26,6 +26,13 @@ namespace visor::canvas {
  * zero padding tails. RGB565 and XRGB8888 rows are exact, two and four bytes
  * per pixel.
  *
+ * The Size/Format pair is the compile-time raster profile: a full frame, a
+ * horizontal strip and the swap buffers of a later batch are this one template
+ * in different configurations, never separate types. A build shops the profile
+ * by buffer budget -- kBufferBytes is the number it shops with -- while the
+ * screen size stays a runtime loop parameter that only says which windows to
+ * render this round.
+ *
  * Pixel access is bounded: set reports an out-of-bounds coordinate with false
  * and touches nothing, get reads out of bounds as the format's zero (unlit for
  * Mono1, black for the color formats). Nothing is checked twice further down --
@@ -41,6 +48,8 @@ class Canvas {
     static constexpr std::size_t kWidth = CanvasSize.w;
     static constexpr std::size_t kHeight = CanvasSize.h;
     static constexpr std::size_t kStrideBytes = Format::bytes_per_row(kWidth);
+    /// The whole buffer in bytes: the budget a raster profile costs.
+    static constexpr std::size_t kBufferBytes = kStrideBytes * kHeight;
 
     /// Fills every pixel with one value, the whole surface in the format's ink.
     constexpr void fill(Pixel value) noexcept {

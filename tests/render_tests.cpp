@@ -6,15 +6,18 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
 #include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/input_router.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/run_loop.hpp"
+#include "visor/ui/theme.hpp"
 #include "visor/ui/widgets/button/button.hpp"
 #include "visor/ui/widgets/checkbox/checkbox.hpp"
 #include "visor/ui/widgets/widget.hpp"
@@ -26,6 +29,7 @@ using visor::base::RectI;
 using visor::base::SizeI;
 using visor::canvas::Canvas;
 using visor::canvas::ColorRole;
+using visor::canvas::Ink;
 using visor::ui::DirtyRegions;
 using visor::ui::Rectangle;
 using visor::ui::Widget;
@@ -37,15 +41,20 @@ const RectI kWholeScreen{.pos = PointI{0, 0}, .size = kScreenSize};
 /// The strip gate's standard cast: a lit full-screen ground, a dark hole
 /// crossing the strip 0/1 boundary, and two lit markers that start hidden.
 /// Every pixel gets painted by someone, so an unrebuilt strip shows up as a
-/// dark patch the comparison cannot miss.
+/// patch the comparison cannot miss. The markers carry Accent and Border so
+/// the color runs compare real distinct values at the seams; a mono run
+/// folds both to lit, exactly what the founding mono gate asserted.
 class GateScene {
   public:
-    GateScene() {
+    explicit GateScene(const visor::ui::Theme* scheme) {
+        root.set_theme(scheme);
         VISOR_CHECK(root.add_child(&ground));
         VISOR_CHECK(root.add_child(&hole));
         VISOR_CHECK(root.add_child(&tail_dot));
         VISOR_CHECK(root.add_child(&head_dot));
         hole.fill = visor::canvas::ColorRole::Background; // the dark hole is the point
+        tail_dot.fill = visor::canvas::ColorRole::Accent;
+        head_dot.fill = visor::canvas::ColorRole::Border;
         tail_dot.set_visible(false);
         head_dot.set_visible(false);
     }
@@ -61,27 +70,30 @@ class GateScene {
 };
 
 /// Renders the tree twice over the same 20x20 screen, once as one integral
-/// window, once strip by strip into a separate host, then compares all 400
-/// received pixels. Flush counts come back for the scenarios that pin them.
+/// window, once strip by strip into a separate host, then compares every
+/// received pixel through the host's own format (a widened word in color, a
+/// 0/1 in mono -- both exact, so a packing slip at a strip seam flips the
+/// comparison either way). Flush counts come back for the scenarios that pin
+/// them.
+template <typename Full, typename Strip>
 void compare_integral_vs_strips(Widget& root, int& integral_flushes, int& strip_flushes) {
-    using GateCanvas = Canvas<SizeI{.w = 20, .h = 20}>;
-    using StripCanvas = Canvas<SizeI{.w = 20, .h = 8}>;
+    visor::host::OffscreenHost integral(kScreen, kScreen,
+                                        visor::host::kWireFormat<typename Full::Traits>);
+    visor::host::OffscreenHost striped(kScreen, kScreen,
+                                       visor::host::kWireFormat<typename Strip::Traits>);
 
-    visor::host::OffscreenHost integral(20, 20);
-    visor::host::OffscreenHost striped(20, 20);
-
-    GateCanvas frame;
+    Full frame;
     frame.set_clear(false);
     visor::ui::render_window(root, frame, kWholeScreen, integral.table());
 
-    StripCanvas strip;
+    Strip strip;
     strip.set_clear(false);
     visor::ui::render_strips(root, strip, kScreenSize, striped.table());
 
     std::size_t mismatches = 0;
     for (int y = 0; y < kScreen; ++y) {
         for (int x = 0; x < kScreen; ++x) {
-            if (integral.get(PointI{x, y}) != striped.get(PointI{x, y})) {
+            if (integral.get_pixel(PointI{x, y}) != striped.get_pixel(PointI{x, y})) {
                 if (mismatches == 0) {
                     std::println("strip gate first mismatch at ({}, {})", x, y);
                 }
@@ -94,12 +106,13 @@ void compare_integral_vs_strips(Widget& root, int& integral_flushes, int& strip_
     strip_flushes = striped.flush_count();
 }
 
-/// Compares two hosts' received frames pixel for pixel.
-void compare_hosts(const visor::host::OffscreenHost& a, const visor::host::OffscreenHost& b) {
+/// Compares two same-format hosts' received frames pixel for pixel.
+void compare_hosts(const visor::host::OffscreenHost& a, const visor::host::OffscreenHost& b,
+                   int width, int height) {
     std::size_t mismatches = 0;
-    for (int y = 0; y < kScreen; ++y) {
-        for (int x = 0; x < kScreen; ++x) {
-            if (a.get(PointI{x, y}) != b.get(PointI{x, y})) {
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            if (a.get_pixel(PointI{x, y}) != b.get_pixel(PointI{x, y})) {
                 if (mismatches == 0) {
                     std::println("host comparison first mismatch at ({}, {})", x, y);
                 }
@@ -108,6 +121,284 @@ void compare_hosts(const visor::host::OffscreenHost& a, const visor::host::Offsc
         }
     }
     VISOR_CHECK_EQ(mismatches, std::size_t{0});
+}
+
+/**
+ * @brief The strip gate in one format: the same tree and the same scenarios
+ *        the founding mono gate ran, pixel-compared in this format's own
+ *        words.
+ *
+ * Mono1 is the founding run and keeps its meaning: an unlit patch where a
+ * strip should have rebuilt. The color runs repeat every scenario with the
+ * color preset, where the markers carry real distinct values, the hole is a
+ * real black, and a wrong byte order or a seam slip anywhere in the packing
+ * flips a comparison. The scenarios themselves never branch on the format.
+ */
+template <typename Format>
+void run_strip_gate(const visor::ui::Theme& scheme) {
+    using Full = Canvas<kScreenSize, Format>;
+    using Strip = Canvas<SizeI{.w = kScreen, .h = 8}, Format>;
+    using Pixel = Format::Pixel;
+    const Pixel ground_pixel = Format::from_ink(scheme.foreground);
+    const Pixel hole_pixel = Format::from_ink(scheme.background);
+    const Pixel dark_pixel = Format::from_ink(Ink::black());
+
+    // Case 1, tail strip: screen 20, strip 8, the last window is four rows.
+    // The hole crosses the strip 0/1 boundary, the lit marker sits in the tail.
+    {
+        GateScene scene{&scheme};
+        scene.tail_dot.set_visible(true);
+        int integral_flushes = 0;
+        int strip_flushes = 0;
+        compare_integral_vs_strips<Full, Strip>(scene.root, integral_flushes, strip_flushes);
+        VISOR_CHECK_EQ(integral_flushes, 1);
+        VISOR_CHECK_EQ(strip_flushes, 3); // 8 + 8 + 4
+    }
+
+    // Case 2, old position restore: the marker moves from the tail strip to
+    // the top. The strip holding the old spot owes a repaint even though
+    // nothing is lit there anymore. The patched host first receives the whole
+    // v1 frame the normal way (it plays a real screen holding last round's
+    // pixels), then the dirty path rebuilds exactly the two strips named by
+    // old and new bounds, and the result matches the integral v2.
+    {
+        GateScene scene{&scheme};
+        scene.tail_dot.set_visible(true);
+        int integral_flushes = 0;
+        int strip_flushes = 0;
+        compare_integral_vs_strips<Full, Strip>(scene.root, integral_flushes, strip_flushes);
+
+        visor::host::OffscreenHost patched(kScreen, kScreen,
+                                           visor::host::kWireFormat<typename Strip::Traits>);
+        Strip strip;
+        strip.set_clear(false);
+        visor::ui::render_strips(scene.root, strip, kScreenSize, patched.table());
+        VISOR_CHECK_EQ(patched.flush_count(), 3); // v1 arrives in full
+
+        scene.tail_dot.set_visible(false);
+        scene.head_dot.set_visible(true);
+        compare_integral_vs_strips<Full, Strip>(scene.root, integral_flushes, strip_flushes);
+
+        visor::host::OffscreenHost integral(kScreen, kScreen,
+                                            visor::host::kWireFormat<typename Full::Traits>);
+        Full frame;
+        frame.set_clear(false);
+        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
+
+        DirtyRegions moved;
+        moved.push(RectI{.pos = PointI{12, 16}, .size = SizeI{.w = 4, .h = 4}}); // old, strip 2
+        moved.push(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 4, .h = 4}});   // new, strip 0
+        visor::ui::render_strips(scene.root, strip, kScreenSize, patched.table(), moved);
+        VISOR_CHECK_EQ(patched.flush_count(), 5); // 3 + the two owed strips
+        compare_hosts(integral, patched, kScreen, kScreen);
+    }
+
+    // Case 3, full-screen invalidation: one push covering the screen rebuilds
+    // every strip.
+    {
+        const GateScene scene{&scheme};
+        visor::host::OffscreenHost striped(kScreen, kScreen,
+                                           visor::host::kWireFormat<typename Strip::Traits>);
+        Strip strip;
+        strip.set_clear(false);
+        DirtyRegions everything;
+        everything.push(kWholeScreen);
+        visor::ui::render_strips(scene.root, strip, kScreenSize, striped.table(), everything);
+        VISOR_CHECK_EQ(striped.flush_count(), 3);
+    }
+
+    // Case 4, dirty overflow collapse: nine disjoint pushes on a capacity-8
+    // list fold the first eight into one box and keep the ninth, and together
+    // the two survivors span all three strips, so the rebuild covers more than
+    // strictly needed and misses nothing.
+    {
+        const GateScene scene{&scheme};
+        visor::host::OffscreenHost integral(kScreen, kScreen,
+                                            visor::host::kWireFormat<typename Full::Traits>);
+        visor::host::OffscreenHost striped(kScreen, kScreen,
+                                           visor::host::kWireFormat<typename Strip::Traits>);
+        Full frame;
+        frame.set_clear(false);
+        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
+        Strip strip;
+        strip.set_clear(false);
+        DirtyRegions scattered;
+        for (int i = 0; i < 9; ++i) {
+            scattered.push(RectI{.pos = PointI{i * 2, i * 2}, .size = SizeI{.w = 1, .h = 1}});
+        }
+        VISOR_CHECK_EQ(scattered.count(), std::size_t{2});
+        visor::ui::render_strips(scene.root, strip, kScreenSize, striped.table(), scattered);
+        VISOR_CHECK_EQ(striped.flush_count(), 3);
+        compare_hosts(integral, striped, kScreen, kScreen);
+    }
+
+    // Case 5, the batch dial: render_strips steps by the strip canvas height,
+    // so a taller strip canvas sends fewer, larger regions from the same loop.
+    // The 16-row canvas covers the screen in two sends, its tail window owning
+    // four of the sixteen stored rows; the 5-row canvas takes four sends and
+    // puts the hole right across the row-10 boundary, so a replay slip at the
+    // batch seam flips hole pixels. Both dials must land pixel-identical.
+    {
+        GateScene scene{&scheme};
+        scene.tail_dot.set_visible(true);
+        visor::host::OffscreenHost integral(kScreen, kScreen,
+                                            visor::host::kWireFormat<typename Full::Traits>);
+        Full frame;
+        frame.set_clear(false);
+        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
+
+        using Half = Canvas<SizeI{.w = kScreen, .h = 16}, Format>;
+        visor::host::OffscreenHost batched(kScreen, kScreen, visor::host::kWireFormat<Format>);
+        Half half;
+        half.set_clear(false);
+        visor::ui::render_strips(scene.root, half, kScreenSize, batched.table());
+        VISOR_CHECK_EQ(batched.flush_count(), 2); // 16 + 4
+        compare_hosts(integral, batched, kScreen, kScreen);
+
+        using Slim = Canvas<SizeI{.w = kScreen, .h = 5}, Format>;
+        visor::host::OffscreenHost fine(kScreen, kScreen, visor::host::kWireFormat<Format>);
+        Slim slim;
+        slim.set_clear(false);
+        visor::ui::render_strips(scene.root, slim, kScreenSize, fine.table());
+        VISOR_CHECK_EQ(fine.flush_count(), 4);
+        compare_hosts(integral, fine, kScreen, kScreen);
+    }
+
+    // Case 6, the odd x: region pixels may start at any scene x, so the host
+    // copy cannot assume source and destination share a byte layout. The
+    // patch starts at x = 3; in mono that means a bit-shifted copy, in color
+    // a whole-pixel offset, and the hole's first dark pixel still has to land
+    // exactly one pixel right of the window corner. The surplus row and
+    // column keep whatever set_clear(false) left, the format's own black.
+    {
+        const GateScene scene{&scheme};
+        visor::host::OffscreenHost integral(kScreen, kScreen,
+                                            visor::host::kWireFormat<typename Full::Traits>);
+        Full frame;
+        frame.set_clear(false);
+        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
+
+        // The patched host first holds a full frame (it plays a screen with
+        // last round's pixels), then replays one small window over it.
+        visor::host::OffscreenHost patched(kScreen, kScreen,
+                                           visor::host::kWireFormat<typename Full::Traits>);
+        Full whole;
+        whole.set_clear(false);
+        visor::ui::render_window(scene.root, whole, kWholeScreen, patched.table());
+        VISOR_CHECK_EQ(patched.flush_count(), 1);
+
+        using Patch = Canvas<SizeI{.w = 8, .h = 4}, Format>;
+        Patch patch;
+        patch.set_clear(false);
+        const RectI patch_window{.pos = PointI{3, 5}, .size = SizeI{.w = 7, .h = 3}};
+        visor::ui::render_window(scene.root, patch, patch_window, patched.table());
+        // The painter shifted scene (3, 5) to buffer (0, 0) and scene (4, 6),
+        // the hole's first dark pixel, to buffer (1, 1); column 7 and row 3
+        // are surplus the 7x3 window never owns.
+        VISOR_CHECK(patch.get(PointI{0, 0}) == ground_pixel);
+        VISOR_CHECK(patch.get(PointI{1, 1}) == hole_pixel);
+        VISOR_CHECK(patch.get(PointI{7, 0}) == dark_pixel);
+        VISOR_CHECK(patch.get(PointI{0, 3}) == dark_pixel);
+        VISOR_CHECK_EQ(patched.flush_count(), 2);
+        compare_hosts(integral, patched, kScreen, kScreen);
+    }
+}
+
+/**
+ * @brief The end-to-end pipeline in one color format: the same rounds and
+ *        the same rhythm rule as the mono case below, each round's strip
+ *        host compared against a fresh integral reference of the same tree.
+ *
+ * The mono run probes individual pixels with bools; in color the same probes
+ * would hard-code control internals, so parity plus the state and flush
+ * assertions carry the story instead. An idle round sends nothing, the
+ * collector retires with the rebuild, and one key event owns one round.
+ */
+template <typename Format>
+void run_pipeline_in_format(const visor::ui::Theme& scheme) {
+    using Full = Canvas<kScreenSize, Format>;
+    using Strip = Canvas<SizeI{.w = kScreen, .h = 8}, Format>;
+
+    int fired = 0;
+    visor::ui::Rectangle ground(kWholeScreen);
+    ground.set_theme(&scheme);
+    visor::ui::Checkbox box(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 6, .h = 6}});
+    visor::ui::Button tail_button(RectI{.pos = PointI{12, 16}, .size = SizeI{.w = 4, .h = 4}});
+    tail_button.set_on_activate(
+        [](visor::ui::Button&, void* context) { ++*static_cast<int*>(context); }, &fired);
+    VISOR_CHECK(ground.add_child(&box));
+    VISOR_CHECK(ground.add_child(&tail_button));
+    DirtyRegions debts;
+    ground.set_dirty_sink(&debts);
+    visor::ui::InputRouter input;
+
+    visor::host::OffscreenHost screen(kScreen, kScreen, visor::host::kWireFormat<Format>);
+
+    // The integral reference of the tree as it stands right now.
+    const auto parity = [&] {
+        visor::host::OffscreenHost reference(kScreen, kScreen, visor::host::kWireFormat<Format>);
+        Full frame;
+        frame.set_clear(false);
+        visor::ui::render_window(ground, frame, kWholeScreen, reference.table());
+        compare_hosts(reference, screen, kScreen, kScreen);
+    };
+
+    Strip strip;
+    strip.set_clear(false);
+    // The first frame is the caller's job: run_dirty only repaints what a
+    // report names, so it starts from a full render_strips.
+    visor::ui::render_strips(ground, strip, kScreenSize, screen.table());
+    VISOR_CHECK_EQ(screen.flush_count(), 3); // 8 + 8 + 4
+    parity();
+
+    // Round one: Tab focuses the checkbox, one strip rebuilt.
+    VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+    VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts),
+                   1);
+    VISOR_CHECK_EQ(screen.flush_count(), 4);
+    VISOR_CHECK_EQ(debts.count(), std::size_t{0});
+    VISOR_CHECK(box.focused());
+    VISOR_CHECK(!box.checked());
+    parity();
+
+    // Round two: Space checks it.
+    VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeySpace}));
+    VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts),
+                   1);
+    VISOR_CHECK_EQ(screen.flush_count(), 5);
+    VISOR_CHECK(box.checked());
+    parity();
+
+    // Round three: Tab walks to the tail button; strips 0 and 2 rebuild.
+    VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyTab}));
+    VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts),
+                   1);
+    VISOR_CHECK_EQ(screen.flush_count(), 7);
+    VISOR_CHECK(tail_button.focused());
+    VISOR_CHECK(!box.focused());
+    parity();
+
+    // Rounds four and five: Enter presses, its release fires.
+    VISOR_CHECK(screen.push_event(visor::host::KeyDown{.code = visor::host::kKeyEnter}));
+    VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts),
+                   1);
+    VISOR_CHECK_EQ(screen.flush_count(), 8);
+    VISOR_CHECK(tail_button.pressed());
+    VISOR_CHECK_EQ(fired, 0);
+    parity();
+    VISOR_CHECK(screen.push_event(visor::host::KeyUp{.code = visor::host::kKeyEnter}));
+    VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts),
+                   1);
+    VISOR_CHECK_EQ(screen.flush_count(), 9);
+    VISOR_CHECK(!tail_button.pressed());
+    VISOR_CHECK_EQ(fired, 1);
+    parity();
+
+    // Idle: no events, no debts, nothing submitted.
+    VISOR_CHECK_EQ(visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts),
+                   0);
+    VISOR_CHECK_EQ(screen.flush_count(), 9);
+    parity();
 }
 
 } // namespace
@@ -193,162 +484,15 @@ void run_render_tests() {
     full.push(RectI{.pos = PointI{40, 40}, .size = SizeI{.w = 1, .h = 1}});
     VISOR_CHECK(full.count() <= DirtyRegions::kCapacity);
 
-    // The strip gate, case by case: integral and strip paths must agree pixel
-    // for pixel on every scenario, flush counts pin where the work went.
+    // The strip gate, one run per format: the founding mono matrix as the
+    // regression floor, then the same scenarios in both color formats where
+    // the pixels carry real values and the seams bite on packing.
+    run_strip_gate<visor::canvas::Mono1Traits>(visor::ui::kLightTheme);
+    run_strip_gate<visor::canvas::Rgb565Traits>(visor::ui::kColorTheme);
+    run_strip_gate<visor::canvas::Xrgb8888Traits>(visor::ui::kColorTheme);
 
-    // Case 1, tail strip: screen 20, strip 8, the last window is four rows.
-    // The hole crosses the strip 0/1 boundary, the lit dot sits in the tail.
-    {
-        GateScene scene;
-        scene.tail_dot.set_visible(true);
-        int integral_flushes = 0;
-        int strip_flushes = 0;
-        compare_integral_vs_strips(scene.root, integral_flushes, strip_flushes);
-        VISOR_CHECK_EQ(integral_flushes, 1);
-        VISOR_CHECK_EQ(strip_flushes, 3); // 8 + 8 + 4
-    }
-
-    // Case 2, old position restore: the marker moves from the tail strip to
-    // the top. The strip holding the old spot owes a repaint even though
-    // nothing is lit there anymore. The patched host first receives the whole
-    // v1 frame the normal way (it plays a real screen holding last round's
-    // pixels), then the dirty path rebuilds exactly the two strips named by
-    // old and new bounds, and the result matches the integral v2.
-    {
-        GateScene scene;
-        scene.tail_dot.set_visible(true);
-        int integral_flushes = 0;
-        int strip_flushes = 0;
-        compare_integral_vs_strips(scene.root, integral_flushes, strip_flushes);
-
-        visor::host::OffscreenHost patched(20, 20);
-        Canvas<SizeI{.w = 20, .h = 8}> strip;
-        strip.set_clear(false);
-        visor::ui::render_strips(scene.root, strip, kScreenSize, patched.table());
-        VISOR_CHECK_EQ(patched.flush_count(), 3); // v1 arrives in full
-
-        scene.tail_dot.set_visible(false);
-        scene.head_dot.set_visible(true);
-        compare_integral_vs_strips(scene.root, integral_flushes, strip_flushes);
-
-        visor::host::OffscreenHost integral(20, 20);
-        Canvas<SizeI{.w = 20, .h = 20}> frame;
-        frame.set_clear(false);
-        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
-
-        DirtyRegions moved;
-        moved.push(RectI{.pos = PointI{12, 16}, .size = SizeI{.w = 4, .h = 4}}); // old, strip 2
-        moved.push(RectI{.pos = PointI{2, 2}, .size = SizeI{.w = 4, .h = 4}});   // new, strip 0
-        visor::ui::render_strips(scene.root, strip, kScreenSize, patched.table(), moved);
-        VISOR_CHECK_EQ(patched.flush_count(), 5); // 3 + the two owed strips
-        compare_hosts(integral, patched);
-    }
-
-    // Case 3, full-screen invalidation: one push covering the screen rebuilds
-    // every strip.
-    {
-        const GateScene scene;
-        visor::host::OffscreenHost striped(20, 20);
-        Canvas<SizeI{.w = 20, .h = 8}> strip;
-        strip.set_clear(false);
-        DirtyRegions everything;
-        everything.push(kWholeScreen);
-        visor::ui::render_strips(scene.root, strip, kScreenSize, striped.table(), everything);
-        VISOR_CHECK_EQ(striped.flush_count(), 3);
-    }
-
-    // Case 4, dirty overflow collapse: nine disjoint pushes on a capacity-8
-    // list fold the first eight into one box and keep the ninth, and together
-    // the two survivors span all three strips, so the rebuild covers more than
-    // strictly needed and misses nothing.
-    {
-        const GateScene scene;
-        visor::host::OffscreenHost integral(20, 20);
-        visor::host::OffscreenHost striped(20, 20);
-        Canvas<SizeI{.w = 20, .h = 20}> frame;
-        frame.set_clear(false);
-        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
-        Canvas<SizeI{.w = 20, .h = 8}> strip;
-        strip.set_clear(false);
-        DirtyRegions scattered;
-        for (int i = 0; i < 9; ++i) {
-            scattered.push(RectI{.pos = PointI{i * 2, i * 2}, .size = SizeI{.w = 1, .h = 1}});
-        }
-        VISOR_CHECK_EQ(scattered.count(), std::size_t{2});
-        visor::ui::render_strips(scene.root, strip, kScreenSize, striped.table(), scattered);
-        VISOR_CHECK_EQ(striped.flush_count(), 3);
-        compare_hosts(integral, striped);
-    }
-
-    // Case 5, the batch dial: render_strips steps by the strip canvas height,
-    // so a taller strip canvas sends fewer, larger regions from the same loop.
-    // The 16-row canvas covers the screen in two sends, its tail window owning
-    // four of the sixteen stored rows; the 5-row canvas takes four sends and
-    // puts the hole right across the row-10 boundary, so a replay slip at the
-    // batch seam flips hole pixels. Both dials must land pixel-identical.
-    {
-        GateScene scene;
-        scene.tail_dot.set_visible(true);
-        visor::host::OffscreenHost integral(20, 20);
-        Canvas<SizeI{.w = 20, .h = 20}> frame;
-        frame.set_clear(false);
-        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
-
-        visor::host::OffscreenHost batched(20, 20);
-        Canvas<SizeI{.w = 20, .h = 16}> half;
-        half.set_clear(false);
-        visor::ui::render_strips(scene.root, half, kScreenSize, batched.table());
-        VISOR_CHECK_EQ(batched.flush_count(), 2); // 16 + 4
-        compare_hosts(integral, batched);
-
-        visor::host::OffscreenHost fine(20, 20);
-        Canvas<SizeI{.w = 20, .h = 5}> slim;
-        slim.set_clear(false);
-        visor::ui::render_strips(scene.root, slim, kScreenSize, fine.table());
-        VISOR_CHECK_EQ(fine.flush_count(), 4);
-        compare_hosts(integral, fine);
-    }
-
-    // Case 6, the odd x: region pixels may start at any scene x, so the host
-    // copy cannot assume source and destination share a byte layout. The
-    // patch starts at x = 3 and its dark columns are the hole's left edge,
-    // so a copy shifted by one bit flips lit and dark pixels on camera.
-    {
-        const GateScene scene;
-        visor::host::OffscreenHost integral(20, 20);
-        Canvas<SizeI{.w = 20, .h = 20}> frame;
-        frame.set_clear(false);
-        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
-
-        // The patched host first holds a full frame (it plays a screen with
-        // last round's pixels), then replays one small window over it.
-        visor::host::OffscreenHost patched(20, 20);
-        Canvas<SizeI{.w = 20, .h = 20}> whole;
-        whole.set_clear(false);
-        visor::ui::render_window(scene.root, whole, kWholeScreen, patched.table());
-        VISOR_CHECK_EQ(patched.flush_count(), 1);
-
-        Canvas<SizeI{.w = 8, .h = 4}> patch;
-        patch.set_clear(false);
-        const RectI patch_window{.pos = PointI{3, 5}, .size = SizeI{.w = 7, .h = 3}};
-        visor::ui::render_window(scene.root, patch, patch_window, patched.table());
-        // The painter shifted scene (3, 5) to buffer (0, 0) and scene (4, 6),
-        // the hole's first dark pixel, to buffer (1, 1); column 7 and row 3
-        // are surplus the 7x3 window never owns.
-        VISOR_CHECK(patch.get(PointI{0, 0}) == true);
-        VISOR_CHECK(patch.get(PointI{1, 1}) == false);
-        VISOR_CHECK(patch.get(PointI{7, 0}) == false);
-        VISOR_CHECK(patch.get(PointI{0, 3}) == false);
-        VISOR_CHECK_EQ(patched.flush_count(), 2);
-        compare_hosts(integral, patched);
-    }
-
-    // Case 7, the pipeline end to end: a first frame painted by hand, then
-    // rounds of run_dirty where controls report their own debts. The flush
-    // count pins the economy -- only the strips a report named go out, an
-    // idle round sends nothing, and the collector retires with the rebuild.
-    // The rounds are one key event each: the pump's rhythm rule, so a key
-    // press and its release each own a rebuild of their own.
+    // The pipeline end to end, mono with its bool probes, then the same
+    // rounds in both color formats against an integral reference per round.
     {
         // Ground covers the screen; the checkbox lives in strip 0, the
         // button in the tail strip. (5,5) is the checkbox's inner mark,
@@ -428,5 +572,79 @@ void run_render_tests() {
         VISOR_CHECK_EQ(
             visor::ui::run_dirty(screen.table(), ground, input, strip, kScreenSize, debts), 0);
         VISOR_CHECK_EQ(screen.flush_count(), 9);
+    }
+    run_pipeline_in_format<visor::canvas::Rgb565Traits>(visor::ui::kColorTheme);
+    run_pipeline_in_format<visor::canvas::Xrgb8888Traits>(visor::ui::kColorTheme);
+
+    // The station arithmetic from the pixel proposal, compiled and pinned
+    // instead of tabled: the 480x320 screen, full frame against the 64-row
+    // stripe, in every format. These are the numbers a small-RAM build shops
+    // its raster profile by, and they are promises now, not prose.
+    using MonoFrame480 = Canvas<SizeI{.w = 480, .h = 320}>;
+    using MonoStripe64 = Canvas<SizeI{.w = 480, .h = 64}>;
+    static_assert(MonoFrame480::kStrideBytes == 60);
+    static_assert(MonoFrame480::kBufferBytes == 19200); // 18.75 KiB
+    static_assert(MonoStripe64::kBufferBytes == 3840);  // 3.75 KiB
+    using Rgb565Frame480 = Canvas<SizeI{.w = 480, .h = 320}, visor::canvas::Rgb565Traits>;
+    using Rgb565Stripe64 = Canvas<SizeI{.w = 480, .h = 64}, visor::canvas::Rgb565Traits>;
+    static_assert(Rgb565Frame480::kStrideBytes == 960);
+    static_assert(Rgb565Frame480::kBufferBytes == 307200); // 300 KiB
+    static_assert(Rgb565Stripe64::kBufferBytes == 61440);  // 60 KiB
+    using Xrgb8888Frame480 = Canvas<SizeI{.w = 480, .h = 320}, visor::canvas::Xrgb8888Traits>;
+    using Xrgb8888Stripe64 = Canvas<SizeI{.w = 480, .h = 64}, visor::canvas::Xrgb8888Traits>;
+    static_assert(Xrgb8888Frame480::kBufferBytes == 614400); // 600 KiB
+    static_assert(Xrgb8888Stripe64::kBufferBytes == 122880); // 120 KiB
+
+    // The station gate in color: the real 480x320 geometry through 64-row
+    // RGB565 stripes, five exact bands (320 = 5 x 64), then a second pass on
+    // 50-row stripes that adds a real tail block (six bands of fifty plus one
+    // of twenty). The hole crosses the 64 and 128 seams, the accent block
+    // lives in the last band, and both passes must land pixel for pixel on
+    // the integral reference -- with the accent's 565 word pinned whole at
+    // the far seam, the channel order rides along.
+    {
+        constexpr SizeI station{.w = 480, .h = 320};
+        const RectI station_screen{.pos = PointI{0, 0}, .size = station};
+        visor::ui::Rectangle root(station_screen);
+        visor::ui::Rectangle ground(station_screen);
+        visor::ui::Rectangle hole(RectI{.pos = PointI{120, 40}, .size = SizeI{.w = 200, .h = 100}});
+        visor::ui::Rectangle mark(RectI{.pos = PointI{440, 300}, .size = SizeI{.w = 24, .h = 16}});
+        hole.fill = visor::canvas::ColorRole::Background;
+        mark.fill = visor::canvas::ColorRole::Accent;
+        root.set_theme(&visor::ui::kColorTheme);
+        VISOR_CHECK(root.add_child(&ground));
+        VISOR_CHECK(root.add_child(&hole));
+        VISOR_CHECK(root.add_child(&mark));
+
+        using Rgb565Full = Canvas<station, visor::canvas::Rgb565Traits>;
+        visor::host::OffscreenHost integral(480, 320, visor::host::PixelFormat::RGB565);
+        Rgb565Full frame;
+        frame.set_clear(false);
+        visor::ui::render_window(root, frame, station_screen, integral.table());
+
+        using Stripe64 = Canvas<SizeI{.w = 480, .h = 64}, visor::canvas::Rgb565Traits>;
+        visor::host::OffscreenHost banded(480, 320, visor::host::PixelFormat::RGB565);
+        Stripe64 stripe;
+        stripe.set_clear(false);
+        visor::ui::render_strips(root, stripe, station, banded.table());
+        VISOR_CHECK_EQ(banded.flush_count(), 5);
+        compare_hosts(integral, banded, station.w, station.h);
+
+        using Stripe50 = Canvas<SizeI{.w = 480, .h = 50}, visor::canvas::Rgb565Traits>;
+        visor::host::OffscreenHost tailed(480, 320, visor::host::PixelFormat::RGB565);
+        Stripe50 tail_stripe;
+        tail_stripe.set_clear(false);
+        visor::ui::render_strips(root, tail_stripe, station, tailed.table());
+        VISOR_CHECK_EQ(tailed.flush_count(), 7); // 6 x 50 + a 20-row tail
+        compare_hosts(integral, tailed, station.w, station.h);
+
+        // The accent's own word at the center of the last band, and the
+        // ground's: the roles the theme names, landed whole through five
+        // band seams.
+        VISOR_CHECK_EQ(banded.get_pixel(PointI{452, 308}),
+                       visor::canvas::Rgb565Traits::from_ink(visor::ui::kColorTheme.accent));
+        VISOR_CHECK_EQ(banded.get_pixel(PointI{10, 10}),
+                       visor::canvas::Rgb565Traits::from_ink(visor::ui::kColorTheme.foreground));
+        VISOR_CHECK_EQ(banded.get_pixel(PointI{130, 50}), 0U); // the hole's black
     }
 }

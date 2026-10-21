@@ -29,6 +29,7 @@ int main() {
     run_text_tests();
     run_theme_tests();
     run_ssd1306_tests();
+    run_submit_plan_tests();
     run_utf8_tests();
     run_widget_tests();
     run_wayland_host_tests();

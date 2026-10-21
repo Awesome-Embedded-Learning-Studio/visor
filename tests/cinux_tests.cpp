@@ -6,6 +6,9 @@
 #include "visor/bindings/cinux/event_wire.hpp"
 #include "visor/bindings/cinux/frame_expand.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/canvas/color.hpp"
+#include "visor/canvas/pixel_convert.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 
 #include <array>
 #include <cstddef>
@@ -79,6 +82,55 @@ void run_cinux_tests() {
         VISOR_CHECK_EQ(frame[(0 * 25) + 8], 0U);
         VISOR_CHECK_EQ(frame[(2 * 25) + 0], 0U);
         VISOR_CHECK_EQ(frame[(0 * 25) + 20], 0U); // the pitch's slack column
+    }
+
+    // The flipped direction: a core that renders in RGB565 hands the frame
+    // expansion real 16-bit color, and each pixel widens through the same
+    // converter the pixel chapter judged over all 65536 values. Black,
+    // white and the iris blue land as their full words, no on/off pair to
+    // pick, and the clip stance matches the mono direction.
+    {
+        using visor::canvas::Ink;
+        using visor::canvas::Rgb565Traits;
+        // A 4-wide RGB565 strip: black, white, iris blue, muted -- stored the
+        // traits' way, low byte first.
+        const std::array<std::uint16_t, 4> colors{
+            Rgb565Traits::from_ink(Ink::black()),
+            Rgb565Traits::from_ink(Ink::white()),
+            Rgb565Traits::from_ink(Ink::from_rgb(0x004a62c8)),
+            Rgb565Traits::from_ink(Ink::from_rgb(0x008a93a6)),
+        };
+        std::array<std::uint8_t, 8> rows{};
+        for (std::size_t i = 0; i < colors.size(); ++i) {
+            Rgb565Traits::store(rows.data(), i, colors[i]);
+        }
+        std::vector<std::uint32_t> frame(static_cast<std::size_t>(16) * 2,
+                                         visor::host::cinux::kXrgbWhite);
+        const visor::host::cinux::FrameTarget target{
+            .pixels = frame.data(),
+            .width = 16,
+            .height = 2,
+            .pitch_px = 16,
+        };
+        const RectI region{.pos = PointI{2, 0}, .size = SizeI{.w = 4, .h = 1}};
+        visor::host::cinux::expand_region_rgb565(target, region, rows.data(), 8);
+        const auto wide = [](std::uint16_t pixel) {
+            return visor::canvas::rgb565_to_xrgb8888(pixel);
+        };
+        VISOR_CHECK_EQ(frame[(0 * 16) + 2], wide(colors[0]));                // black -> 0xff000000
+        VISOR_CHECK_EQ(frame[(0 * 16) + 3], wide(colors[1]));                // white -> 0xffffffff
+        VISOR_CHECK_EQ(frame[(0 * 16) + 4], wide(colors[2]));                // the iris blue word
+        VISOR_CHECK_EQ(frame[(0 * 16) + 5], wide(colors[3]));                // the muted word
+        VISOR_CHECK_EQ(frame[(0 * 16) + 6], visor::host::cinux::kXrgbWhite); // past the region
+        VISOR_CHECK_EQ(frame[(1 * 16) + 2],
+                       visor::host::cinux::kXrgbWhite); // below the region
+        // The words the adapter sees are the converter's own, by hand: black
+        // and white at the ends, the blue back from 565 with its low bits
+        // re-derived (0x4a62c8 narrows and re-widens to 0x4a61ce, the
+        // chapter's lossy-narrow stance showing in the last bits).
+        VISOR_CHECK_EQ(wide(colors[0]), 0xff00'0000U);
+        VISOR_CHECK_EQ(wide(colors[1]), 0xffff'ffffU);
+        VISOR_CHECK_EQ(wide(colors[2]), 0xff4a'61ceU);
     }
 
     // The scancode table: the named keys arrive by their raw codes, and the

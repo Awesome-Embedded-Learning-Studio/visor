@@ -151,7 +151,8 @@ void run_x11_host_tests() {
     }
 
     // A full frame lands bit for bit: ink reads back as the visual's lit
-    // word, the dark panel as zero.
+    // word, the dark panel as zero. The puts leave at the next poll now, so
+    // the readback asks the host for a round first.
     {
         Frame frame;
         frame.set_clear(false);
@@ -164,6 +165,8 @@ void run_x11_host_tests() {
             return;
         }
         VISOR_CHECK(host->table().submit_frame(frame));
+        visor::host::Event event;
+        VISOR_CHECK(!host->table().poll(event)); // the drain rides the poll
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame);
         VISOR_CHECK_EQ(host->flush_count(), 1);
@@ -183,6 +186,8 @@ void run_x11_host_tests() {
             return;
         }
         VISOR_CHECK(host->table().submit_frame(frame));
+        visor::host::Event event;
+        VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
 
         const visor::base::RectI region{.pos = PointI{5, 20}, .size = {.w = 33, .h = 24}};
@@ -194,6 +199,7 @@ void run_x11_host_tests() {
             frame.pixels().data() + (static_cast<std::size_t>(region.pos.y) * Frame::kStrideBytes) +
             (static_cast<std::size_t>(region.pos.x) / 8);
         VISOR_CHECK(host->table().submit_region(region, region_pixels, Frame::kStrideBytes));
+        VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame); // the hole and the rest
         VISOR_CHECK_EQ(host->flush_count(), 2);
@@ -201,7 +207,8 @@ void run_x11_host_tests() {
 
     // A region whose leading byte offset is nonzero (x=16): the source walk
     // starts at the region's own first byte, and a second hop past it would
-    // paint the neighbors' bits into the hole.
+    // paint the neighbors' bits into the hole. The puts ride the next poll
+    // now, so each readback asks the host for a round first.
     {
         Frame frame;
         frame.set_clear(false);
@@ -212,7 +219,9 @@ void run_x11_host_tests() {
         if (!host.has_value()) {
             return;
         }
+        visor::host::Event event;
         VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
 
         const visor::base::RectI region{.pos = PointI{16, 8}, .size = {.w = 33, .h = 20}};
@@ -222,9 +231,42 @@ void run_x11_host_tests() {
             frame.pixels().data() + (static_cast<std::size_t>(region.pos.y) * Frame::kStrideBytes) +
             (static_cast<std::size_t>(region.pos.x) / 8);
         VISOR_CHECK(host->table().submit_region(region, region_pixels, Frame::kStrideBytes));
+        VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame);
         VISOR_CHECK_EQ(host->flush_count(), 2);
+    }
+
+    // The batching itself: a strip rebuild's bands arrive as separate regions
+    // and leave as one merged put. Three bands of a 64-row screen sit in the
+    // plan as a single rectangle, the poll drains them, and every pixel is
+    // on the server after one round -- the five-band full rebuild of the
+    // desktop example is this same shape scaled up.
+    {
+        Frame frame;
+        frame.set_clear(false);
+        const visor::draw::Pen on_pen{frame, true};
+        on_pen.fill({.pos = PointI{0, 0}, .size = {.w = kWidth, .h = 8}});
+        on_pen.fill({.pos = PointI{0, 16}, .size = {.w = kWidth, .h = 8}});
+        auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight);
+        VISOR_CHECK(host.has_value());
+        if (!host.has_value()) {
+            return;
+        }
+        for (int top = 0; top < kHeight; top += 8) {
+            const visor::base::RectI band{.pos = PointI{0, top}, .size = {.w = kWidth, .h = 8}};
+            const std::uint8_t* band_pixels =
+                frame.pixels().data() + (static_cast<std::size_t>(top) * Frame::kStrideBytes);
+            VISOR_CHECK(host->table().submit_region(band, band_pixels, Frame::kStrideBytes));
+        }
+        VISOR_CHECK_EQ(host->flush_count(), 8);
+        VISOR_CHECK_EQ(host->pending_submissions(), 1); // eight bands, one box
+        visor::host::Event event;
+        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK_EQ(host->pending_submissions(), 0);
+        XSync(screen.display(), False);
+        compare_readback(screen.display(), host->window(), frame);
+    }
     }
 
     // A color window: an RGB565 frame is widened to the visual's channels on
@@ -243,6 +285,8 @@ void run_x11_host_tests() {
             return;
         }
         VISOR_CHECK(host->table().submit_frame(frame));
+        visor::host::Event event;
+        VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
 
         const auto read_word = [&](int x, int y) -> std::uint32_t {
@@ -269,6 +313,7 @@ void run_x11_host_tests() {
         // Two rows of pure red land as the red mask, the other channels dark.
         frame.fill(visor::canvas::Rgb565Traits::from_ink(visor::canvas::Ink::from_rgb(0xff0000)));
         VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
         XImage* red_shot =
             XGetImage(screen.display(), host->window(), 0, 0, 1, 1, AllPlanes, ZPixmap);
@@ -389,6 +434,8 @@ void run_x11_host_tests() {
             return;
         }
         VISOR_CHECK(host->table().submit_frame(frame));
+        visor::host::Event event;
+        VISOR_CHECK(!host->table().poll(event)); // the frame takes the screen
         XSync(screen.display(), False);
 
         XClearWindow(screen.display(), host->window());
@@ -406,7 +453,6 @@ void run_x11_host_tests() {
         word.xexpose.height = kHeight;
         word.xexpose.count = 0;
         put_back_word(host->display(), word);
-        visor::host::Event event;
         VISOR_CHECK(!host->table().poll(event)); // no core word
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame); // the shadow answered
@@ -427,6 +473,8 @@ void run_x11_host_tests() {
             return;
         }
         VISOR_CHECK(host->table().submit_frame(frame));
+        visor::host::Event event;
+        VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
         XClearWindow(screen.display(), host->window());
         XSync(screen.display(), False);
@@ -440,7 +488,6 @@ void run_x11_host_tests() {
         word.xexpose.height = 480;
         word.xexpose.count = 0;
         put_back_word(host->display(), word);
-        visor::host::Event event;
         VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame); // intact, no crash
@@ -461,6 +508,8 @@ void run_x11_host_tests() {
             return;
         }
         VISOR_CHECK(host->table().submit_frame(frame));
+        visor::host::Event event;
+        VISOR_CHECK(!host->table().poll(event));
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame, 3); // 384x192 of blocks
         VISOR_CHECK_EQ(host->flush_count(), 1);

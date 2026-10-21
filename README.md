@@ -22,7 +22,7 @@ visor 面向想看一个跨宿主 GUI 框架如何从零搭起来的读者。想
 - 动画与帧循环。`examples/signal` 在宿主时钟上推进相位，`tick` 在绘制外写状态、只申报示波区欠画；HOLD 冻结时一轮零提交，固定相位快照与离屏自测让动画可复现。波形走定点正弦表与两像素 Bresenham，不碰浮点。
 - 小游戏。`examples/snake` 是 480×320 的 `VISOR // SNAKE`：30×20 格子、固定步长、两格输入缓冲、食物与加速、暂停/重开/黑白反相；`--demo` 自动巡演，固定种子快照与离屏自测，规则对象不碰绘制。
 - 取模工具 `tools/fontgen` 独立构建：子命令 `image` 把二进制 PBM（P4）图片转成与画布同款打包的 C++ 点阵数组头文件，子命令 `font` 把一张条带图按格子切成字模组头文件（码点连续标号，字距烤进格子），子命令 `bdf` 从 BDF 点阵字体（文泉驿、GNU Unifont 一类授权干净的自由字体）按码点范围切子集，比例字模自带 advance 与偏移，独立测试与命令行界面齐备。
-- 第二站已开工的纯逻辑半边（2026-10-12 拍板 SSD1306、I2C、128x64）：bindings 按宿主分目录（离屏替身与 SSD1306 各立门户），画布行主序到 GDDRAM 页主序的转换在 PC 侧先行验证，I2C 传输与初始化时序等主控板定了再动工。Cinux 宿主的 visor 侧已落地：1bpp 到 XRGB8888 的帧展开与 /dev/event0 事件翻译在 `bindings/cinux` 以 PC 判例先行验证，Cinux 链接层标准库白名单零违规（适配层在 CinuxOS 仓另批）。PC 窗口宿主线已开工（2026-10-14 拍板 X11 起步）：keysym 与指针词的事件翻译在 `bindings/x11` 以 PC 判例先行验证，`X11WindowHost`（开窗、影子帧、暴露重放、宿主表三口接 Xlib）与演示二进制 `examples/x11_window` 已落地，无头判例跑 Xvfb 读回差分，真窗口直接弹在桌面显示上（WSLg 下 `DISPLAY=:0 ./build/examples/x11_window`）。
+- 第二站已开工的纯逻辑半边（2026-10-12 拍板 SSD1306、I2C、128x64）：bindings 按宿主分目录（离屏替身与 SSD1306 各立门户），画布行主序到 GDDRAM 页主序的转换在 PC 侧先行验证，I2C 传输与初始化时序等主控板定了再动工。Cinux 宿主的 visor 侧已落地：1bpp 与 RGB565 到 XRGB8888 的帧展开（核内单色或 565 时各自的方向）与 /dev/event0 事件翻译在 `bindings/cinux` 以 PC 判例先行验证，Cinux 链接层标准库白名单零违规（适配层在 CinuxOS 仓另批）。PC 窗口宿主线已收口（2026-10-14 拍板 X11 起步，2026-10-21 提交策略落地）：keysym 与指针词的事件翻译在 `bindings/x11` 以 PC 判例先行验证，`X11WindowHost`（开窗、影子帧、暴露重放、宿主表三口接 Xlib）与演示二进制 `examples/x11_window` 已落地，区域提交走 `SubmitPlan`：入区先裁剪到窗口、贴边或重叠合并、满容坍缩成包围盒，一轮的区域攒成一批在下轮 poll 一次送出，无头判例跑 Xvfb 读回差分，真窗口直接弹在桌面显示上（WSLg 下 `DISPLAY=:0 ./build/examples/x11_window`）。
 
 正在路上的：交换缓冲与更多条带配置、更多控件与布局、桌面窗口宿主、真实 OLED 与 SPI 彩屏开发板（驱动适配另线推进）、Cinux 宿主（visor 侧已落地，适配层在 CinuxOS 仓推进）。路线与每一步的待办见[待办清单](document/todo/README.md)。
 

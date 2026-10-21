@@ -115,6 +115,10 @@ std::optional<X11WindowHost> X11WindowHost::open(const char* display_name, int w
     host.width_ = width;
     host.height_ = height;
     host.scale_ = scale;
+    host.plan_ = SubmitPlan{base::RectI{
+        .pos = base::PointI{0, 0},
+        .size = base::SizeI{.w = width, .h = height},
+    }};
     const std::size_t stride = row_bytes(format, static_cast<std::size_t>(width));
     host.shadow_.assign(stride * static_cast<std::size_t>(height), 0);
     host.expanded_.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
@@ -153,6 +157,7 @@ X11WindowHost& X11WindowHost::operator=(X11WindowHost&& other) noexcept {
         rejected_count_ = other.rejected_count_;
         shadow_ = std::move(other.shadow_);
         expanded_ = std::move(other.expanded_);
+        plan_ = other.plan_;
         other.display_ = nullptr;
         other.window_ = None;
         other.gc_ = nullptr;
@@ -200,6 +205,10 @@ int X11WindowHost::rejected_count() const noexcept {
     return rejected_count_;
 }
 
+int X11WindowHost::pending_submissions() const noexcept {
+    return static_cast<int>(plan_.count());
+}
+
 Window X11WindowHost::window() const noexcept {
     return window_;
 }
@@ -220,7 +229,20 @@ void X11WindowHost::handle_flush(const FlushRegion& region) noexcept {
     }
     paint_shadow(region);
     ++flush_count_;
-    put_region(region.rect);
+    // The put is a batch, not a call: the rectangle joins the plan and the
+    // next poll's drain carries it out. The shadow already holds the pixels,
+    // so however late the put leaves, it sends the right ones.
+    plan_.push(region.rect);
+}
+
+void X11WindowHost::drain_submissions() noexcept {
+    for (std::size_t i = 0; i < plan_.count(); ++i) {
+        put_region(plan_.at(i));
+    }
+    if (!plan_.empty()) {
+        XFlush(display_);
+    }
+    plan_.clear();
 }
 
 void X11WindowHost::paint_shadow(const FlushRegion& region) noexcept {
@@ -321,7 +343,8 @@ void X11WindowHost::put_region(base::RectI area) noexcept {
     XPutImage(display_, window_, gc_, &image, 0, 0, area.pos.x * scale_, area.pos.y * scale_,
               static_cast<unsigned>(area.size.w) * static_cast<unsigned>(scale_),
               static_cast<unsigned>(area.size.h) * static_cast<unsigned>(scale_));
-    XFlush(display_);
+    // No flush here on purpose: the request rides Xlib's buffer until the
+    // caller's own flush, so a drained batch leaves as one flight.
 }
 
 std::uint32_t X11WindowHost::canvas_pixel_word(const std::uint8_t* row,
@@ -343,6 +366,9 @@ std::uint32_t X11WindowHost::canvas_pixel_word(const std::uint8_t* row,
 }
 
 bool X11WindowHost::poll_one(Event& out) noexcept {
+    // The round opens here, so the previous round's puts leave here: one
+    // drain, one flush, however many regions that round submitted.
+    drain_submissions();
     for (;;) {
         XEvent raw{};
         // The close word travels as a ClientMessage, which no event mask
@@ -375,7 +401,11 @@ bool X11WindowHost::poll_one(Event& out) noexcept {
                                                  .size = base::SizeI{.w = width_, .h = height_},
                                              });
                 if (!owned.is_empty()) {
+                    // A repair leaves at once, its own flush included: the
+                    // screen is missing pixels right now, batching would only
+                    // prolong the hole.
                     put_region(owned);
+                    XFlush(display_);
                 }
                 continue;
             }

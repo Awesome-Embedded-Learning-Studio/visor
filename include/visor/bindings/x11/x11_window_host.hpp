@@ -3,6 +3,7 @@
 #include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
+#include "visor/bindings/submit_plan.hpp"
 
 #include <X11/Xlib.h>
 
@@ -17,12 +18,15 @@ namespace visor::host::x11 {
  *
  * open() connects a display, creates a canvas-sized window and returns a host
  * whose table talks to it. flush paints each region into a shadow frame (the
- * canvas packing) and XPutImage's it to the window, so an Expose replays the
- * shadow without the core repainting anything: the host is the screen's
- * memory, same stance as the offscreen double. poll_event drains the X queue:
- * pointer and key words go through the B20 translation, Expose replays the
- * shadow, and the window manager's close request turns into close_requested()
- * instead of an event. clock_ms counts steady milliseconds.
+ * canvas packing) and hands its rectangle to a submission plan; the puts go
+ * out when the next poll drains the plan, so a strip rebuild's five bands
+ * leave as one batched flight behind a single flush. The shadow is what an
+ * Expose replays without the core repainting anything: the host is the
+ * screen's memory, same stance as the offscreen double. poll_event drains the
+ * X queue: pointer and key words go through the B20 translation, Expose
+ * repaints from the shadow at once (a repair is not a batch), and the window
+ * manager's close request turns into close_requested() instead of an event.
+ * clock_ms counts steady milliseconds.
  *
  * open() failing is a returned empty optional, never a crash: a missing
  * display is an answer, not an emergency. The window is pinned to the
@@ -69,6 +73,11 @@ class X11WindowHost {
     /// rectangle leaving the window. Same refusal line as the offscreen host.
     [[nodiscard]] int rejected_count() const noexcept;
 
+    /// Rectangles sitting in the submission plan, waiting for the poll that
+    /// drains them. A judgment's probe for the batching: five strips in, one
+    /// merged rectangle pending.
+    [[nodiscard]] int pending_submissions() const noexcept;
+
     /// The X window id, for judgments and tools that read the screen back.
     [[nodiscard]] Window window() const noexcept;
 
@@ -87,6 +96,7 @@ class X11WindowHost {
     bool poll_one(Event& out) noexcept;
     void paint_shadow(const FlushRegion& region) noexcept;
     void put_region(base::RectI area) noexcept;
+    void drain_submissions() noexcept;
     [[nodiscard]] std::uint32_t canvas_pixel_word(const std::uint8_t* row,
                                                   std::size_t x) const noexcept;
     void release() noexcept;
@@ -110,6 +120,7 @@ class X11WindowHost {
     int rejected_count_ = 0;
     std::vector<std::uint8_t> shadow_;    // the screen's memory, format_ packing
     std::vector<std::uint32_t> expanded_; // one region's worth of 32bpp words
+    SubmitPlan plan_;                     // the batch between regions and puts
 };
 
 } // namespace visor::host::x11

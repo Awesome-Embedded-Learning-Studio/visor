@@ -29,6 +29,7 @@ void run_smoke_tests();
 void run_text_tests();
 void run_theme_tests();
 void run_ssd1306_tests();
+void run_submit_plan_tests();
 void run_utf8_tests();
 void run_widget_tests();
 void run_wayland_host_tests();

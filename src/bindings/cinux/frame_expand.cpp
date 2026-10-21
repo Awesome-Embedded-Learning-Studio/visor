@@ -8,6 +8,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/canvas/pixel_convert.hpp"
 #include "visor/canvas/pixel_traits.hpp"
 
 namespace visor::host::cinux {
@@ -33,6 +34,28 @@ void expand_region(const FrameTarget& target, base::RectI rect, const std::uint8
             const bool lit =
                 word.has(base::bit::mask_bit<std::uint8_t>(canvas::pixel_bit_position(region_x)));
             dst_row[x] = lit ? on : off;
+        }
+    }
+}
+
+void expand_region_rgb565(const FrameTarget& target, base::RectI rect, const std::uint8_t* rgb565,
+                          std::size_t stride_bytes) noexcept {
+    if (target.pixels == nullptr || rgb565 == nullptr || rect.is_empty()) {
+        return;
+    }
+    // The same clip the mono direction takes; the region's own pixels stay
+    // indexed by region coordinates either way.
+    const int x0 = std::max(rect.pos.x, 0);
+    const int y0 = std::max(rect.pos.y, 0);
+    const int x1 = std::min(rect.pos.x + rect.size.w, target.width);
+    const int y1 = std::min(rect.pos.y + rect.size.h, target.height);
+    for (int y = y0; y < y1; ++y) {
+        const std::uint8_t* src_row =
+            rgb565 + (static_cast<std::size_t>(y - rect.pos.y) * stride_bytes);
+        std::uint32_t* dst_row = target.pixels + (static_cast<std::size_t>(y) * target.pitch_px);
+        for (int x = x0; x < x1; ++x) {
+            const auto region_x = static_cast<std::size_t>(x - rect.pos.x);
+            dst_row[x] = canvas::rgb565_to_xrgb8888(canvas::Rgb565Traits::load(src_row, region_x));
         }
     }
 }

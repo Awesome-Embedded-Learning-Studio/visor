@@ -46,4 +46,19 @@ struct FrameTarget {
 void expand_region(const FrameTarget& target, base::RectI rect, const std::uint8_t* mono,
                    std::size_t mono_stride_bytes, std::uint32_t on, std::uint32_t off) noexcept;
 
+/**
+ * @brief Expands one RGB565 region into the XRGB8888 frame, pure logic.
+ *
+ * The flipped direction for a core that renders in RGB565: the source rows
+ * carry real 16-bit color (low byte first, the traits' packing) and the
+ * frame wants 32-bit words, so the expansion widens each pixel through
+ * canvas::rgb565_to_xrgb8888 -- the same bit-copies the pixel chapter judged
+ * over all 65536 values. There is no on/off pair to choose, because the
+ * source says the color itself. rect is in frame coordinates; rgb565 points
+ * at the region's own first byte, stride_bytes apart. Parts of rect outside
+ * the frame clip silently, the pen's stance, same as the mono direction.
+ */
+void expand_region_rgb565(const FrameTarget& target, base::RectI rect, const std::uint8_t* rgb565,
+                          std::size_t stride_bytes) noexcept;
+
 } // namespace visor::host::cinux

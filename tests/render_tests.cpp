@@ -647,4 +647,83 @@ void run_render_tests() {
                        visor::canvas::Rgb565Traits::from_ink(visor::ui::kColorTheme.foreground));
         VISOR_CHECK_EQ(banded.get_pixel(PointI{130, 50}), 0U); // the hole's black
     }
+
+    // The third configuration: SwapCanvas trades its two full-frame stores
+    // between rounds, and the vocabulary is Canvas's own -- the same
+    // render_strips drives it without knowing. Two full rebuilds with a swap
+    // between them land pixel-identical to the integral reference, because a
+    // full rebuild repaints every pixel whichever store is the back one. The
+    // markers go dark on the lit ground so the two states differ visibly,
+    // and after the second swap the back store must hold the opening state:
+    // that is the alternation itself, not just a second full repaint landing
+    // on the same store.
+    {
+        GateScene scene{&visor::ui::kLightTheme};
+        scene.tail_dot.fill = visor::canvas::ColorRole::Background;
+        scene.head_dot.fill = visor::canvas::ColorRole::Background;
+        scene.tail_dot.set_visible(true);
+        using Swap = visor::canvas::SwapCanvas<kScreenSize>;
+        visor::host::OffscreenHost swapped(kScreen, kScreen);
+        Swap buffers;
+        buffers.set_clear(false);
+        visor::ui::render_strips(scene.root, buffers, kScreenSize, swapped.table());
+        buffers.swap();
+        scene.tail_dot.set_visible(false);
+        scene.head_dot.set_visible(true);
+        visor::ui::render_strips(scene.root, buffers, kScreenSize, swapped.table());
+        buffers.swap();
+        // The reference renders the tree as it stands after the flip, the
+        // state the second rebuild painted.
+        visor::host::OffscreenHost integral(kScreen, kScreen);
+        Canvas<SizeI{.w = kScreen, .h = kScreen}> frame;
+        frame.set_clear(false);
+        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
+        compare_hosts(integral, swapped, kScreen, kScreen);
+        // The back store now holds the opening state (round one's): its tail
+        // pixel is the dark marker, its head pixel plain lit ground.
+        VISOR_CHECK(!buffers.get(PointI{13, 18}));
+        VISOR_CHECK(buffers.get(PointI{3, 3}));
+    }
+
+    // The swap across strip rounds: a strip-shaped swap canvas carries two
+    // strips, and complete rounds alternate them. Each round renders its
+    // three windows into the back strip and submits them; swap trades the
+    // strips, so the front always holds the previous complete round and a
+    // scanning host would read one whole round back, never a partial frame.
+    // The probe reads the strip's own coordinates: after the second round
+    // and its swap, the back strip must still carry round one's rendering --
+    // its tail-window rows hold the dark marker -- where the strip a
+    // no-op swap would have left holds round two's lit ground. That is the
+    // alternation itself, not a second round landing on the same strip.
+    {
+        GateScene scene{&visor::ui::kLightTheme};
+        // Mono folds Accent and Border to lit, invisible on the lit ground;
+        // this segment's marker goes dark so one pixel can tell the rounds
+        // apart.
+        scene.tail_dot.fill = visor::canvas::ColorRole::Background;
+        scene.tail_dot.set_visible(true);
+
+        using SwapStrip = visor::canvas::SwapCanvas<SizeI{.w = kScreen, .h = 8}>;
+        visor::host::OffscreenHost swapped(kScreen, kScreen);
+        SwapStrip buffers;
+        buffers.set_clear(false);
+        visor::ui::render_strips(scene.root, buffers, kScreenSize, swapped.table());
+        buffers.swap();
+
+        scene.tail_dot.set_visible(false);
+        visor::ui::render_strips(scene.root, buffers, kScreenSize, swapped.table());
+        buffers.swap();
+
+        // The reference renders the tree as it stands after the change, the
+        // state the second round painted.
+        visor::host::OffscreenHost integral(kScreen, kScreen);
+        Canvas<SizeI{.w = kScreen, .h = kScreen}> frame;
+        frame.set_clear(false);
+        visor::ui::render_window(scene.root, frame, kWholeScreen, integral.table());
+        compare_hosts(integral, swapped, kScreen, kScreen);
+        // Strip coordinates: the tail window is the round's last, its scene
+        // row 18 living at strip row 2. Round one put the dark marker there;
+        // round two's strip (now up front) holds lit ground instead.
+        VISOR_CHECK(!buffers.get(PointI{13, 2}));
+    }
 }

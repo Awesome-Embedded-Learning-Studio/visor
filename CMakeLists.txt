@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(visor LANGUAGES CXX VERSION 0.1.0)
+project(visor LANGUAGES C CXX VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,7 +19,13 @@ if(VISOR_SANITIZE AND VISOR_TSAN)
     message(FATAL_ERROR "VISOR_SANITIZE 与 VISOR_TSAN 互斥：分目录构建，各自只开一个")
 endif()
 
-add_compile_options(-fno-exceptions -fno-rtti -fno-threadsafe-statics -Wall -Wextra -Werror)
+# The no-rtti trio is C++'s own; the scanner-generated protocol C must not
+# receive it, so the trio rides a language generator while the warning line
+# keeps covering both languages.
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
+                    $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
+                    $<$<COMPILE_LANGUAGE:CXX>:-fno-threadsafe-statics>)
+add_compile_options(-Wall -Wextra -Werror)
 
 if(VISOR_SANITIZE)
     add_compile_options(-fsanitize=address,undefined)
@@ -68,6 +74,45 @@ add_library(visor.host.x11 STATIC src/bindings/x11/event_wire.cpp
                                     src/bindings/x11/x11_window_host.cpp)
 find_package(X11 REQUIRED)
 target_link_libraries(visor.host.x11 PUBLIC visor.core X11::X11)
+# The Wayland binding: the window half speaks the client protocol through the
+# system libwayland (a system library, the X11 tier's own stance), and the
+# xdg-shell half is generated from the system's protocol XML by the system's
+# wayland-scanner -- nothing is vendored, the same line the X11 tier drew.
+find_package(PkgConfig REQUIRED)
+# The listener tables name the pointer's warp member, which only a 1.26-era
+# libwayland knows; older headers fail at compile time, so the floor is said
+# here instead.
+pkg_check_modules(VISOR_WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client>=1.26)
+pkg_check_modules(VISOR_WAYLAND_PROTOCOLS REQUIRED wayland-protocols)
+pkg_get_variable(VISOR_WAYLAND_PROTOCOLS_DATADIR wayland-protocols pkgdatadir)
+# Some distributions keep wayland-scanner beside libwayland in sbin, which
+# find_program does not search by default, so the package prefix hints it.
+find_program(VISOR_WAYLAND_SCANNER NAMES wayland-scanner REQUIRED
+             HINTS "${VISOR_WAYLAND_CLIENT_PREFIX}/bin" "${VISOR_WAYLAND_CLIENT_PREFIX}/../sbin"
+                   "${VISOR_WAYLAND_CLIENT_PREFIX}/sbin")
+set(VISOR_WAYLAND_GEN ${CMAKE_CURRENT_BINARY_DIR}/generated/wayland)
+add_custom_command(
+    OUTPUT ${VISOR_WAYLAND_GEN}/xdg-shell-protocol.c
+           ${VISOR_WAYLAND_GEN}/xdg-shell-client-protocol.h
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${VISOR_WAYLAND_GEN}
+    COMMAND ${VISOR_WAYLAND_SCANNER} client-header
+            ${VISOR_WAYLAND_PROTOCOLS_DATADIR}/stable/xdg-shell/xdg-shell.xml
+            ${VISOR_WAYLAND_GEN}/xdg-shell-client-protocol.h
+    COMMAND ${VISOR_WAYLAND_SCANNER} private-code
+            ${VISOR_WAYLAND_PROTOCOLS_DATADIR}/stable/xdg-shell/xdg-shell.xml
+            ${VISOR_WAYLAND_GEN}/xdg-shell-protocol.c
+    DEPENDS ${VISOR_WAYLAND_PROTOCOLS_DATADIR}/stable/xdg-shell/xdg-shell.xml
+    COMMENT "wayland-scanner 生成 xdg-shell 客户端代码"
+    VERBATIM)
+set_source_files_properties(${VISOR_WAYLAND_GEN}/xdg-shell-protocol.c PROPERTIES LANGUAGE C)
+add_library(visor.host.wayland STATIC src/bindings/wayland/event_wire.cpp
+                                      src/bindings/wayland/wayland_window_host.cpp
+                                      ${VISOR_WAYLAND_GEN}/xdg-shell-protocol.c)
+# The scanner's output is a generated guest, not house code: a SYSTEM include
+# keeps clang-tidy and clang-format from reading it as visor's own.
+target_include_directories(visor.host.wayland SYSTEM PRIVATE ${VISOR_WAYLAND_GEN})
+target_compile_definitions(visor.host.wayland PRIVATE _GNU_SOURCE) # memfd_create
+target_link_libraries(visor.host.wayland PUBLIC visor.core PRIVATE PkgConfig::VISOR_WAYLAND_CLIENT)
 add_library(
     visor.ui STATIC
     src/ui/widgets/widget.cpp

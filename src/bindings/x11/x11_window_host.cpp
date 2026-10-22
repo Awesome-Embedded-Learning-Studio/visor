@@ -244,10 +244,15 @@ void X11WindowHost::paint_shadow(const FlushRegion& region) noexcept {
     }
     // Pixel-by-pixel, MSB-first, the canvas's own packing. The per-byte fast
     // path lives in the offscreen host; a second shopper is when it moves out.
+    // pixels already points at the region's leading byte (the FlushRegion
+    // contract), so the row walk starts there; the column index subtracts the
+    // region's own leading byte to name the source byte for a global x. The
+    // walk used to hop past the leading byte a second time, which every
+    // judgment survived only because their regions began inside byte zero.
     const std::size_t first_src_byte = static_cast<std::size_t>(region.rect.pos.x) / 8;
     for (int row = 0; row < region.rect.size.h; ++row) {
         const std::uint8_t* src =
-            region.pixels + (static_cast<std::size_t>(row) * region.stride_bytes) + first_src_byte;
+            region.pixels + (static_cast<std::size_t>(row) * region.stride_bytes);
         std::uint8_t* dst =
             shadow_.data() + (static_cast<std::size_t>(region.rect.pos.y + row) * dst_stride);
         for (int col = 0; col < region.rect.size.w; ++col) {

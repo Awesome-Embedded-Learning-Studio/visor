@@ -2,6 +2,10 @@
 add_executable(x11_window x11_window.cpp)
 target_link_libraries(x11_window PRIVATE visor.host.x11 visor.host visor.ui)
 
+# The Wayland eyeball lane: the same idea on the second real host.
+add_executable(wayland_window wayland_window.cpp)
+target_link_libraries(wayland_window PRIVATE visor.host.wayland visor.host)
+
 # The live signal lab: the same window host, an animated scene, and a
 # headless self-test so the frame loop has a judgment of its own.
 add_executable(signal signal.cpp)

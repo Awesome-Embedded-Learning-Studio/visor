@@ -199,6 +199,34 @@ void run_x11_host_tests() {
         VISOR_CHECK_EQ(host->flush_count(), 2);
     }
 
+    // A region whose leading byte offset is nonzero (x=16): the source walk
+    // starts at the region's own first byte, and a second hop past it would
+    // paint the neighbors' bits into the hole.
+    {
+        Frame frame;
+        frame.set_clear(false);
+        const visor::draw::Pen on_pen{frame, true};
+        on_pen.fill({.pos = PointI{0, 0}, .size = {.w = kWidth, .h = kHeight}});
+        auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight);
+        VISOR_CHECK(host.has_value());
+        if (!host.has_value()) {
+            return;
+        }
+        VISOR_CHECK(host->table().submit_frame(frame));
+        XSync(screen.display(), False);
+
+        const visor::base::RectI region{.pos = PointI{16, 8}, .size = {.w = 33, .h = 20}};
+        const visor::draw::Pen off_pen{frame, false};
+        off_pen.fill(region);
+        const std::uint8_t* region_pixels =
+            frame.pixels().data() + (static_cast<std::size_t>(region.pos.y) * Frame::kStrideBytes) +
+            (static_cast<std::size_t>(region.pos.x) / 8);
+        VISOR_CHECK(host->table().submit_region(region, region_pixels, Frame::kStrideBytes));
+        XSync(screen.display(), False);
+        compare_readback(screen.display(), host->window(), frame);
+        VISOR_CHECK_EQ(host->flush_count(), 2);
+    }
+
     // A color window: an RGB565 frame is widened to the visual's channels on
     // the way out, so white reads back as every channel bit and pure red as the
     // red mask alone. The masks come from the shot, not from a guess about this

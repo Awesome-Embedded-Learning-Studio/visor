@@ -269,7 +269,6 @@ void run_x11_host_tests() {
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame);
     }
-    }
 
     // A color window: an RGB565 frame is widened to the visual's channels on
     // the way out, so white reads back as every channel bit and pure red as the

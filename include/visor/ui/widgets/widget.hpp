@@ -5,7 +5,8 @@
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
-#include "visor/bindings/events.hpp"
+#include "visor/bindings/events/modifiers.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 #include "visor/ui/dirty_regions.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/theme.hpp"

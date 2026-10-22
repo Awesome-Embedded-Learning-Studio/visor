@@ -1,6 +1,7 @@
 #include "cases.hpp"
 #include "testing.hpp"
-#include "visor/bindings/events.hpp"
+#include "visor/bindings/events/key_words.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 #include "visor/bindings/x11/event_wire.hpp"
 
 #include <array>

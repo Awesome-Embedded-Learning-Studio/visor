@@ -3,7 +3,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
-#include "visor/bindings/events.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
 #include "visor/canvas/canvas.hpp"
 #include "visor/ui/input_router.hpp"

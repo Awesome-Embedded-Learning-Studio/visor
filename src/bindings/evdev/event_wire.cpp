@@ -8,6 +8,8 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/events/key_words.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 
 namespace visor::host::evdev {
 namespace {

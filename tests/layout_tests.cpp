@@ -5,7 +5,8 @@
 #include "visor/base/geometry/size.hpp"
 #include <cstddef>
 
-#include "visor/bindings/events.hpp"
+#include "visor/bindings/events/key_words.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
 #include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"

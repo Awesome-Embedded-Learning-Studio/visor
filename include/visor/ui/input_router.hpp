@@ -2,6 +2,8 @@
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/events/modifiers.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 #include "visor/ui/widgets/widget.hpp"
 
 namespace visor::ui {

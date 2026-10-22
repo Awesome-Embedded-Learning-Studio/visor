@@ -24,6 +24,9 @@
 #include "visor/bindings/display.hpp"
 #include "visor/bindings/evdev/event_wire.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/events/key_words.hpp"
+#include "visor/bindings/events/modifiers.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
@@ -119,7 +122,9 @@ bool exercise_canvas_family() {
                                       RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 4, .h = 1}},
                                       mono.data(), 1, 0xffffffffU, 0xff000000U);
     ok = frame[0] == 0xffffffffU && ok;
-    const std::array<std::uint8_t, 8> color{0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00};
+    // Little endian, low byte first: white leads so frame[0] answers the
+    // assertion below, black follows at frame[1].
+    const std::array<std::uint8_t, 8> color{0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     visor::host::cinux::expand_region_rgb565(
         target, RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 4, .h = 1}}, color.data(), 8);
     ok = frame[0] == 0xffffffffU && ok;

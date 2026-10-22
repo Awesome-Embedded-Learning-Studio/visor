@@ -5,6 +5,9 @@
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/evdev/event_wire.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/events/key_words.hpp"
+#include "visor/bindings/events/modifiers.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 
 #include <array>
 #include <cstdint>

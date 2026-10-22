@@ -6,6 +6,7 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/events/key_words.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/dirty_regions.hpp"

@@ -5,6 +5,8 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/events/modifiers.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/draw/mono_bitmap.hpp"
 #include "visor/ui/dirty_regions.hpp"

@@ -5,6 +5,8 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/events/modifiers.hpp"
+#include "visor/bindings/events/pointer_words.hpp"
 #include "visor/ui/input_router.hpp"
 #include "visor/ui/painter.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"

@@ -4,7 +4,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/bindings/display.hpp"
-#include "visor/bindings/events.hpp"
+#include "visor/bindings/events/modifiers.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/bindings/wayland/key_repeat.hpp"
 

@@ -5,6 +5,7 @@
 
 #include "visor/base/geometry/point.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/events/modifiers.hpp"
 
 namespace visor::host::wayland {
 

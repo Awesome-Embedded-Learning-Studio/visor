@@ -3,6 +3,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/wayland/event_wire.hpp"
+#include "visor/bindings/wayland/key_repeat.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -39,6 +40,94 @@ std::uint32_t key_code(const std::optional<Event>& word) {
 
 void run_wayland_tests() {
     using visor::base::PointI;
+    using visor::host::wayland::KeyRepeat;
+
+    // Backspace repeats only after the compositor's delay, then at its rate.
+    {
+        KeyRepeat repeat;
+        repeat.configure(25, 400, 0);
+        repeat.key(14, true, true, 100'000);
+        VISOR_CHECK(!repeat.poll(499'999).has_value());
+        VISOR_CHECK_EQ(repeat.poll(500'000), 14U);
+        VISOR_CHECK(!repeat.poll(500'000).has_value());
+        VISOR_CHECK(!repeat.poll(539'999).has_value());
+        VISOR_CHECK_EQ(repeat.poll(540'000), 14U);
+        repeat.key(14, false, true, 550'000);
+        VISOR_CHECK(!repeat.poll(1'000'000).has_value());
+    }
+
+    // The last repeatable press owns the timer. Other releases and modifier
+    // presses leave it alone; releasing its owner does not resume an old key.
+    {
+        KeyRepeat repeat;
+        repeat.configure(20, 50, 0);
+        repeat.key(30, true, true, 0);
+        repeat.key(48, true, true, 20'000);
+        repeat.key(30, false, true, 30'000);
+        repeat.key(42, true, false, 40'000);
+        VISOR_CHECK(!repeat.poll(69'999).has_value());
+        VISOR_CHECK_EQ(repeat.poll(70'000), 48U);
+        repeat.key(48, false, true, 80'000);
+        VISOR_CHECK(!repeat.poll(200'000).has_value());
+    }
+
+    // A stalled application emits one repeat on waking, keeping its cadence
+    // without flooding the queue with every interval it missed.
+    {
+        KeyRepeat repeat;
+        repeat.configure(25, 0, 0);
+        repeat.key(30, true, true, 1'000'000);
+        VISOR_CHECK_EQ(repeat.poll(1'210'000), 30U);
+        VISOR_CHECK(!repeat.poll(1'210'000).has_value());
+        VISOR_CHECK(!repeat.poll(1'239'999).has_value());
+        VISOR_CHECK_EQ(repeat.poll(1'240'000), 30U);
+    }
+
+    // Focus loss and keyboard removal both cancel the pending press. A
+    // modifier or lock key alone never starts repetition.
+    {
+        KeyRepeat repeat;
+        repeat.key(14, true, true, 0);
+        repeat.cancel();
+        VISOR_CHECK(!repeat.poll(1'000'000).has_value());
+        repeat.key(42, true, false, 1'000'000);
+        VISOR_CHECK(!repeat.poll(2'000'000).has_value());
+        repeat.key(14, true, true, 2'000'000);
+        repeat.cancel();
+        VISOR_CHECK(!repeat.poll(3'000'000).has_value());
+    }
+
+    // A zero rate disables both the current repeat and future presses.
+    // Re-enabling requires a fresh press, so an old held key cannot revive.
+    {
+        KeyRepeat repeat;
+        repeat.key(14, true, true, 0);
+        repeat.configure(0, 400, 100'000);
+        VISOR_CHECK(!repeat.poll(1'000'000).has_value());
+        repeat.key(30, true, true, 1'000'000);
+        VISOR_CHECK(!repeat.poll(2'000'000).has_value());
+        repeat.configure(25, 400, 2'000'000);
+        VISOR_CHECK(!repeat.poll(3'000'000).has_value());
+        repeat.key(30, true, true, 3'000'000);
+        VISOR_CHECK_EQ(repeat.poll(3'400'000), 30U);
+    }
+
+    // A repeat_info update while held restarts the delay using the new
+    // settings. Invalid settings safely disable repetition.
+    {
+        KeyRepeat repeat;
+        repeat.configure(25, 400, 0);
+        repeat.key(14, true, true, 0);
+        repeat.configure(10, 100, 200'000);
+        VISOR_CHECK(!repeat.poll(299'999).has_value());
+        VISOR_CHECK_EQ(repeat.poll(300'000), 14U);
+        VISOR_CHECK_EQ(repeat.poll(400'000), 14U);
+        repeat.configure(-1, 100, 400'000);
+        VISOR_CHECK(!repeat.poll(1'000'000).has_value());
+        repeat.configure(25, -1, 1'000'000);
+        repeat.key(14, true, true, 1'000'000);
+        VISOR_CHECK(!repeat.poll(2'000'000).has_value());
+    }
 
     // The mask halves: each named bit lights its own flag and none other,
     // and the lock and numeric bits light nothing.

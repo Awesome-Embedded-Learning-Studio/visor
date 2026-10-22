@@ -7,6 +7,7 @@
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
 #include "visor/bindings/wayland/event_wire.hpp"
+#include "visor/bindings/wayland/key_repeat.hpp"
 #include "visor/canvas/pixel_convert.hpp"
 #include "visor/canvas/pixel_traits.hpp"
 
@@ -16,6 +17,7 @@
 
 #include "xdg-shell-client-protocol.h"
 
+#include <linux/input-event-codes.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -63,6 +65,34 @@ constexpr timespec kWaitSlice{.tv_sec = 0, .tv_nsec = 10'000'000};
 
 [[nodiscard]] std::uint32_t bind_version(std::uint32_t advertised, std::uint32_t wanted) noexcept {
     return advertised < wanted ? advertised : wanted;
+}
+
+[[nodiscard]] std::uint64_t monotonic_us() noexcept {
+    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                          std::chrono::steady_clock::now().time_since_epoch())
+                                          .count());
+}
+
+// This host deliberately keeps raw evdev semantics instead of interpreting
+// the keymap. Modifier and lock keys change state once; editing keys repeat.
+[[nodiscard]] bool key_repeats(std::uint32_t key) noexcept {
+    switch (key) {
+        case KEY_LEFTSHIFT:
+        case KEY_RIGHTSHIFT:
+        case KEY_LEFTCTRL:
+        case KEY_RIGHTCTRL:
+        case KEY_LEFTALT:
+        case KEY_RIGHTALT:
+        case KEY_LEFTMETA:
+        case KEY_RIGHTMETA:
+        case KEY_CAPSLOCK:
+        case KEY_NUMLOCK:
+        case KEY_SCROLLLOCK:
+        case KEY_COMPOSE:
+            return false;
+        default:
+            return true;
+    }
 }
 
 } // namespace
@@ -173,6 +203,7 @@ struct WaylandWindowHost::Wiring {
             host->keyboard_ = wl_seat_get_keyboard(seat);
             wl_keyboard_add_listener(host->keyboard_, &kKeyboard, host);
         } else if (!keyboard && host->keyboard_ != nullptr) {
+            host->key_repeat_.cancel();
             wl_keyboard_release(host->keyboard_);
             host->keyboard_ = nullptr;
         }
@@ -282,16 +313,22 @@ struct WaylandWindowHost::Wiring {
         // from its own words; nothing to hand over.
     }
 
-    static void keyboard_leave([[maybe_unused]] void* data, [[maybe_unused]] wl_keyboard* keyboard,
+    static void keyboard_leave(void* data, [[maybe_unused]] wl_keyboard* keyboard,
                                [[maybe_unused]] std::uint32_t serial,
-                               [[maybe_unused]] wl_surface* surface) noexcept {}
+                               [[maybe_unused]] wl_surface* surface) noexcept {
+        auto* host = static_cast<WaylandWindowHost*>(data);
+        host->key_repeat_.cancel();
+        host->modifiers_ = {};
+    }
 
     static void keyboard_key(void* data, [[maybe_unused]] wl_keyboard* keyboard,
                              [[maybe_unused]] std::uint32_t serial,
                              [[maybe_unused]] std::uint32_t time, std::uint32_t key,
                              std::uint32_t state) noexcept {
         auto* host = static_cast<WaylandWindowHost*>(data);
-        offer(*host, translate_key(key, state == WL_KEYBOARD_KEY_STATE_PRESSED, host->modifiers_));
+        const bool pressed = state == WL_KEYBOARD_KEY_STATE_PRESSED;
+        host->key_repeat_.key(key, pressed, key_repeats(key), monotonic_us());
+        offer(*host, translate_key(key, pressed, host->modifiers_));
     }
 
     static void keyboard_modifiers(void* data, [[maybe_unused]] wl_keyboard* keyboard,
@@ -304,11 +341,9 @@ struct WaylandWindowHost::Wiring {
         static_cast<WaylandWindowHost*>(data)->modifiers_ = translate_modifiers(depressed);
     }
 
-    static void keyboard_repeat([[maybe_unused]] void* data, [[maybe_unused]] wl_keyboard* keyboard,
-                                [[maybe_unused]] std::int32_t rate,
-                                [[maybe_unused]] std::int32_t delay) noexcept {
-        // Auto-repeat is the core's layer to grow later (the evdev line
-        // again); the host lets the compositor's settings pass by.
+    static void keyboard_repeat(void* data, [[maybe_unused]] wl_keyboard* keyboard,
+                                std::int32_t rate, std::int32_t delay) noexcept {
+        static_cast<WaylandWindowHost*>(data)->key_repeat_.configure(rate, delay, monotonic_us());
     }
 
     static const wl_registry_listener kRegistry;
@@ -510,6 +545,7 @@ WaylandWindowHost& WaylandWindowHost::operator=(WaylandWindowHost&& other) noexc
         format_ = other.format_;
         pointer_pos_ = other.pointer_pos_;
         modifiers_ = other.modifiers_;
+        key_repeat_ = std::exchange(other.key_repeat_, KeyRepeat{});
         pending_wheel_dx_ = other.pending_wheel_dx_;
         pending_wheel_dy_ = other.pending_wheel_dy_;
         configured_ = other.configured_;
@@ -580,6 +616,7 @@ void WaylandWindowHost::rewire() noexcept {
 }
 
 void WaylandWindowHost::release() noexcept {
+    key_repeat_.cancel();
     if (display_ == nullptr) {
         return;
     }
@@ -866,8 +903,22 @@ bool WaylandWindowHost::poll_one(Event& out) noexcept {
     // again. The zero timeout reads whatever has arrived and hands it over
     // without waiting, so poll keeps its non-blocking word.
     constexpr timespec nowait{.tv_sec = 0, .tv_nsec = 0};
-    wl_display_dispatch_timeout(display_, &nowait);
-    return feed_.pop(out);
+    if (wl_display_dispatch_timeout(display_, &nowait) < 0) {
+        key_repeat_.cancel();
+        return false;
+    }
+    if (feed_.pop(out)) {
+        return true;
+    }
+    if (!close_requested_) {
+        if (const auto key = key_repeat_.poll(monotonic_us())) {
+            if (const auto event = translate_key(*key, true, modifiers_)) {
+                out = *event;
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void WaylandWindowHost::flush_thunk(void* context, const FlushRegion& region) noexcept {

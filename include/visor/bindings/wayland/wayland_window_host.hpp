@@ -6,6 +6,7 @@
 #include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
 #include "visor/bindings/host.hpp"
+#include "visor/bindings/wayland/key_repeat.hpp"
 
 #include <array>
 #include <cstddef>
@@ -48,7 +49,9 @@ namespace visor::host::wayland {
  * pointer and key words go through the evdev-line translation, the wheel
  * accumulates its discrete steps until the pointer's frame word closes the
  * group, and the toplevel's close word turns into close_requested() instead
- * of an event. clock_ms counts steady milliseconds.
+ * of an event. Held keys repeat at the compositor's rate and delay while
+ * polling, until release or keyboard focus loss. clock_ms counts steady
+ * milliseconds.
  *
  * open() failing is a returned empty optional, never a crash: a missing
  * display is an answer, not an emergency. The window is pinned to the scaled
@@ -177,6 +180,7 @@ class WaylandWindowHost {
     PixelFormat format_ = PixelFormat::Mono1;
     base::PointI pointer_pos_;
     host::Modifiers modifiers_{};
+    KeyRepeat key_repeat_;
     int pending_wheel_dx_ = 0;
     int pending_wheel_dy_ = 0;
     bool configured_ = false; // the compositor answered the first configure

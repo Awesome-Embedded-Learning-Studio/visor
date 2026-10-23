@@ -48,6 +48,9 @@ class NullPainter final : public visor::ui::Painter {
                      [[maybe_unused]] const visor::draw::MonoBitmap& source,
                      [[maybe_unused]] visor::canvas::ColorRole ink,
                      [[maybe_unused]] int scale) const noexcept override {}
+    void draw_image([[maybe_unused]] PointI at, [[maybe_unused]] const std::uint32_t* words,
+                    [[maybe_unused]] int width, [[maybe_unused]] int height,
+                    [[maybe_unused]] std::size_t stride_words) const noexcept override {}
     void
     fill_rounded([[maybe_unused]] RectI area, [[maybe_unused]] visor::canvas::ColorRole ink,
                  [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {}

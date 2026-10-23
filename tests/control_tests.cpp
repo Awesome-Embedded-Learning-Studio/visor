@@ -32,6 +32,11 @@ class RecordingPainter final : public visor::ui::Painter {
         visor::base::PointI at;
         int scale = 1;
     };
+    struct ImageDrawn {
+        visor::base::PointI at;
+        int w = 0;
+        int h = 0;
+    };
 
     void fill([[maybe_unused]] visor::base::RectI area,
               [[maybe_unused]] visor::canvas::ColorRole ink) const noexcept override {}
@@ -41,6 +46,10 @@ class RecordingPainter final : public visor::ui::Painter {
                      [[maybe_unused]] visor::canvas::ColorRole ink,
                      int scale) const noexcept override {
         bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
+    }
+    void draw_image(visor::base::PointI at, [[maybe_unused]] const std::uint32_t* words, int width,
+                    int height, [[maybe_unused]] std::size_t stride_words) const noexcept override {
+        images_.push_back(ImageDrawn{.at = at, .w = width, .h = height});
     }
 
     void
@@ -52,6 +61,7 @@ class RecordingPainter final : public visor::ui::Painter {
 
   private:
     mutable std::vector<BitmapDrawn> bitmaps_;
+    mutable std::vector<ImageDrawn> images_;
 };
 
 // A two-glyph font in the generated-header shape: 'a' is a solid 2x4 block,

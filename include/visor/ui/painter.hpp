@@ -6,6 +6,9 @@
 #include "visor/draw/mono_bitmap.hpp"
 #include "visor/ui/theme.hpp"
 
+#include <cstddef>
+#include <cstdint>
+
 namespace visor::ui {
 
 /**
@@ -34,6 +37,15 @@ class Painter {
     /// keeps none.
     virtual void draw_bitmap(base::PointI at, const draw::MonoBitmap& source,
                              canvas::ColorRole role, int scale) const noexcept = 0;
+    /// Pastes a rectangle of XRGB8888 words (0xAARRGGBB values, stride_words
+    /// apart) at the given point: content imagery, not a role. Each source
+    /// word is its own ink, and the target's traits fold it -- a 565 canvas
+    /// quantizes the channels, a mono canvas takes the polarity (any
+    /// non-black word reads lit). Parts outside the frame clip silently.
+    /// This is the verb a windowed program's pixels arrive on: the words are
+    /// data handed over, never state shared with the painter.
+    virtual void draw_image(base::PointI at, const std::uint32_t* words, int width, int height,
+                            std::size_t stride_words) const noexcept = 0;
     /// Fills a rectangle with its corners rounded per radius: every row
     /// paints one span, the span's insets follow the corner discs (a pixel
     /// in a corner's zone stays dark when its corner point lies outside the

@@ -123,6 +123,35 @@ class CanvasPainter final : public Painter {
         }
     }
 
+    void draw_image(base::PointI at, const std::uint32_t* words, int width, int height,
+                    std::size_t stride_words) const noexcept override {
+        // Content imagery, not a role: each source word is its own ink, and
+        // the canvas's traits fold it. The rows walk inside the painter's
+        // own window, so a strip replay paints exactly its share of the
+        // image, and a word outside the window or the canvas never lands.
+        if (words == nullptr || width <= 0 || height <= 0) {
+            return;
+        }
+        const base::RectI image{
+            .pos = at,
+            .size = base::SizeI{.w = width, .h = height},
+        };
+        const base::RectI visible = base::intersect(image, window_);
+        for (int row = visible.pos.y; row < visible.pos.y + visible.size.h; ++row) {
+            const std::uint32_t* source =
+                words + ((static_cast<std::size_t>(row - at.y) * stride_words) +
+                         static_cast<std::size_t>(visible.pos.x - at.x));
+            for (int column = visible.pos.x; column < visible.pos.x + visible.size.w; ++column) {
+                const base::PointI buffer{
+                    column - window_.pos.x,
+                    row - window_.pos.y,
+                };
+                static_cast<void>(
+                    canvas_.set(buffer, CanvasT::Traits::from_ink(canvas::Ink{*source++})));
+            }
+        }
+    }
+
     void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::ColorRole role,
                      int scale) const noexcept override {
         // One lit source pixel is one scale x scale block, at the source

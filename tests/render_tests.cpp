@@ -1,4 +1,6 @@
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <print>
 
 #include "cases.hpp"
@@ -30,6 +32,8 @@ using visor::base::SizeI;
 using visor::canvas::Canvas;
 using visor::canvas::ColorRole;
 using visor::canvas::Ink;
+using visor::canvas::Rgb565Traits;
+using visor::canvas::Xrgb8888Traits;
 using visor::ui::DirtyRegions;
 using visor::ui::Rectangle;
 using visor::ui::Widget;
@@ -435,6 +439,68 @@ void run_render_tests() {
     VISOR_CHECK(tail_buffer.get(PointI{19, 3}) == true); // scene row 19
     VISOR_CHECK(tail_buffer.get(PointI{0, 4}) == false); // below the window
     VISOR_CHECK(tail_buffer.get(PointI{19, 7}) == false);
+
+    // The image verb, window half: a 6x6 XRGB8888 image pasted at (12, 12)
+    // against the same 10x10 window -- only its top-left 3x3 share is inside,
+    // so the buffer sees three rows of three words and nothing beyond. Each
+    // word is its own ink: on this mono canvas a red word folds to lit, a
+    // pure black word folds to unlit, in the same breath.
+    {
+        Canvas<SizeI{.w = 20, .h = 20}> image_buffer;
+        image_buffer.set_clear(false);
+        const visor::ui::CanvasPainter image_painter{
+            image_buffer, RectI{.pos = PointI{5, 5}, .size = SizeI{.w = 10, .h = 10}}};
+        constexpr std::array<std::uint32_t, 36> black_words{};
+        image_painter.draw_image(PointI{12, 12}, black_words.data(), 6, 6, 6);
+        VISOR_CHECK_EQ(image_buffer.get(PointI{7, 7}), false); // scene (12, 12), black word
+        constexpr std::array<std::uint32_t, 36> red_words{
+            0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000,
+            0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000,
+            0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000,
+            0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000,
+            0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000,
+            0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000, 0xffc00000,
+        };
+        image_painter.draw_image(PointI{12, 12}, red_words.data(), 6, 6, 6);
+        VISOR_CHECK_EQ(image_buffer.get(PointI{7, 7}), true);    // scene (12, 12), red word
+        VISOR_CHECK_EQ(image_buffer.get(PointI{9, 9}), true);    // scene (14, 14), last inside
+        VISOR_CHECK_EQ(image_buffer.get(PointI{10, 10}), false); // scene (15, 15), outside
+    }
+
+    // The image verb, folding half: the same words through each format's
+    // own traits -- the color targets keep their channels (565 quantized,
+    // XRGB8888 verbatim with alpha forced), and the mono target keeps only
+    // the polarity.
+    {
+        constexpr std::uint32_t red_word = 0xffc00000;
+        constexpr std::array<std::uint32_t, 4> picture{
+            red_word,
+            0xff000000,
+            0xffffffff,
+            red_word,
+        };
+        Canvas<SizeI{.w = 2, .h = 2}, Rgb565Traits> five;
+        const visor::ui::CanvasPainter five_painter{five};
+        five_painter.draw_image(PointI{0, 0}, picture.data(), 2, 2, 2);
+        VISOR_CHECK_EQ(five.get(PointI{0, 0}), Rgb565Traits::from_ink(Ink{red_word}));
+        VISOR_CHECK_EQ(five.get(PointI{1, 0}), Rgb565Traits::from_ink(Ink::black()));
+        VISOR_CHECK_EQ(five.get(PointI{0, 1}), Rgb565Traits::from_ink(Ink::white()));
+
+        Canvas<SizeI{.w = 2, .h = 2}, Xrgb8888Traits> deep;
+        const visor::ui::CanvasPainter deep_painter{deep};
+        deep_painter.draw_image(PointI{0, 0}, picture.data(), 2, 2, 2);
+        VISOR_CHECK_EQ(deep.get(PointI{0, 0}), red_word);
+        VISOR_CHECK_EQ(deep.get(PointI{1, 1}), red_word);
+        VISOR_CHECK_EQ(deep.get(PointI{1, 0}), 0xff000000U);
+
+        Canvas<SizeI{.w = 2, .h = 2}> mono;
+        mono.set_clear(false);
+        const visor::ui::CanvasPainter mono_painter{mono};
+        mono_painter.draw_image(PointI{0, 0}, picture.data(), 2, 2, 2);
+        VISOR_CHECK_EQ(mono.get(PointI{0, 0}), true);  // red is ink
+        VISOR_CHECK_EQ(mono.get(PointI{1, 0}), false); // black is not
+        VISOR_CHECK_EQ(mono.get(PointI{0, 1}), true);  // white is
+    }
 
     // The collector: overlapping pushes merge, disjoint ones stay separate.
     // Region order on file is not part of the contract, only coverage is.

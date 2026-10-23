@@ -153,8 +153,16 @@ file(GLOB_RECURSE VISOR_TIDY_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/examples/*.cpp)
 
 if(VISOR_CLANG_TIDY)
+    # The fan-out lives in run_tidy.sh: one clang-tidy process per file
+    # across every core, where a single process walks the whole list in
+    # series and pins one core for minutes. The list rides in a generated
+    # file (CMake lists are semicolon-joined, and embedding them in a
+    # shell string splits the command).
+    string(REPLACE ";" "\n" VISOR_TIDY_LINES "${VISOR_TIDY_SOURCES}")
+    file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/tidy_files.txt CONTENT "${VISOR_TIDY_LINES}\n")
     add_custom_target(visor.check-tidy
-        COMMAND ${VISOR_CLANG_TIDY} --quiet -p ${CMAKE_BINARY_DIR} ${VISOR_TIDY_SOURCES}
+        COMMAND /bin/sh ${CMAKE_SOURCE_DIR}/scripts/checks/run_tidy.sh
+                ${VISOR_CLANG_TIDY} ${CMAKE_BINARY_DIR} < ${CMAKE_BINARY_DIR}/tidy_files.txt
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "clang-tidy 静态检查")
 endif()

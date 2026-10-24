@@ -27,6 +27,7 @@ int main() {
     run_ring_queue_tests();
     run_run_loop_tests();
     run_smoke_tests();
+    run_spawn_tests();
     run_text_tests();
     run_theme_tests();
     run_ssd1306_tests();

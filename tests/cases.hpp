@@ -27,6 +27,7 @@ void run_render_tests();
 void run_ring_queue_tests();
 void run_run_loop_tests();
 void run_smoke_tests();
+void run_spawn_tests();
 void run_text_tests();
 void run_theme_tests();
 void run_ssd1306_tests();

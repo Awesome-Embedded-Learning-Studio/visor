@@ -54,6 +54,12 @@ add_library(visor.host STATIC src/bindings/host.cpp)
 target_link_libraries(visor.host PUBLIC visor.core)
 add_library(visor.host.offscreen STATIC src/bindings/offscreen/offscreen_host.cpp)
 target_link_libraries(visor.host.offscreen PUBLIC visor.host)
+# The fourth slot's POSIX filling: fork, gifts, whitelist, execve. A library
+# of its own because the birth words are OS words -- the offscreen and fake
+# hosts stay OS-free and simply leave the slot unwired, and the adapters
+# that raise real programs link this in.
+add_library(visor.host.posix STATIC src/bindings/posix/spawn.cpp)
+target_link_libraries(visor.host.posix PUBLIC visor.core)
 # The Cinux binding's pure half: frame expansion and event translation, free
 # of mmap and ioctl so PC judgments drive them. The adapter that reads
 # /dev/fb0 and /dev/event0 lives in the CinuxOS tree and links this in.

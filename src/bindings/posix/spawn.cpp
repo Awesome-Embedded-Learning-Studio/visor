@@ -17,9 +17,11 @@ namespace {
 
 // The exec words ride the stack, so a program needing more than this is not
 // a desk citizen. The request's spans stay honest: the host appends the
-// terminating nulls itself.
+// terminating nulls itself. The env budget is the larger number because an
+// inherited desktop environment runs to dozens of words on its own, and the
+// inherit-plus-override stance hands the whole list, not a curated one.
 constexpr std::size_t kMaxArgWords = 64;
-constexpr std::size_t kMaxEnvWords = 64;
+constexpr std::size_t kMaxEnvWords = 256;
 
 /// Closes every descriptor above stdio except the gift targets, the
 /// whitelist stance. A closed fd never fails the birth: the program was

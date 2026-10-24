@@ -119,6 +119,39 @@ void run_spawn_tests() {
         VISOR_CHECK_EQ(answer.words, std::string("carry"));
     }
 
+    // The fat-env shape: a desktop's inherited environment runs to dozens
+    // of words on its own, and the bridge's stance hands the whole list
+    // plus its overrides, so the budget must hold a real environment. One
+    // hundred filler words ride along and the marked word still arrives --
+    // a 64-word budget would have refused the birth outright.
+    {
+        std::array<int, 2> channel{};
+        VISOR_CHECK(::pipe(channel.data()) == 0);
+        std::array<std::array<char, 24>, 100> fillers{};
+        std::array<const char*, 101> env_words{};
+        for (std::size_t i = 0; i < fillers.size(); ++i) {
+            static_cast<void>(
+                std::snprintf(fillers[i].data(), fillers[i].size(), "SPAWN_FILL_%zu=0", i));
+            env_words[i] = fillers[i].data();
+        }
+        env_words[100] = "VISOR_SPAWN_MARK=fat";
+        const FdGift gift{.child_fd = 1, .parent_fd = channel[1]};
+        const std::array argv{"/bin/sh", "-c", "printf %s $VISOR_SPAWN_MARK"};
+        const SpawnRequest request{
+            .path = "/bin/sh",
+            .argv = argv,
+            .env = env_words,
+            .gifts = std::span<const FdGift>(&gift, 1),
+            .close_other_fds = false,
+        };
+        const int child = table.spawn_child(request);
+        VISOR_CHECK(child > 0);
+        ::close(channel[1]);
+        const Answer answer = collect(channel[0], static_cast<pid_t>(child));
+        VISOR_CHECK_EQ(answer.exit_status, 0);
+        VISOR_CHECK_EQ(answer.words, std::string("fat"));
+    }
+
     // The whitelist stance, both directions on one fixed number: the parent
     // parks a descriptor at 9, and the child reports whether it survived.
     // /proc/self/fd is the Linux eye the probe looks through, which is the

@@ -5,6 +5,7 @@
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/display.hpp"
 #include "visor/bindings/events.hpp"
+#include "visor/bindings/spawn.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -15,17 +16,22 @@ namespace visor::host {
  * @brief The one boundary between the core and the world: hosts fill it in, the
  *        core only ever calls through it. Ch2 carries three callbacks: the
  *        display flush, the event poll, and the millisecond clock, plus the
- *        display surface description.
+ *        display surface description. Stage 4 joined a fourth: the spawn
+ *        slot, birthing programs with the host's own wiring.
  * @note  poll_event returns false when no event waits, never blocking; what a
  *        full queue drops is the host's decision, not the core's.
  *        clock_ms returns milliseconds since a host-chosen epoch. The value
  *        may wrap, so durations are computed by unsigned subtraction
  *        (now - then), never by comparing absolute values.
+ *        spawn returns the child pid, or -1 when the host cannot birth --
+ *        an unwired slot is the fake stance, a failed birth cleans up after
+ *        itself. The slot only births, it never reaps.
  */
 struct HostTable {
     void (*flush)(void* context, const FlushRegion& region) noexcept = nullptr;
     bool (*poll_event)(void* context, Event& out) noexcept = nullptr;
     std::uint64_t (*clock_ms)(void* context) noexcept = nullptr;
+    int (*spawn)(void* context, const SpawnRequest& request) noexcept = nullptr;
     void* context = nullptr;
     HostInfo info{};
 
@@ -59,6 +65,13 @@ struct HostTable {
 
     /// Whether the host wired a clock.
     [[nodiscard]] bool has_clock() const noexcept;
+
+    /// Births one program through the host's wiring; -1 when the host wired
+    /// no spawn (the fake stance) or the birth failed.
+    [[nodiscard]] int spawn_child(const SpawnRequest& request) const noexcept;
+
+    /// Whether the host can birth programs at all.
+    [[nodiscard]] bool can_spawn() const noexcept;
 };
 
 } // namespace visor::host

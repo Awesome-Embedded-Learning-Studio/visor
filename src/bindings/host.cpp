@@ -1,5 +1,6 @@
 #include "visor/bindings/host.hpp"
 #include "visor/bindings/display.hpp"
+#include "visor/bindings/spawn.hpp"
 
 #include "visor/base/geometry/rect.hpp"
 #include "visor/bindings/events.hpp"
@@ -37,6 +38,14 @@ std::uint64_t HostTable::now_ms() const noexcept {
 
 bool HostTable::has_clock() const noexcept {
     return clock_ms != nullptr;
+}
+
+int HostTable::spawn_child(const SpawnRequest& request) const noexcept {
+    return spawn != nullptr ? spawn(context, request) : -1;
+}
+
+bool HostTable::can_spawn() const noexcept {
+    return spawn != nullptr;
 }
 
 } // namespace visor::host

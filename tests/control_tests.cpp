@@ -42,9 +42,17 @@ class RecordingPainter final : public visor::ui::Painter {
               [[maybe_unused]] visor::canvas::ColorRole ink) const noexcept override {}
     void plot([[maybe_unused]] visor::base::PointI at,
               [[maybe_unused]] visor::canvas::ColorRole ink) const noexcept override {}
+    void fill([[maybe_unused]] visor::base::RectI area,
+              [[maybe_unused]] visor::canvas::Ink ink) const noexcept override {}
+    void plot([[maybe_unused]] visor::base::PointI at,
+              [[maybe_unused]] visor::canvas::Ink ink) const noexcept override {}
     void draw_bitmap(visor::base::PointI at, [[maybe_unused]] const visor::draw::MonoBitmap& source,
                      [[maybe_unused]] visor::canvas::ColorRole ink,
                      int scale) const noexcept override {
+        bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
+    }
+    void draw_bitmap(visor::base::PointI at, [[maybe_unused]] const visor::draw::MonoBitmap& source,
+                     [[maybe_unused]] visor::canvas::Ink ink, int scale) const noexcept override {
         bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
     }
     void draw_image(visor::base::PointI at, [[maybe_unused]] const std::uint32_t* words, int width,
@@ -55,6 +63,9 @@ class RecordingPainter final : public visor::ui::Painter {
     void
     fill_rounded([[maybe_unused]] visor::base::RectI area,
                  [[maybe_unused]] visor::canvas::ColorRole ink,
+                 [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {}
+    void
+    fill_rounded([[maybe_unused]] visor::base::RectI area, [[maybe_unused]] visor::canvas::Ink ink,
                  [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {}
 
     [[nodiscard]] const std::vector<BitmapDrawn>& bitmaps() const noexcept { return bitmaps_; }

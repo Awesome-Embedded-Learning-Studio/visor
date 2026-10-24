@@ -53,6 +53,22 @@ class Painter {
     /// clamps into a capsule, parts outside the frame clip silently.
     virtual void fill_rounded(base::RectI area, canvas::ColorRole role,
                               const CornerRadius& radius) const noexcept = 0;
+    /// The raw-ink lane, one overload beside every role verb: a color value
+    /// straight from data -- a terminal's SGR palette, decoded imagery --
+    /// rides these without inventing a theme slot for it. Targets fold the
+    /// ink through their own traits exactly as draw_image's words already
+    /// do: a mono canvas takes the polarity, a 565 canvas quantizes.
+    virtual void fill(base::RectI area, canvas::Ink ink) const noexcept = 0;
+    /// Plots one pixel at a raw ink; same silent-drop stance as the role verb.
+    virtual void plot(base::PointI at, canvas::Ink ink) const noexcept = 0;
+    /// Blits a packed 1bpp bitmap in a raw ink; ink transfer, not area
+    /// overwrite, same as the role verb.
+    virtual void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::Ink ink,
+                             int scale) const noexcept = 0;
+    /// The rounded fill in a raw ink; radius zero is the plain fill, same
+    /// clamps as the role verb.
+    virtual void fill_rounded(base::RectI area, canvas::Ink ink,
+                              const CornerRadius& radius) const noexcept = 0;
 
   protected:
     // Non-virtual and protected: implementations are owned by their creator, never

@@ -31,6 +31,10 @@ class RecordingPainter final : public visor::ui::Painter {
         visor::base::RectI area;
         visor::canvas::ColorRole ink;
     };
+    struct InkFill {
+        visor::base::RectI area;
+        visor::canvas::Ink ink;
+    };
     struct Plotted {
         visor::base::PointI at;
         visor::canvas::ColorRole ink;
@@ -48,13 +52,22 @@ class RecordingPainter final : public visor::ui::Painter {
     void fill(visor::base::RectI area, visor::canvas::ColorRole ink) const noexcept override {
         fills_.push_back(Fill{.area = area, .ink = ink});
     }
+    void fill(visor::base::RectI area, visor::canvas::Ink ink) const noexcept override {
+        ink_fills_.push_back(InkFill{.area = area, .ink = ink});
+    }
     void plot(visor::base::PointI p, visor::canvas::ColorRole ink) const noexcept override {
         plots_.push_back(Plotted{.at = p, .ink = ink});
     }
+    void plot([[maybe_unused]] visor::base::PointI p,
+              [[maybe_unused]] visor::canvas::Ink ink) const noexcept override {}
     void draw_bitmap(visor::base::PointI at, const visor::draw::MonoBitmap& source,
                      visor::canvas::ColorRole ink, int scale) const noexcept override {
         static_cast<void>(source);
         static_cast<void>(ink);
+        bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
+    }
+    void draw_bitmap(visor::base::PointI at, [[maybe_unused]] const visor::draw::MonoBitmap& source,
+                     [[maybe_unused]] visor::canvas::Ink ink, int scale) const noexcept override {
         bitmaps_.push_back(BitmapDrawn{.at = at, .scale = scale});
     }
     void draw_image(visor::base::PointI at, [[maybe_unused]] const std::uint32_t* words, int width,
@@ -63,17 +76,24 @@ class RecordingPainter final : public visor::ui::Painter {
     }
 
     [[nodiscard]] const std::vector<Fill>& fills() const noexcept { return fills_; }
+    [[nodiscard]] const std::vector<InkFill>& ink_fills() const noexcept { return ink_fills_; }
     [[nodiscard]] const std::vector<Plotted>& plots() const noexcept { return plots_; }
     void
     fill_rounded(visor::base::RectI area, visor::canvas::ColorRole ink,
                  [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {
         fills_.push_back(Fill{.area = area, .ink = ink});
     }
+    void
+    fill_rounded(visor::base::RectI area, visor::canvas::Ink ink,
+                 [[maybe_unused]] const visor::ui::CornerRadius& radius) const noexcept override {
+        ink_fills_.push_back(InkFill{.area = area, .ink = ink});
+    }
 
     [[nodiscard]] const std::vector<BitmapDrawn>& bitmaps() const noexcept { return bitmaps_; }
 
   private:
     mutable std::vector<Fill> fills_;
+    mutable std::vector<InkFill> ink_fills_;
     mutable std::vector<Plotted> plots_;
     mutable std::vector<BitmapDrawn> bitmaps_;
     mutable std::vector<ImageDrawn> images_;

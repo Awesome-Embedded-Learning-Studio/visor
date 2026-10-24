@@ -12,6 +12,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 namespace visor::ui {
 
@@ -66,16 +67,94 @@ class CanvasPainter final : public Painter {
     }
 
     void fill(base::RectI area, canvas::ColorRole role) const noexcept override {
-        const base::RectI visible = base::intersect(area, window_);
-        if (visible.is_empty()) {
-            return;
-        }
-        const draw::Pen<CanvasT, Pixel> pen{canvas_, pixel(role)};
-        pen.fill(shift_to_buffer(visible));
+        fill_with(area, pixel(role));
+    }
+
+    void fill(base::RectI area, canvas::Ink ink) const noexcept override {
+        fill_with(area, CanvasT::Traits::from_ink(ink));
     }
 
     void fill_rounded(base::RectI area, canvas::ColorRole role,
                       const CornerRadius& radius) const noexcept override {
+        rounded_with(area, radius, pixel(role));
+    }
+
+    void fill_rounded(base::RectI area, canvas::Ink ink,
+                      const CornerRadius& radius) const noexcept override {
+        rounded_with(area, radius, CanvasT::Traits::from_ink(ink));
+    }
+
+    void draw_image(base::PointI at, const std::uint32_t* words, int width, int height,
+                    std::size_t stride_words) const noexcept override {
+        // Content imagery, not a role: each source word is its own ink, and
+        // the canvas's traits fold it. The rows walk inside the painter's
+        // own window, so a strip replay paints exactly its share of the
+        // image, and a word outside the window or the canvas never lands.
+        if (words == nullptr || width <= 0 || height <= 0) {
+            return;
+        }
+        const base::RectI image{
+            .pos = at,
+            .size = base::SizeI{.w = width, .h = height},
+        };
+        const base::RectI visible = base::intersect(image, window_);
+        for (int row = visible.pos.y; row < visible.pos.y + visible.size.h; ++row) {
+            const std::uint32_t* source =
+                words + ((static_cast<std::size_t>(row - at.y) * stride_words) +
+                         static_cast<std::size_t>(visible.pos.x - at.x));
+            for (int column = visible.pos.x; column < visible.pos.x + visible.size.w; ++column) {
+                const base::PointI buffer{
+                    column - window_.pos.x,
+                    row - window_.pos.y,
+                };
+                static_cast<void>(
+                    canvas_.set(buffer, CanvasT::Traits::from_ink(canvas::Ink{*source++})));
+            }
+        }
+    }
+
+    void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::ColorRole role,
+                     int scale) const noexcept override {
+        bitmap_with(at, source, pixel(role), scale);
+    }
+
+    void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::Ink ink,
+                     int scale) const noexcept override {
+        bitmap_with(at, source, CanvasT::Traits::from_ink(ink), scale);
+    }
+
+    void plot(base::PointI at, canvas::ColorRole role) const noexcept override {
+        plot_with(at, pixel(role));
+    }
+
+    void plot(base::PointI at, canvas::Ink ink) const noexcept override {
+        plot_with(at, CanvasT::Traits::from_ink(ink));
+    }
+
+  private:
+    /// The one stroke per verb, in the target's own pixel: both public
+    /// lanes -- the theme's precomputed table and the raw-ink traits fold --
+    /// converge here, so the clipping and Pen work lives exactly once.
+    /// Same stance as Pen toward out-of-bounds: a stroke outside the
+    /// window vanishes silently, stroke algorithms never check bounds.
+    void fill_with(base::RectI area, Pixel px) const noexcept {
+        const base::RectI visible = base::intersect(area, window_);
+        if (visible.is_empty()) {
+            return;
+        }
+        const draw::Pen<CanvasT, Pixel> pen{canvas_, px};
+        pen.fill(shift_to_buffer(visible));
+    }
+
+    void plot_with(base::PointI at, Pixel px) const noexcept {
+        if (!window_.contains(at)) {
+            return;
+        }
+        const draw::Pen<CanvasT, Pixel> pen{canvas_, px};
+        pen.plot(base::PointI{at.x - window_.pos.x, at.y - window_.pos.y});
+    }
+
+    void rounded_with(base::RectI area, const CornerRadius& radius, Pixel px) const noexcept {
         // One span per row: a row in the upper half takes its insets from
         // the top corners, the lower half from the bottom ones. Within a
         // corner's r x r zone a pixel at (u, v) -- offsets from the corner
@@ -119,47 +198,18 @@ class CanvasPainter final : public Painter {
                 .pos = base::PointI{area.pos.x + inset_left, area.pos.y + row},
                 .size = base::SizeI{.w = area.size.w - inset_left - inset_right, .h = 1},
             };
-            fill(span, role);
+            fill_with(span, px);
         }
     }
 
-    void draw_image(base::PointI at, const std::uint32_t* words, int width, int height,
-                    std::size_t stride_words) const noexcept override {
-        // Content imagery, not a role: each source word is its own ink, and
-        // the canvas's traits fold it. The rows walk inside the painter's
-        // own window, so a strip replay paints exactly its share of the
-        // image, and a word outside the window or the canvas never lands.
-        if (words == nullptr || width <= 0 || height <= 0) {
-            return;
-        }
-        const base::RectI image{
-            .pos = at,
-            .size = base::SizeI{.w = width, .h = height},
-        };
-        const base::RectI visible = base::intersect(image, window_);
-        for (int row = visible.pos.y; row < visible.pos.y + visible.size.h; ++row) {
-            const std::uint32_t* source =
-                words + ((static_cast<std::size_t>(row - at.y) * stride_words) +
-                         static_cast<std::size_t>(visible.pos.x - at.x));
-            for (int column = visible.pos.x; column < visible.pos.x + visible.size.w; ++column) {
-                const base::PointI buffer{
-                    column - window_.pos.x,
-                    row - window_.pos.y,
-                };
-                static_cast<void>(
-                    canvas_.set(buffer, CanvasT::Traits::from_ink(canvas::Ink{*source++})));
-            }
-        }
-    }
-
-    void draw_bitmap(base::PointI at, const draw::MonoBitmap& source, canvas::ColorRole role,
-                     int scale) const noexcept override {
+    void bitmap_with(base::PointI at, const draw::MonoBitmap& source, Pixel px,
+                     int scale) const noexcept {
         // One lit source pixel is one scale x scale block, at the source
         // coordinate times the factor. Neighbour blocks never overlap (their
         // origins are scale apart), so any order of painting lands the same
         // pixels -- which is what makes strip replays safe here too.
         const int factor = scale < 1 ? 1 : scale;
-        const draw::Pen<CanvasT, Pixel> pen{canvas_, pixel(role)};
+        const draw::Pen<CanvasT, Pixel> pen{canvas_, px};
         for (std::size_t row = 0; row < source.height; ++row) {
             for (std::size_t column = 0; column < source.width; ++column) {
                 if (!source.pixel(column, row)) {
@@ -179,17 +229,6 @@ class CanvasPainter final : public Painter {
         }
     }
 
-    void plot(base::PointI at, canvas::ColorRole role) const noexcept override {
-        // Same stance as Pen::plot toward out-of-bounds: a stroke outside the
-        // window vanishes silently, stroke algorithms never check bounds.
-        if (!window_.contains(at)) {
-            return;
-        }
-        const draw::Pen<CanvasT, Pixel> pen{canvas_, pixel(role)};
-        pen.plot(base::PointI{at.x - window_.pos.x, at.y - window_.pos.y});
-    }
-
-  private:
     /// Resolves the seven roles into the target's pixels once per painter.
     /// The Ink-to-pixel step is the canvas's traits table, so the rule that
     /// used to live here as mono_ink now belongs to whatever format the canvas

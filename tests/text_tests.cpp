@@ -8,11 +8,13 @@
 #include "visor/bindings/offscreen/offscreen_host.hpp"
 #include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
+#include "visor/canvas/pixel_traits.hpp"
 #include "visor/draw/mono_font.hpp"
 #include "visor/ui/canvas_painter.hpp"
 #include "visor/ui/input_router.hpp"
 #include "visor/ui/primitives/rectangle/rectangle.hpp"
 #include "visor/ui/run_loop.hpp"
+#include "visor/ui/text.hpp"
 #include "visor/ui/widgets/textbox/textbox.hpp"
 
 #include <cstddef>
@@ -282,4 +284,47 @@ void run_text_tests() {
         VISOR_CHECK(canvas.get(PointI{6, 7}) == false); // 'i', not 'h'
         VISOR_CHECK(canvas.get(PointI{8, 7}) == true);  // the caret
     }
+
+    // The raw-ink lane, pixel for pixel: a color straight from data (the
+    // SGR palette's red is the caller this lane exists for) lands as the
+    // literal XRGB word through every verb that carries it -- fill, plot,
+    // both text walks -- and a mono canvas folds the same ink to lit, the
+    // polarity rule draw_image's words already live by.
+    using ColorCanvas = Canvas<SizeI{.w = 16, .h = 8}, visor::canvas::Xrgb8888Traits>;
+    ColorCanvas color;
+    color.set_clear(false);
+    const visor::ui::CanvasPainter ink_painter{color};
+    const visor::canvas::Ink sgr_red = visor::canvas::Ink::from_rgb(0xcd0000);
+    const auto red_pixel = ColorCanvas::Traits::from_ink(sgr_red);
+    const auto ground_pixel = ColorCanvas::Traits::from_ink(visor::canvas::Ink::black());
+
+    ink_painter.fill(RectI{.pos = PointI{10, 0}, .size = SizeI{.w = 4, .h = 4}}, sgr_red);
+    VISOR_CHECK(color.get(PointI{11, 1}) == red_pixel);
+    ink_painter.plot(PointI{15, 7}, sgr_red);
+    VISOR_CHECK(color.get(PointI{15, 7}) == red_pixel);
+
+    // The 'h' glyph lights both columns of rows 0..3 (bits 0xc0), so the
+    // inked text reads back as the palette word at exactly those spots.
+    visor::ui::draw_text(ink_painter, PointI{0, 0}, kTypeFont, "h", sgr_red, 1);
+    VISOR_CHECK(color.get(PointI{0, 0}) == red_pixel);
+    VISOR_CHECK(color.get(PointI{1, 3}) == red_pixel);
+    VISOR_CHECK(color.get(PointI{2, 0}) == ground_pixel); // the advance gap stays dark
+
+    // The clipped twin rides the same lane: a clip that bites the glyph's
+    // right column sends the boundary pixels through fill, interior ones
+    // through the bitmap blit, and both arrive in the same ink.
+    visor::ui::draw_text_clipped(ink_painter,
+                                 RectI{.pos = PointI{4, 0}, .size = SizeI{.w = 2, .h = 8}},
+                                 PointI{4, 0}, kTypeFont, "h", sgr_red, 1);
+    VISOR_CHECK(color.get(PointI{4, 0}) == red_pixel);
+    VISOR_CHECK(color.get(PointI{5, 3}) == red_pixel);
+    VISOR_CHECK(color.get(PointI{6, 0}) == ground_pixel); // past the clip's edge
+
+    // A mono target takes the ink's polarity: red is not black, so every
+    // lit check the mono canvas can make reads the same as role text.
+    Canvas<SizeI{.w = 4, .h = 4}> mono;
+    mono.set_clear(false);
+    const visor::ui::CanvasPainter mono_painter{mono};
+    mono_painter.fill(RectI{.pos = PointI{0, 0}, .size = SizeI{.w = 4, .h = 4}}, sgr_red);
+    VISOR_CHECK(mono.get(PointI{2, 2}));
 }

@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "visor/base/geometry/point.hpp"
+#include "visor/base/geometry/rect.hpp"
 #include "visor/canvas/color.hpp"
 #include "visor/draw/mono_font.hpp"
 #include "visor/ui/painter.hpp"
@@ -27,9 +28,20 @@ namespace visor::ui {
 void draw_text(const Painter& painter, base::PointI at, const draw::MonoFont& font,
                std::string_view utf8, canvas::ColorRole role, int scale) noexcept;
 
+/// The raw-ink twin: same walk, same layout, the glyphs paint in a color
+/// straight from data instead of a theme slot. A terminal's SGR palette is
+/// the caller this lane exists for.
+void draw_text(const Painter& painter, base::PointI at, const draw::MonoFont& font,
+               std::string_view utf8, canvas::Ink ink, int scale) noexcept;
+
 /// Clips glyph ink to a control's content rectangle, including overhangs.
 void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at,
                        const draw::MonoFont& font, std::string_view utf8, canvas::ColorRole role,
+                       int scale) noexcept;
+
+/// The clipped walk's raw-ink twin.
+void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at,
+                       const draw::MonoFont& font, std::string_view utf8, canvas::Ink ink,
                        int scale) noexcept;
 
 } // namespace visor::ui

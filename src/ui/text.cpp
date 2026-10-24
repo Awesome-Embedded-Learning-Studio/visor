@@ -11,19 +11,26 @@
 #include "visor/ui/painter.hpp"
 
 namespace visor::ui {
+namespace {
 
-void draw_text(const Painter& painter, base::PointI at, const draw::MonoFont& font,
-               std::string_view utf8, canvas::ColorRole role, int scale) noexcept {
+// The walk lives once per shape and stays color-agnostic: a ColorRole and
+// an Ink both pass straight through to the painter's overloaded verbs, so
+// the twin public functions below share every placement decision.
+template <typename Color>
+void text_walk(const Painter& painter, base::PointI at, const draw::MonoFont& font,
+               std::string_view utf8, Color color, int scale) noexcept {
     draw::TextLayout layout{font, utf8, scale};
     while (const auto placement = layout.next()) {
         painter.draw_bitmap(base::PointI{at.x + placement->pos.x, at.y + placement->pos.y},
-                            font.bitmap(*placement->glyph), role, draw::TextLayout::clamped(scale));
+                            font.bitmap(*placement->glyph), color,
+                            draw::TextLayout::clamped(scale));
     }
 }
 
-void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at,
-                       const draw::MonoFont& font, std::string_view utf8, canvas::ColorRole role,
-                       int scale) noexcept {
+template <typename Color>
+void clipped_walk(const Painter& painter, base::RectI clip, base::PointI at,
+                  const draw::MonoFont& font, std::string_view utf8, Color color,
+                  int scale) noexcept {
     const int factor = draw::TextLayout::clamped(scale);
     draw::TextLayout layout{font, utf8, factor};
     while (const auto placement = layout.next()) {
@@ -41,7 +48,7 @@ void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at
             continue;
         }
         if (visible == area) {
-            painter.draw_bitmap(area.pos, bitmap, role, factor);
+            painter.draw_bitmap(area.pos, bitmap, color, factor);
             continue;
         }
         // Only boundary glyphs need per-pixel clipping; interior glyphs blit directly.
@@ -56,11 +63,35 @@ void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at
                             },
                         .size = {.w = factor, .h = factor},
                     };
-                    painter.fill(base::intersect(pixel, clip), role);
+                    painter.fill(base::intersect(pixel, clip), color);
                 }
             }
         }
     }
+}
+
+} // namespace
+
+void draw_text(const Painter& painter, base::PointI at, const draw::MonoFont& font,
+               std::string_view utf8, canvas::ColorRole role, int scale) noexcept {
+    text_walk(painter, at, font, utf8, role, scale);
+}
+
+void draw_text(const Painter& painter, base::PointI at, const draw::MonoFont& font,
+               std::string_view utf8, canvas::Ink ink, int scale) noexcept {
+    text_walk(painter, at, font, utf8, ink, scale);
+}
+
+void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at,
+                       const draw::MonoFont& font, std::string_view utf8, canvas::ColorRole role,
+                       int scale) noexcept {
+    clipped_walk(painter, clip, at, font, utf8, role, scale);
+}
+
+void draw_text_clipped(const Painter& painter, base::RectI clip, base::PointI at,
+                       const draw::MonoFont& font, std::string_view utf8, canvas::Ink ink,
+                       int scale) noexcept {
+    clipped_walk(painter, clip, at, font, utf8, ink, scale);
 }
 
 } // namespace visor::ui

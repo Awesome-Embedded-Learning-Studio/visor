@@ -2,6 +2,7 @@
 
 #include "visor/bindings/spawn.hpp"
 
+#include <fcntl.h>
 #include <unistd.h>
 
 #include <array>
@@ -60,7 +61,25 @@ int spawn_via_posix(void* /*context*/, const SpawnRequest& request) noexcept {
         // setup never returns to the caller -- exit word 127 is the classic
         // "the exec never happened".
         for (const FdGift& gift : request.gifts) {
-            if (gift.child_fd != gift.parent_fd && ::dup2(gift.parent_fd, gift.child_fd) < 0) {
+            if (gift.child_fd == gift.parent_fd) {
+                // The pass-as-is gift keeps its number, so whatever flags it
+                // carries ride along too: a CLOEXEC mark would seal the very
+                // descriptor this gift promises, so it comes off before the
+                // exec can honor it.
+                const int flags = ::fcntl(gift.child_fd, F_GETFD);
+                if (flags < 0) {
+                    _exit(127);
+                }
+                // fcntl's flag words are ints by contract.
+                // NOLINTBEGIN(bugprone-signed-bitwise)
+                if ((flags & FD_CLOEXEC) != 0 &&
+                    ::fcntl(gift.child_fd, F_SETFD, flags & ~FD_CLOEXEC) < 0) {
+                    _exit(127);
+                }
+                // NOLINTEND(bugprone-signed-bitwise)
+            } else if (::dup2(gift.parent_fd, gift.child_fd) < 0) {
+                // The redirect gift's new number arrives flag-clean by
+                // dup2's own contract.
                 _exit(127);
             }
         }

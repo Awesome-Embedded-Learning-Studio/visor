@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -88,6 +89,34 @@ void run_spawn_tests() {
         const Answer answer = collect(channel[0], static_cast<pid_t>(child));
         VISOR_CHECK_EQ(answer.exit_status, 0);
         VISOR_CHECK_EQ(answer.words, std::string("ok"));
+    }
+
+    // The CLOEXEC survival: a gift promised to the child must live through
+    // the exec even when the parent marked it CLOEXEC for its own hygiene
+    // (the bridge's sockets all carry the mark). The pass-as-is gift gets
+    // the seal taken off in the child, and the words still come back
+    // through the marked descriptor's own number.
+    {
+        std::array<int, 2> channel{};
+        VISOR_CHECK(::pipe2(channel.data(), O_CLOEXEC) == 0);
+        std::array<char, 64> script{};
+        static_cast<void>(
+            std::snprintf(script.data(), script.size(), "printf %%s marked >&%d", channel[1]));
+        const FdGift gift{.child_fd = channel[1], .parent_fd = channel[1]};
+        const std::array<const char*, 3> argv{"/bin/sh", "-c", script.data()};
+        const SpawnRequest request{
+            .path = "/bin/sh",
+            .argv = argv,
+            .env = {},
+            .gifts = std::span<const FdGift>(&gift, 1),
+            .close_other_fds = false,
+        };
+        const int child = table.spawn_child(request);
+        VISOR_CHECK(child > 0);
+        ::close(channel[1]);
+        const Answer answer = collect(channel[0], static_cast<pid_t>(child));
+        VISOR_CHECK_EQ(answer.exit_status, 0);
+        VISOR_CHECK_EQ(answer.words, std::string("marked"));
     }
 
     // The pass-as-is shape with a replaced environment: the gift keeps its

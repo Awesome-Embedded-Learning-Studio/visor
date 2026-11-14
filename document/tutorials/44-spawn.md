@@ -16,15 +16,15 @@ struct HostTable {
 
 类注释给表的历史记了一笔，Ch2 carries three callbacks 说的是老三口，规格里的 Ch2 对应教程的第八章，下一句接着写 Stage 4 joined a fourth: the spawn slot, birthing programs with the host's own wiring。生程序用的是宿主自己的接线，核心只发请求。注释同时把新口的边界写明：spawn returns the child pid, or -1 when the host cannot birth，而槽位只生不收，the slot only births, it never reaps，等子程序退出归填表人。咱们把承诺念出来就是，表的第四口只管生孩子，孩子活到几时归请生的人管。
 
-包装有两个，与 submit_region、poll、now_ms 住在同一层，咱们连着看：
+包装有两个，与 submit_region、poll、now_ms 一样是住在表旁边的自由函数，头一个参数都是表（本章写法随宿主表分家同步过，成员写法是旧档的形状），咱们连着看：
 
 ```cpp
-    /// Births one program through the host's wiring; -1 when the host wired
-    /// no spawn (the fake stance) or the birth failed.
-    [[nodiscard]] int spawn_child(const SpawnRequest& request) const noexcept;
+/// Births one program through the host's wiring; -1 when the host wired
+/// no spawn (the fake stance) or the birth failed.
+[[nodiscard]] int spawn_child(const HostTable& host, const SpawnRequest& request) noexcept;
 
-    /// Whether the host can birth programs at all.
-    [[nodiscard]] bool can_spawn() const noexcept;
+/// Whether the host can birth programs at all.
+[[nodiscard]] bool can_spawn(const HostTable& host) noexcept;
 ```
 
 实现咱们在 `src/bindings/host.cpp` 里看，一行见底，槽位非空就调，空则回 -1，与 poll 的 null 检查同一条纪律。
@@ -121,7 +121,7 @@ struct Answer {
 
 collect 是另一样，拿着读端与 pid 收尾，读通道到 EOF 再 waitpid。注释说明读会阻塞，答案要么完整到、要么判据挂住，either way the truth gets said，咱们看，两种下场都比说谎强。
 
-开场两查咱们跟着过：空表摆出来，can_spawn() 假、spawn_child(SpawnRequest{}) 回 -1，未接线的立场有了判据守着。随后判例看一眼 /bin/sh 在不在，缺席就 println 一行 SKIP 响亮返回。孩子全请 /bin/sh 当，类 Unix 机器上它最不挑，`-c` 一句脚本就能把话写进赠出的 fd。
+开场两查咱们跟着过：空表摆出来，`can_spawn(bare)` 假、`spawn_child(bare, SpawnRequest{})` 回 -1，未接线的立场有了判据守着。随后判例看一眼 /bin/sh 在不在，缺席就 println 一行 SKIP 响亮返回。孩子全请 /bin/sh 当，类 Unix 机器上它最不挑，`-c` 一句脚本就能把话写进赠出的 fd。
 
 ## 五段现场
 

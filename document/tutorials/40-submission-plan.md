@@ -161,19 +161,20 @@ if (!owned.is_empty()) {
 
 ## 批式判例与读回的新节奏
 
-纯逻辑之外咱们再看 `tests/x11_host_tests.cpp`，它自己起 Xvfb 走真服务器。批式判例摆一个 128x64 的屏，8 行一带，八带循环送进宿主：
+纯逻辑之外咱们再看 `tests/x11_host_tests.cpp`，它自己起 Xvfb 走真服务器。批式判例摆一个 128x64 的屏，8 行一带，八带循环送进宿主（调用写法随宿主表分家同步过：判空包装是自由函数，头一个参数是表）：
 
 ```cpp
 for (int top = 0; top < kHeight; top += 8) {
     const visor::base::RectI band{.pos = PointI{0, top}, .size = {.w = kWidth, .h = 8}};
     const std::uint8_t* band_pixels =
         frame.pixels().data() + (static_cast<std::size_t>(top) * Frame::kStrideBytes);
-    VISOR_CHECK(host->table().submit_region(band, band_pixels, Frame::kStrideBytes));
+    VISOR_CHECK(visor::host::submit_region(host->table(), band, band_pixels,
+                                           Frame::kStrideBytes));
 }
 VISOR_CHECK_EQ(host->flush_count(), 8);
 VISOR_CHECK_EQ(host->pending_submissions(), 1); // eight bands, one box
 visor::host::Event event;
-VISOR_CHECK(!host->table().poll(event));
+VISOR_CHECK(!visor::host::poll(host->table(), event));
 VISOR_CHECK_EQ(host->pending_submissions(), 0);
 XSync(screen.display(), False);
 compare_readback(screen.display(), host->window(), frame);

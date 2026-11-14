@@ -11,11 +11,12 @@
 namespace visor::host {
 
 // Every access to the host table goes through a null check, so an empty table
-// degrades to "no events, clock at zero" instead of a crash. The offscreen
-// double lives in offscreen_host.cpp.
-bool HostTable::submit_region(base::RectI rect, const std::uint8_t* pixels,
-                              std::size_t stride_bytes, PixelFormat format) const noexcept {
-    if (flush == nullptr) {
+// degrades to "no events, clock at zero" instead of a crash. These free
+// functions are the consuming vocabulary; the table itself carries only the
+// slots. The offscreen double lives in offscreen_host.cpp.
+bool submit_region(const HostTable& host, base::RectI rect, const std::uint8_t* pixels,
+                   std::size_t stride_bytes, PixelFormat format) noexcept {
+    if (host.flush == nullptr) {
         return false;
     }
     const FlushRegion region{
@@ -24,28 +25,28 @@ bool HostTable::submit_region(base::RectI rect, const std::uint8_t* pixels,
         .stride_bytes = stride_bytes,
         .format = format,
     };
-    flush(context, region);
+    host.flush(host.context, region);
     return true;
 }
 
-bool HostTable::poll(Event& out) const noexcept {
-    return poll_event != nullptr && poll_event(context, out);
+bool poll(const HostTable& host, Event& out) noexcept {
+    return host.poll_event != nullptr && host.poll_event(host.context, out);
 }
 
-std::uint64_t HostTable::now_ms() const noexcept {
-    return clock_ms != nullptr ? clock_ms(context) : 0;
+std::uint64_t now_ms(const HostTable& host) noexcept {
+    return has_clock(host) ? host.clock_ms(host.context) : 0;
 }
 
-bool HostTable::has_clock() const noexcept {
-    return clock_ms != nullptr;
+bool has_clock(const HostTable& host) noexcept {
+    return host.clock_ms != nullptr;
 }
 
-int HostTable::spawn_child(const SpawnRequest& request) const noexcept {
-    return spawn != nullptr ? spawn(context, request) : -1;
+int spawn_child(const HostTable& host, const SpawnRequest& request) noexcept {
+    return can_spawn(host) ? host.spawn(host.context, request) : -1;
 }
 
-bool HostTable::can_spawn() const noexcept {
-    return spawn != nullptr;
+bool can_spawn(const HostTable& host) noexcept {
+    return host.spawn != nullptr;
 }
 
 } // namespace visor::host

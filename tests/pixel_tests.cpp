@@ -9,6 +9,7 @@
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
 #include "visor/bindings/display.hpp"
+#include "visor/bindings/host.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
 #include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
@@ -263,7 +264,7 @@ void host_receives_color() {
     OffscreenHost screen{kFrame.w, kFrame.h, PixelFormat::RGB565};
     Canvas<kFrame, Rgb565Traits> frame;
     VISOR_CHECK(frame.set(PointI{1, 0}, kIrisRgb565));
-    VISOR_CHECK(screen.table().submit_frame(frame));
+    VISOR_CHECK(visor::host::submit_frame(screen.table(), frame));
     VISOR_CHECK_EQ(screen.flush_count(), 1);
     VISOR_CHECK_EQ(screen.get_pixel(PointI{1, 0}), std::uint32_t{kIrisRgb565});
     VISOR_CHECK_EQ(screen.get_pixel(PointI{0, 0}), std::uint32_t{0});
@@ -273,7 +274,7 @@ void host_receives_color() {
 
     // The same region to a mono host is refused and counted, not misread.
     OffscreenHost mono_screen{kFrame.w, kFrame.h};
-    VISOR_CHECK(mono_screen.table().submit_frame(frame));
+    VISOR_CHECK(visor::host::submit_frame(mono_screen.table(), frame));
     VISOR_CHECK_EQ(mono_screen.rejected_count(), 1);
     VISOR_CHECK_EQ(mono_screen.flush_count(), 0);
 }

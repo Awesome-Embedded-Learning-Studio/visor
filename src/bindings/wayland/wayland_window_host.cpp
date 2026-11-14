@@ -718,6 +718,18 @@ int WaylandWindowHost::dropped_event_count() const noexcept {
     return dropped_event_count_;
 }
 
+HostStatus WaylandWindowHost::status() const noexcept {
+    return status_;
+}
+
+std::uint32_t WaylandWindowHost::last_error() const noexcept {
+    return last_error_;
+}
+
+int WaylandWindowHost::error_count() const noexcept {
+    return error_count_;
+}
+
 const std::uint32_t* WaylandWindowHost::submitted_words() const noexcept {
     return submitted_;
 }
@@ -735,6 +747,10 @@ wl_surface* WaylandWindowHost::surface() const noexcept {
 }
 
 void WaylandWindowHost::handle_flush(const FlushRegion& region) noexcept {
+    if (status_ == HostStatus::Disconnected) {
+        ++rejected_count_; // no writing into a dead socket
+        return;
+    }
     const bool inside = region.format == format_ && region.pixels != nullptr &&
                         !region.rect.is_empty() && region.rect.pos.x >= 0 &&
                         region.rect.pos.y >= 0 &&
@@ -898,12 +914,20 @@ std::uint32_t WaylandWindowHost::canvas_pixel_word(const std::uint8_t* row,
 }
 
 bool WaylandWindowHost::poll_one(Event& out) noexcept {
+    if (status_ == HostStatus::Disconnected) {
+        return false; // the link is gone; the host only answers silence now
+    }
     // dispatch_pending alone never touches the socket: an application that
     // stops drawing and only polls would never hear input, close or ping
     // again. The zero timeout reads whatever has arrived and hands it over
     // without waiting, so poll keeps its non-blocking word.
     constexpr timespec nowait{.tv_sec = 0, .tv_nsec = 0};
     if (wl_display_dispatch_timeout(display_, &nowait) < 0) {
+        if (status_ != HostStatus::Disconnected) {
+            status_ = HostStatus::Disconnected;
+            ++error_count_;
+            last_error_ = static_cast<std::uint32_t>(wl_display_get_error(display_));
+        }
         key_repeat_.cancel();
         return false;
     }

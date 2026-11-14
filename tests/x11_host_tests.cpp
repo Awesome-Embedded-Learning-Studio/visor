@@ -147,9 +147,9 @@ void run_x11_host_tests() {
         VISOR_CHECK_EQ(table.info.screen.w, kWidth);
         VISOR_CHECK_EQ(table.info.screen.h, kHeight);
         VISOR_CHECK_EQ(table.info.format, visor::host::PixelFormat::Mono1);
-        const std::uint64_t now = table.now_ms();
+        const std::uint64_t now = visor::host::now_ms(table);
         ::usleep(2000);
-        VISOR_CHECK(table.now_ms() >= now + 2); // the clock walks
+        VISOR_CHECK(visor::host::now_ms(table) >= now + 2); // the clock walks
     }
 
     // A full frame lands bit for bit: ink reads back as the visual's lit
@@ -166,9 +166,9 @@ void run_x11_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
         visor::host::Event event;
-        VISOR_CHECK(!host->table().poll(event)); // the drain rides the poll
+        VISOR_CHECK(!visor::host::poll(host->table(), event)); // the drain rides the poll
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame);
         VISOR_CHECK_EQ(host->flush_count(), 1);
@@ -187,9 +187,9 @@ void run_x11_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
         visor::host::Event event;
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
 
         const visor::base::RectI region{.pos = PointI{5, 20}, .size = {.w = 33, .h = 24}};
@@ -200,8 +200,9 @@ void run_x11_host_tests() {
         const std::uint8_t* region_pixels =
             frame.pixels().data() + (static_cast<std::size_t>(region.pos.y) * Frame::kStrideBytes) +
             (static_cast<std::size_t>(region.pos.x) / 8);
-        VISOR_CHECK(host->table().submit_region(region, region_pixels, Frame::kStrideBytes));
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(
+            visor::host::submit_region(host->table(), region, region_pixels, Frame::kStrideBytes));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame); // the hole and the rest
         VISOR_CHECK_EQ(host->flush_count(), 2);
@@ -222,8 +223,8 @@ void run_x11_host_tests() {
             return;
         }
         visor::host::Event event;
-        VISOR_CHECK(host->table().submit_frame(frame));
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
 
         const visor::base::RectI region{.pos = PointI{16, 8}, .size = {.w = 33, .h = 20}};
@@ -232,8 +233,9 @@ void run_x11_host_tests() {
         const std::uint8_t* region_pixels =
             frame.pixels().data() + (static_cast<std::size_t>(region.pos.y) * Frame::kStrideBytes) +
             (static_cast<std::size_t>(region.pos.x) / 8);
-        VISOR_CHECK(host->table().submit_region(region, region_pixels, Frame::kStrideBytes));
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(
+            visor::host::submit_region(host->table(), region, region_pixels, Frame::kStrideBytes));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame);
         VISOR_CHECK_EQ(host->flush_count(), 2);
@@ -259,12 +261,13 @@ void run_x11_host_tests() {
             const visor::base::RectI band{.pos = PointI{0, top}, .size = {.w = kWidth, .h = 8}};
             const std::uint8_t* band_pixels =
                 frame.pixels().data() + (static_cast<std::size_t>(top) * Frame::kStrideBytes);
-            VISOR_CHECK(host->table().submit_region(band, band_pixels, Frame::kStrideBytes));
+            VISOR_CHECK(
+                visor::host::submit_region(host->table(), band, band_pixels, Frame::kStrideBytes));
         }
         VISOR_CHECK_EQ(host->flush_count(), 8);
         VISOR_CHECK_EQ(host->pending_submissions(), 1); // eight bands, one box
         visor::host::Event event;
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         VISOR_CHECK_EQ(host->pending_submissions(), 0);
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame);
@@ -285,9 +288,9 @@ void run_x11_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
         visor::host::Event event;
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
 
         const auto read_word = [&](int x, int y) -> std::uint32_t {
@@ -313,8 +316,8 @@ void run_x11_host_tests() {
 
         // Two rows of pure red land as the red mask, the other channels dark.
         frame.fill(visor::canvas::Rgb565Traits::from_ink(visor::canvas::Ink::from_rgb(0xff0000)));
-        VISOR_CHECK(host->table().submit_frame(frame));
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
         XImage* red_shot =
             XGetImage(screen.display(), host->window(), 0, 0, 1, 1, AllPlanes, ZPixmap);
@@ -327,7 +330,7 @@ void run_x11_host_tests() {
 
         // A mono frame to a color window is refused like any other wrong format.
         const Frame mono_frame;
-        VISOR_CHECK(host->table().submit_frame(mono_frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), mono_frame));
         VISOR_CHECK_EQ(host->rejected_count(), 1);
     }
 
@@ -341,7 +344,7 @@ void run_x11_host_tests() {
         const visor::base::RectI outside{.pos = PointI{120, 0}, .size = {.w = 16, .h = 10}};
         // The call itself succeeds -- an empty table is the only false -- the
         // refusal shows up in the host's own ledger.
-        VISOR_CHECK(host->table().submit_region(outside, nullptr, 16));
+        VISOR_CHECK(visor::host::submit_region(host->table(), outside, nullptr, 16));
         VISOR_CHECK_EQ(host->rejected_count(), 1);
         VISOR_CHECK_EQ(host->flush_count(), 0);
     }
@@ -364,7 +367,7 @@ void run_x11_host_tests() {
         word.xbutton.y = 9;
         put_back_word(host->display(), word);
         visor::host::Event event;
-        VISOR_CHECK(table.poll(event));
+        VISOR_CHECK(visor::host::poll(table, event));
         if (const auto* down = std::get_if<visor::host::PointerDown>(&event)) {
             VISOR_CHECK_EQ(down->button, 1U);
             VISOR_CHECK_EQ(down->pos.x, 5);
@@ -378,7 +381,7 @@ void run_x11_host_tests() {
         word.xmotion.x = 40;
         word.xmotion.y = -3;
         put_back_word(host->display(), word);
-        VISOR_CHECK(table.poll(event));
+        VISOR_CHECK(visor::host::poll(table, event));
         if (const auto* move = std::get_if<visor::host::PointerMove>(&event)) {
             VISOR_CHECK_EQ(move->pos.x, 40);
             VISOR_CHECK_EQ(move->pos.y, -3);
@@ -392,7 +395,7 @@ void run_x11_host_tests() {
         word.xkey.window = host->window();
         word.xkey.keycode = 24;
         put_back_word(host->display(), word);
-        VISOR_CHECK(table.poll(event));
+        VISOR_CHECK(visor::host::poll(table, event));
         if (const auto* down = std::get_if<visor::host::KeyDown>(&event)) {
             VISOR_CHECK_EQ(down->code, 0x71U); // 'q' as a code point
         } else {
@@ -418,7 +421,7 @@ void run_x11_host_tests() {
         word.xclient.data.l[0] = static_cast<long>(delete_window);
         put_back_word(host->display(), word);
         visor::host::Event event;
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         VISOR_CHECK(host->close_requested());
     }
 
@@ -434,9 +437,9 @@ void run_x11_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
         visor::host::Event event;
-        VISOR_CHECK(!host->table().poll(event)); // the frame takes the screen
+        VISOR_CHECK(!visor::host::poll(host->table(), event)); // the frame takes the screen
         XSync(screen.display(), False);
 
         XClearWindow(screen.display(), host->window());
@@ -454,7 +457,7 @@ void run_x11_host_tests() {
         word.xexpose.height = kHeight;
         word.xexpose.count = 0;
         put_back_word(host->display(), word);
-        VISOR_CHECK(!host->table().poll(event)); // no core word
+        VISOR_CHECK(!visor::host::poll(host->table(), event)); // no core word
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame); // the shadow answered
     }
@@ -473,9 +476,9 @@ void run_x11_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
         visor::host::Event event;
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
         XClearWindow(screen.display(), host->window());
         XSync(screen.display(), False);
@@ -489,7 +492,7 @@ void run_x11_host_tests() {
         word.xexpose.height = 480;
         word.xexpose.count = 0;
         put_back_word(host->display(), word);
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame); // intact, no crash
     }
@@ -508,9 +511,9 @@ void run_x11_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
         visor::host::Event event;
-        VISOR_CHECK(!host->table().poll(event));
+        VISOR_CHECK(!visor::host::poll(host->table(), event));
         XSync(screen.display(), False);
         compare_readback(screen.display(), host->window(), frame, 3); // 384x192 of blocks
         VISOR_CHECK_EQ(host->flush_count(), 1);
@@ -542,7 +545,7 @@ void run_x11_host_tests() {
         word.xbutton.y = 27;
         put_back_word(host->display(), word);
         visor::host::Event event;
-        VISOR_CHECK(table.poll(event));
+        VISOR_CHECK(visor::host::poll(table, event));
         if (const auto* down = std::get_if<visor::host::PointerDown>(&event)) {
             VISOR_CHECK_EQ(down->pos.x, 8);
             VISOR_CHECK_EQ(down->pos.y, 9);
@@ -555,12 +558,58 @@ void run_x11_host_tests() {
         word.xmotion.x = 40; // 13 remainder 1: floor back to canvas
         word.xmotion.y = -3; // negative drifts stay negative
         put_back_word(host->display(), word);
-        VISOR_CHECK(table.poll(event));
+        VISOR_CHECK(visor::host::poll(table, event));
         if (const auto* move = std::get_if<visor::host::PointerMove>(&event)) {
             VISOR_CHECK_EQ(move->pos.x, 13);
             VISOR_CHECK_EQ(move->pos.y, -1);
         } else {
             VISOR_CHECK(false && "expected a PointerMove");
+        }
+    }
+
+    // The host's own status: a server error lands in its ledger, and a client
+    // the server hangs up reads as a disconnect. Neither one exits the
+    // process through Xlib's default treatment.
+    {
+        auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight);
+        VISOR_CHECK(host.has_value());
+        if (host.has_value()) {
+            VISOR_CHECK(host->status() == visor::host::HostStatus::Ok);
+            Display* const link = host->display(); // arms the host's handler
+            VISOR_CHECK(link != nullptr);
+            // Destroy the host's window, then ask the server twice: the second
+            // destroy is a BadWindow, which the handler records instead of
+            // letting Xlib's default treatment end the process.
+            XDestroyWindow(link, host->window());
+            XDestroyWindow(link, host->window());
+            XSync(link, False);
+            VISOR_CHECK_EQ(host->error_count(), 1);
+            VISOR_CHECK_EQ(host->last_error(), 3U); // BadWindow
+            VISOR_CHECK(host->status() == visor::host::HostStatus::ProtocolError);
+        }
+    }
+
+    {
+        auto host = visor::host::x11::X11WindowHost::open(":99", kWidth, kHeight);
+        VISOR_CHECK(host.has_value());
+        if (host.has_value()) {
+            // The server hangs up the host's own client while the suite's
+            // connection stays: the window id names the client to kill.
+            XKillClient(screen.display(), host->window());
+            XSync(screen.display(), False);
+            // Let the server finish hanging up the victim before the host
+            // touches its socket: the peek wants the EOF to be there already,
+            // a retry loop would race Xlib's own read into the same hangup.
+            ::usleep(100000);
+            visor::host::Event event;
+            static_cast<void>(visor::host::poll(host->table(), event)); // the peek sees EOF
+            VISOR_CHECK(host->status() == visor::host::HostStatus::Disconnected);
+            VISOR_CHECK(host->error_count() >= 1);
+            // Submissions are refused now, without touching Xlib.
+            const int refused = host->rejected_count();
+            const Frame frame;
+            static_cast<void>(visor::host::submit_frame(host->table(), frame));
+            VISOR_CHECK_EQ(host->rejected_count(), refused + 1);
         }
     }
 }

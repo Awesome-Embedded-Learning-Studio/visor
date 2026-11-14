@@ -78,6 +78,18 @@ class X11WindowHost {
     /// merged rectangle pending.
     [[nodiscard]] int pending_submissions() const noexcept;
 
+    /// The host's own health: ok until the server answers with an error or
+    /// the link dies. A dead link is caught by the next poll's socket peek,
+    /// before Xlib is touched, so the caller learns of it instead of the
+    /// process exiting through Xlib's IO handling.
+    [[nodiscard]] HostStatus status() const noexcept;
+
+    /// The last X protocol error code the server answered with, 0 before any.
+    [[nodiscard]] std::uint32_t last_error() const noexcept;
+
+    /// X protocol errors recorded since open(); the ledger a judgment probes.
+    [[nodiscard]] int error_count() const noexcept;
+
     /// The X window id, for judgments and tools that read the screen back.
     [[nodiscard]] Window window() const noexcept;
 
@@ -101,6 +113,23 @@ class X11WindowHost {
                                                   std::size_t x) const noexcept;
     void release() noexcept;
 
+    /// Points the process-wide error handler at this host: Xlib delivers a
+    /// protocol error asynchronously, and the handler must know whose window
+    /// it is. Every touch of Xlib arms first.
+    void arm() const noexcept;
+
+    /// The connection still answers: one non-blocking socket peek, no Xlib
+    /// call. False means the server closed its end.
+    [[nodiscard]] bool connection_alive() noexcept;
+
+    void note_error(std::uint32_t code) noexcept;
+    void note_disconnected() noexcept;
+
+    /// Xlib's process-wide error handler. Instead of Xlib's default treatment
+    /// (print and exit), the word lands in the armed host's ledger.
+    static int on_x_error(Display* display, XErrorEvent* error) noexcept;
+    static inline X11WindowHost* s_target = nullptr;
+
     Display* display_ = nullptr;
     Window window_ = None;
     GC gc_ = nullptr;
@@ -118,6 +147,9 @@ class X11WindowHost {
     bool close_requested_ = false;
     int flush_count_ = 0;
     int rejected_count_ = 0;
+    HostStatus status_ = HostStatus::Ok;
+    std::uint32_t last_error_ = 0;
+    int error_count_ = 0;
     std::vector<std::uint8_t> shadow_;    // the screen's memory, format_ packing
     std::vector<std::uint32_t> expanded_; // one region's worth of 32bpp words
     SubmitPlan plan_;                     // the batch between regions and puts

@@ -60,7 +60,7 @@ int main() {
 
     Frame frame;
     paint(frame);
-    if (!table.submit_frame(frame)) {
+    if (!visor::host::submit_frame(table, frame)) {
         std::println(stderr, "the frame was refused");
         return 1;
     }
@@ -72,7 +72,7 @@ int main() {
     // burning the core.
     for (;;) {
         visor::host::Event event{};
-        if (table.poll(event)) {
+        if (visor::host::poll(table, event)) {
             if (const auto* down = std::get_if<visor::host::PointerDown>(&event)) {
                 std::println("pointer down {} at {},{}", down->button, down->pos.x, down->pos.y);
             } else if (const auto* key = std::get_if<visor::host::KeyDown>(&event)) {

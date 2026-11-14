@@ -2,7 +2,7 @@
 
 第三十四章把内核的输入词接到了六个事件上，第三十二章给分发带上了每轮读一次的时钟。这一章做这些事件之上的第一件手势：双击。事件表不加词，单击也不等：每一对按下抬起照旧立刻送 `on_pointer_up`，双击只是额外再送一次 `on_double_click`。为了在两次点击之间认出同一个控件，我们还要给控件发编号。你读完能把 500 改成 501，看边界判例怎么红。
 
-第三十二章读时钟用的是 `current_time_ms(host)`，查有没有时钟留的是 `has_clock(host)`。到这一章，读取与查询已经换成成员函数 `host.now_ms()` 与 `host.has_clock()`。语义没有变，名字换了，你读第三十二章的调用时把旧名字对到成员函数上。
+第三十二章读时钟用的是 `current_time_ms(host)`，查有没有时钟留的是 `has_clock(host)`。中途的批次把读取与查询收成过成员函数 `host.now_ms()` 与 `host.has_clock()`，宿主表分家那批又请回了自由函数：判空包装从此住在表旁边的 `visor::host` 命名空间里，写法回到 `now_ms(host)` 与 `has_clock(host)`。语义从头到尾没有变，你读本章与第三十二章的调用时，把这几样写法对到同一件事上。
 
 ## 单击不等待
 
@@ -78,7 +78,7 @@ if (state.has_last_click && state.last_click_id == owner->id() &&
 
 你在判例里会看到第一次释放放在 `UINT64_MAX - 100`，第二次放在 200。绝对值上第二次小得多，无符号差仍是 301 毫秒，这一对成立。要是写成 `now > then` 再相减，回绕那一下就会把新点击判成旧点击。
 
-你还要看时钟的前提。宿主表可以没有 `clock_ms`，`host.has_clock()` 为假。这时 `host.now_ms()` 读出来是 0，而 0 是一个真实的毫秒数，不能拿来当「没有时钟」的标记。所以双击比较还要一个独立的 `clock_available`，它为假时双击整个关掉。判例在没有时钟的条件下点两下，确认不出双击，再打开时钟点一对，确认恢复正常。
+你还要看时钟的前提。宿主表可以没有 `clock_ms`，`has_clock(host)` 为假。这时 `now_ms(host)` 读出来是 0，而 0 是一个真实的毫秒数，不能拿来当「没有时钟」的标记。所以双击比较还要一个独立的 `clock_available`，它为假时双击整个关掉。判例在没有时钟的条件下点两下，确认不出双击，再打开时钟点一对，确认恢复正常。
 
 ## 什么时候把待配对清掉
 
@@ -184,7 +184,7 @@ void dispatch_event(Widget& root, InputRouter& input, const host::Event& event,
                     std::uint64_t now_ms, bool clock_available) noexcept;
 ```
 
-你读 `run_dirty` 与 `run_once`，它们每轮读一次 `now_ms`，再把 `host.has_clock()` 随每个事件一起传给 `dispatch_event`。同一轮里的事件共用这个时间读数，双击的两次释放通常落在不同轮，差值就是两轮之间的毫秒数。
+你读 `run_dirty` 与 `run_once`，它们每轮读一次 `now_ms(host)`，再把 `has_clock(host)` 随每个事件一起传给 `dispatch_event`。同一轮里的事件共用这个时间读数，双击的两次释放通常落在不同轮，差值就是两轮之间的毫秒数。
 
 我们让 `InputRouter` 新存了按下按钮与修饰键，还有上次点击的编号、位置、时间，以及一个待配对标志。投递函数不收整个 `InputRouter` 引用，`Delivery` 这个投递参数包把这些字段按引用带进去，这些状态仍只由 `dispatch_event` 写入。`dispatch_event` 是 `InputRouter` 的友元，别的代码只能读 `press_owner()` 与 `focus_scope()`，改不了待配对状态。
 

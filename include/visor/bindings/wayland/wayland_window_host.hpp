@@ -108,6 +108,18 @@ class WaylandWindowHost {
     /// newcomer and counts it, the fake session's own line.
     [[nodiscard]] int dropped_event_count() const noexcept;
 
+    /// The host's own health: ok until a dispatch fails, then disconnected.
+    /// From then on poll keeps answering silence and submissions are refused,
+    /// so a caller can still close down in its own words.
+    [[nodiscard]] HostStatus status() const noexcept;
+
+    /// The display's errno view of the failure (EPIPE for a closed link), 0
+    /// before any.
+    [[nodiscard]] std::uint32_t last_error() const noexcept;
+
+    /// Dispatch failures recorded since open().
+    [[nodiscard]] int error_count() const noexcept;
+
     /// The words of the window-sized buffer the last flush filled, XRGB8888
     /// packing. Wayland offers no readback from the compositor, so judgments
     /// that need pixels read what the host itself wrote.
@@ -192,6 +204,9 @@ class WaylandWindowHost {
     int flush_count_ = 0;
     int rejected_count_ = 0;
     int dropped_event_count_ = 0;
+    HostStatus status_ = HostStatus::Ok;
+    std::uint32_t last_error_ = 0;
+    int error_count_ = 0;
     const std::uint32_t* submitted_ = nullptr;
     base::container::RingQueue<Event, kFeedCapacity> feed_{};
     std::vector<std::uint8_t> shadow_;    // the screen's memory, format_ packing

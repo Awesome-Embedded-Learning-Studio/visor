@@ -22,7 +22,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <poll.h>
+#include <unistd.h>
 #include <utility>
+#include <vector>
 
 namespace visor::host::x11 {
 namespace {
@@ -40,6 +43,23 @@ constexpr long kEventMask = ExposureMask | KeyPressMask | KeyReleaseMask | Butto
 int ignore_x_errors([[maybe_unused]] Display* display,     // NOLINT(misc-const-correctness)
                     [[maybe_unused]] XErrorEvent* event) { // NOLINT(misc-const-correctness)
     return 0;
+}
+
+// The dead-link park: a Display whose connection died cannot go through
+// XCloseDisplay without Xlib ending the process, and freeing it by hand is
+// not Xlib's promise. The Display and its GC are parked together so the whole
+// reachable graph stays reachable for the process's lifetime, the honest
+// shape of a bounded, deliberate leak.
+struct ParkedLink {
+    Display* display;
+    GC gc;
+};
+
+std::vector<ParkedLink>& parked_links() {
+    // Never destroyed: the leak check runs after static destructors, and a
+    // parked link must still be reachable when it does.
+    static auto* parked = new std::vector<ParkedLink>();
+    return *parked;
 }
 
 // NOLINTBEGIN(bugprone-signed-bitwise): the mask arithmetic below is deliberate;
@@ -77,6 +97,10 @@ std::optional<X11WindowHost> X11WindowHost::open(const char* display_name, int w
     if (display == nullptr) {
         return std::nullopt;
     }
+    // Protocol errors land in the armed host's ledger instead of Xlib's
+    // default print-and-exit, so a server that answers badly cannot end the
+    // process behind the caller's back.
+    XSetErrorHandler(&X11WindowHost::on_x_error);
     const int screen = DefaultScreen(display);
     const unsigned long dark = BlackPixel(display, screen);
     const Window window = XCreateSimpleWindow(display, RootWindow(display, screen), 0, 0,
@@ -169,6 +193,19 @@ void X11WindowHost::release() noexcept {
     if (display_ == nullptr) {
         return;
     }
+    if (status_ == HostStatus::Disconnected) {
+        // Xlib cannot close a connection the server already hung up: its
+        // goodbye path writes into the dead socket, and that write ends the
+        // process. The dead Display is parked instead, with its fd closed;
+        // the memory stays reachable for the process's lifetime, so one
+        // bounded structure per lost link is the price of not exiting.
+        ::close(ConnectionNumber(display_));
+        parked_links().push_back(ParkedLink{.display = display_, .gc = gc_});
+        display_ = nullptr;
+        gc_ = nullptr;
+        s_target = nullptr;
+        return;
+    }
     // An orderly goodbye of our own, not the echo of a dropped connection:
     // destroy the window, let the server settle, then close.
     XSetErrorHandler(&ignore_x_errors);
@@ -178,9 +215,11 @@ void X11WindowHost::release() noexcept {
     XFreeGC(display_, gc_);
     XCloseDisplay(display_);
     display_ = nullptr;
+    s_target = nullptr;
 }
 
 HostTable X11WindowHost::table() noexcept {
+    arm();
     HostTable table;
     table.flush = &X11WindowHost::flush_thunk;
     table.poll_event = &X11WindowHost::poll_event_thunk;
@@ -210,14 +249,85 @@ int X11WindowHost::pending_submissions() const noexcept {
 }
 
 Window X11WindowHost::window() const noexcept {
+    arm();
     return window_;
 }
 
 Display* X11WindowHost::display() const noexcept {
+    arm();
     return display_;
 }
 
+HostStatus X11WindowHost::status() const noexcept {
+    return status_;
+}
+
+std::uint32_t X11WindowHost::last_error() const noexcept {
+    return last_error_;
+}
+
+int X11WindowHost::error_count() const noexcept {
+    return error_count_;
+}
+
+void X11WindowHost::arm() const noexcept {
+    // The registry is process-wide because Xlib's handler is; the cast is the
+    // price of registering a const accessor as the current owner.
+    s_target = const_cast<X11WindowHost*>(this);
+}
+
+// NOLINTBEGIN(misc-include-cleaner): pollfd and the POLL* words come from
+// <poll.h>, which is included; the checker's table does not map the POSIX
+// header's words on every toolchain.
+bool X11WindowHost::connection_alive() noexcept {
+    // Readiness names the hangup before Xlib does: a dead server raises
+    // POLLHUP even when bytes it sent earlier still wait in the socket. Data
+    // alone (POLLIN without a hangup) is the only state worth handing Xlib,
+    // because Xlib's own read at the end of that data would meet the EOF and
+    // exit the process.
+    ::pollfd waiting{
+        .fd = ConnectionNumber(display_),
+        .events = POLLIN,
+        .revents = 0,
+    };
+    const int ready = ::poll(&waiting, 1, 0);
+    if (ready <= 0) {
+        return true; // nothing to read and no hangup named yet
+    }
+    const auto hangup = static_cast<unsigned short>(POLLHUP | POLLERR | POLLNVAL);
+    return (static_cast<unsigned short>(waiting.revents) & hangup) == 0;
+}
+// NOLINTEND(misc-include-cleaner)
+
+void X11WindowHost::note_error(std::uint32_t code) noexcept {
+    if (status_ == HostStatus::Ok) {
+        status_ = HostStatus::ProtocolError;
+    }
+    ++error_count_;
+    last_error_ = code;
+}
+
+void X11WindowHost::note_disconnected() noexcept {
+    if (status_ == HostStatus::Disconnected) {
+        return;
+    }
+    status_ = HostStatus::Disconnected;
+    ++error_count_;
+}
+
+int X11WindowHost::on_x_error([[maybe_unused]] Display* display, // NOLINT(misc-const-correctness)
+                              XErrorEvent* error) noexcept {     // NOLINT(misc-const-correctness)
+    if (s_target != nullptr) {
+        s_target->note_error(static_cast<std::uint32_t>(error->error_code));
+    }
+    return 0; // swallowed: the ledger carries the word from here
+}
+
 void X11WindowHost::handle_flush(const FlushRegion& region) noexcept {
+    if (status_ == HostStatus::Disconnected) {
+        ++rejected_count_; // no touching Xlib on a link that is gone
+        return;
+    }
     const bool inside = region.format == format_ && region.pixels != nullptr &&
                         !region.rect.is_empty() && region.rect.pos.x >= 0 &&
                         region.rect.pos.y >= 0 &&
@@ -366,6 +476,14 @@ std::uint32_t X11WindowHost::canvas_pixel_word(const std::uint8_t* row,
 }
 
 bool X11WindowHost::poll_one(Event& out) noexcept {
+    if (status_ == HostStatus::Disconnected) {
+        return false; // the link is gone; nothing here may touch Xlib
+    }
+    arm();
+    if (!connection_alive()) {
+        note_disconnected();
+        return false;
+    }
     // The round opens here, so the previous round's puts leave here: one
     // drain, one flush, however many regions that round submitted.
     drain_submissions();

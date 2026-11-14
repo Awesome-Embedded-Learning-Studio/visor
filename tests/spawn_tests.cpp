@@ -55,8 +55,8 @@ void run_spawn_tests() {
     // pretending. The fake and offscreen hosts live here by design -- a
     // spawn-less desk is a judgment desk, not a broken one.
     const HostTable bare;
-    VISOR_CHECK(!bare.can_spawn());
-    VISOR_CHECK_EQ(bare.spawn_child(SpawnRequest{}), -1);
+    VISOR_CHECK(!visor::host::can_spawn(bare));
+    VISOR_CHECK_EQ(visor::host::spawn_child(bare, SpawnRequest{}), -1);
 
     // The live judgments raise /bin/sh; an environment without it still
     // deserves the unwired stance above, said loudly.
@@ -67,7 +67,7 @@ void run_spawn_tests() {
 
     HostTable table;
     table.spawn = &spawn_via_posix;
-    VISOR_CHECK(table.can_spawn());
+    VISOR_CHECK(visor::host::can_spawn(table));
 
     // The redirect shape (the private-channel trick): a pipe's write end
     // lands at the child's stdout, and the words come back through it.
@@ -83,7 +83,7 @@ void run_spawn_tests() {
             .gifts = std::span<const FdGift>(&gift, 1),
             .close_other_fds = false,
         };
-        const int child = table.spawn_child(request);
+        const int child = visor::host::spawn_child(table, request);
         VISOR_CHECK(child > 0);
         ::close(channel[1]); // the caller's half is the caller's to close
         const Answer answer = collect(channel[0], static_cast<pid_t>(child));
@@ -111,7 +111,7 @@ void run_spawn_tests() {
             .gifts = std::span<const FdGift>(&gift, 1),
             .close_other_fds = false,
         };
-        const int child = table.spawn_child(request);
+        const int child = visor::host::spawn_child(table, request);
         VISOR_CHECK(child > 0);
         ::close(channel[1]);
         const Answer answer = collect(channel[0], static_cast<pid_t>(child));
@@ -140,7 +140,7 @@ void run_spawn_tests() {
             .gifts = std::span<const FdGift>(&gift, 1),
             .close_other_fds = true,
         };
-        const int child = table.spawn_child(request);
+        const int child = visor::host::spawn_child(table, request);
         VISOR_CHECK(child > 0);
         ::close(channel[1]);
         const Answer answer = collect(channel[0], static_cast<pid_t>(child));
@@ -173,7 +173,7 @@ void run_spawn_tests() {
             .gifts = std::span<const FdGift>(&gift, 1),
             .close_other_fds = false,
         };
-        const int child = table.spawn_child(request);
+        const int child = visor::host::spawn_child(table, request);
         VISOR_CHECK(child > 0);
         ::close(channel[1]);
         const Answer answer = collect(channel[0], static_cast<pid_t>(child));
@@ -204,7 +204,7 @@ void run_spawn_tests() {
             .gifts = std::span<const FdGift>(&gift, 1),
             .close_other_fds = whitelist,
         };
-        const int child = table.spawn_child(request);
+        const int child = visor::host::spawn_child(table, request);
         VISOR_CHECK(child > 0);
         ::close(channel[1]);
         ::close(9);

@@ -8,6 +8,7 @@
 #include "visor/base/geometry/point.hpp"
 #include "visor/base/geometry/rect.hpp"
 #include "visor/base/geometry/size.hpp"
+#include "visor/bindings/host.hpp"
 #include "visor/bindings/offscreen/offscreen_host.hpp"
 #include "visor/canvas/canvas.hpp"
 #include "visor/canvas/color.hpp"
@@ -57,7 +58,7 @@ void run_diff_tests() {
 
     // Hand the finished frame to the offscreen host, the second reader in the ring.
     OffscreenHost mirror(128, 64);
-    VISOR_CHECK(mirror.table().submit_frame(canvas));
+    VISOR_CHECK(visor::host::submit_frame(mirror.table(), canvas));
 
     // Three comparisons over all 8192 pixels: canvas against the reference, the
     // host's received frame against the reference, and the host against the canvas.

@@ -85,6 +85,18 @@ class HeadlessWeston {
     /// Whether the socket answers.
     [[nodiscard]] bool up() const noexcept { return up_; }
 
+    /// Stops the compositor this object started; a session it did not start
+    /// is somebody else's and stays. The hangup judgment's cue.
+    void stop() {
+        up_ = false;
+        if (spawned_ > 0) {
+            ::kill(spawned_, SIGTERM);
+            int status = 0;
+            ::waitpid(spawned_, &status, 0);
+            spawned_ = -1;
+        }
+    }
+
   private:
     /// One connect attempt, closed at once: a probe, not a session.
     [[nodiscard]] bool probe(const char* socket) noexcept {
@@ -152,7 +164,7 @@ void run_wayland_host_tests() {
     using visor::host::wayland::WaylandWindowHost;
     using Frame = Canvas<visor::base::SizeI{.w = kWidth, .h = kHeight}>;
 
-    HeadlessWeston const compositor("visor-headless-test");
+    HeadlessWeston compositor("visor-headless-test");
     if (!compositor.up()) {
         VISOR_CHECK(false && "headless weston did not come up for the wayland host judgments");
         return;
@@ -173,12 +185,12 @@ void run_wayland_host_tests() {
         VISOR_CHECK_EQ(table.info.screen.w, kWidth);
         VISOR_CHECK_EQ(table.info.screen.h, kHeight);
         VISOR_CHECK_EQ(table.info.format, PixelFormat::Mono1);
-        const std::uint64_t now = table.now_ms();
+        const std::uint64_t now = visor::host::now_ms(table);
         ::usleep(2000);
-        VISOR_CHECK(table.now_ms() >= now + 2); // the clock walks
+        VISOR_CHECK(visor::host::now_ms(table) >= now + 2); // the clock walks
 
         visor::host::Event ignored{};
-        VISOR_CHECK(!table.poll(ignored)); // a still session has no words
+        VISOR_CHECK(!visor::host::poll(table, ignored)); // a still session has no words
     }
 
     // A full frame lands bit for bit: ink reads back as the lit word, the
@@ -194,7 +206,7 @@ void run_wayland_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
         compare_window(*host, frame);
         VISOR_CHECK_EQ(host->flush_count(), 1);
     }
@@ -212,7 +224,7 @@ void run_wayland_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
 
         const RectI region{.pos = PointI{5, 20}, .size = {.w = 33, .h = 24}};
         const visor::draw::Pen off_pen{frame, false};
@@ -222,7 +234,8 @@ void run_wayland_host_tests() {
         const std::uint8_t* region_pixels =
             frame.pixels().data() + (static_cast<std::size_t>(region.pos.y) * Frame::kStrideBytes) +
             (static_cast<std::size_t>(region.pos.x) / 8);
-        VISOR_CHECK(host->table().submit_region(region, region_pixels, Frame::kStrideBytes));
+        VISOR_CHECK(
+            visor::host::submit_region(host->table(), region, region_pixels, Frame::kStrideBytes));
         compare_window(*host, frame); // the hole and the rest
         VISOR_CHECK_EQ(host->flush_count(), 2);
     }
@@ -241,7 +254,7 @@ void run_wayland_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
 
         const RectI region{.pos = PointI{16, 8}, .size = {.w = 33, .h = 20}};
         const visor::draw::Pen off_pen{frame, false};
@@ -249,7 +262,8 @@ void run_wayland_host_tests() {
         const std::uint8_t* region_pixels =
             frame.pixels().data() + (static_cast<std::size_t>(region.pos.y) * Frame::kStrideBytes) +
             (static_cast<std::size_t>(region.pos.x) / 8);
-        VISOR_CHECK(host->table().submit_region(region, region_pixels, Frame::kStrideBytes));
+        VISOR_CHECK(
+            visor::host::submit_region(host->table(), region, region_pixels, Frame::kStrideBytes));
         compare_window(*host, frame);
         VISOR_CHECK_EQ(host->flush_count(), 2);
     }
@@ -265,7 +279,7 @@ void run_wayland_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
         compare_window(*host, frame, 3);
     }
 
@@ -283,7 +297,7 @@ void run_wayland_host_tests() {
         if (!host.has_value()) {
             return;
         }
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
 
         auto moved = std::move(host); // the whole object, listeners and all
         const RectI region{.pos = PointI{10, 10}, .size = {.w = 8, .h = 8}};
@@ -292,7 +306,8 @@ void run_wayland_host_tests() {
         const std::uint8_t* region_pixels =
             frame.pixels().data() + (static_cast<std::size_t>(region.pos.y) * Frame::kStrideBytes) +
             (static_cast<std::size_t>(region.pos.x) / 8);
-        VISOR_CHECK(moved->table().submit_region(region, region_pixels, Frame::kStrideBytes));
+        VISOR_CHECK(
+            visor::host::submit_region(moved->table(), region, region_pixels, Frame::kStrideBytes));
         compare_window(*moved, frame); // the hole new, the lit history intact
         VISOR_CHECK_EQ(moved->flush_count(), 2);
     }
@@ -308,7 +323,8 @@ void run_wayland_host_tests() {
         }
         const std::array<std::uint8_t, 4> row = {0x00, 0xF8, 0x1F, 0x00}; // LE words 0xF800, 0x001F
         const RectI two{.pos = PointI{0, 0}, .size = {.w = 2, .h = 1}};
-        VISOR_CHECK(host->table().submit_region(two, row.data(), 4, PixelFormat::RGB565));
+        VISOR_CHECK(
+            visor::host::submit_region(host->table(), two, row.data(), 4, PixelFormat::RGB565));
         const std::uint32_t* words = host->submitted_words();
         VISOR_CHECK(words != nullptr);
         if (words != nullptr) {
@@ -328,7 +344,8 @@ void run_wayland_host_tests() {
         }
         const std::array<std::uint8_t, 4> row = {0xFF, 0x00, 0x00, 0xAA}; // LE word 0xAA0000FF
         const RectI one{.pos = PointI{0, 0}, .size = {.w = 1, .h = 1}};
-        VISOR_CHECK(host->table().submit_region(one, row.data(), 4, PixelFormat::XRGB8888));
+        VISOR_CHECK(
+            visor::host::submit_region(host->table(), one, row.data(), 4, PixelFormat::XRGB8888));
         const std::uint32_t* words = host->submitted_words();
         VISOR_CHECK(words != nullptr);
         if (words != nullptr) {
@@ -350,16 +367,18 @@ void run_wayland_host_tests() {
         // The return word says only whether a flush is wired (it stays true
         // while the host counts the refusal); the judgment reads the count
         // below, the same line the X11 judgments draw.
-        VISOR_CHECK(table.submit_region(RectI{.pos = PointI{0, 0}, .size = {.w = 2, .h = 1}},
-                                        row.data(), 4,
-                                        PixelFormat::XRGB8888)); // the host speaks Mono1
-        VISOR_CHECK(table.submit_region(RectI{.pos = PointI{0, 0}, .size = {.w = 2, .h = 1}},
-                                        nullptr, 4, PixelFormat::Mono1));
-        VISOR_CHECK(table.submit_region(RectI{.pos = PointI{0, 0}, .size = {.w = 0, .h = 0}},
-                                        row.data(), 4, PixelFormat::Mono1));
-        VISOR_CHECK(
-            table.submit_region(RectI{.pos = PointI{0, 0}, .size = {.w = kWidth + 1, .h = 1}},
-                                row.data(), 4, PixelFormat::Mono1));
+        VISOR_CHECK(visor::host::submit_region(
+            table, RectI{.pos = PointI{0, 0}, .size = {.w = 2, .h = 1}}, row.data(), 4,
+            PixelFormat::XRGB8888)); // the host speaks Mono1
+        VISOR_CHECK(visor::host::submit_region(table,
+                                               RectI{.pos = PointI{0, 0}, .size = {.w = 2, .h = 1}},
+                                               nullptr, 4, PixelFormat::Mono1));
+        VISOR_CHECK(visor::host::submit_region(table,
+                                               RectI{.pos = PointI{0, 0}, .size = {.w = 0, .h = 0}},
+                                               row.data(), 4, PixelFormat::Mono1));
+        VISOR_CHECK(visor::host::submit_region(
+            table, RectI{.pos = PointI{0, 0}, .size = {.w = kWidth + 1, .h = 1}}, row.data(), 4,
+            PixelFormat::Mono1));
         VISOR_CHECK_EQ(host->rejected_count(), 4);
         VISOR_CHECK_EQ(host->flush_count(), 0); // the first frame open() paints is no flush
 
@@ -384,7 +403,7 @@ void run_wayland_host_tests() {
         frame.set_clear(false);
         const visor::draw::Pen on_pen{frame, true};
         on_pen.fill({.pos = PointI{0, 0}, .size = {.w = 16, .h = 16}});
-        VISOR_CHECK(host->table().submit_frame(frame));
+        VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
 
         FrameWatch watch;
         // The proxy hands itself to add_listener and destroy, both of which
@@ -398,5 +417,32 @@ void run_wayland_host_tests() {
         }
         wl_callback_destroy(callback);
         VISOR_CHECK(watch.done);
+    }
+
+    // The compositor hangs up: the next dispatch marks the link dead, and the
+    // host then refuses submissions instead of writing into a dead socket.
+    // The process keeps its word either way.
+    {
+        auto host = WaylandWindowHost::open("visor-headless-test", kWidth, kHeight);
+        VISOR_CHECK(host.has_value());
+        if (host.has_value()) {
+            const Frame frame;
+            VISOR_CHECK(visor::host::submit_frame(host->table(), frame));
+            compositor.stop();
+            visor::host::Event event;
+            // The dead compositor's end of the socket can take a beat to
+            // surface as EOF; the poll is retried until the host reads it, and
+            // the loop names its own limit rather than assuming one round.
+            for (int tries = 0; tries < 100 && host->status() == visor::host::HostStatus::Ok;
+                 ++tries) {
+                ::usleep(5000);
+                static_cast<void>(visor::host::poll(host->table(), event));
+            }
+            VISOR_CHECK(host->status() == visor::host::HostStatus::Disconnected);
+            VISOR_CHECK(host->error_count() >= 1);
+            const int refused = host->rejected_count();
+            static_cast<void>(visor::host::submit_frame(host->table(), frame));
+            VISOR_CHECK_EQ(host->rejected_count(), refused + 1);
+        }
     }
 }

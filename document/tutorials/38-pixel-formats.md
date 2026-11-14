@@ -129,11 +129,13 @@ struct WireFormat<canvas::Rgb565Traits> {
 真用到表的只有两家，我们不用在别处找：`submit_frame` 与 `render_window`，它们自动带上画布自己的格式，不让人写第二遍：
 
 ```cpp
-return submit_region(full, canvas.pixels().data(), CanvasT::kStrideBytes,
+return submit_region(host, full, canvas.pixels().data(), CanvasT::kStrideBytes,
                      kWireFormat<typename CanvasT::Traits>);
 ```
 
-你要手写调用，口子留在 `submit_region`，它显式收一个格式参数，默认 Mono1。同一个格式只在一处命名，彩色画布交到彩色宿主，中间没有人手抄一遍枚举。
+（这段随宿主表分家同步过：判空包装住回自由函数，`submit_region` 与 `submit_frame` 的头一个参数都是表。）
+
+你要手写调用，口子留在 `submit_region(host, ...)`，它显式收表与格式参数，格式默认 Mono1。同一个格式只在一处命名，彩色画布交到彩色宿主，中间没有人手抄一遍枚举。
 
 第三十一章留话里说 Mono1 的默认值会删掉。真到动手这一批，我们把它留下了，理由就写在参数旁边：这一章之前的调用点说的都是 Mono1，默认参数让他们照旧编过。新代码不必写它，`submit_frame` 会自己带上。
 

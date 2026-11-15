@@ -22,7 +22,7 @@ void text_walk(const Painter& painter, base::PointI at, const draw::MonoFont& fo
     draw::TextLayout layout{font, utf8, scale};
     while (const auto placement = layout.next()) {
         painter.draw_bitmap(base::PointI{at.x + placement->pos.x, at.y + placement->pos.y},
-                            font.bitmap(*placement->glyph), color,
+                            placement->font->bitmap(*placement->glyph), color,
                             draw::TextLayout::clamped(scale));
     }
 }
@@ -34,7 +34,7 @@ void clipped_walk(const Painter& painter, base::RectI clip, base::PointI at,
     const int factor = draw::TextLayout::clamped(scale);
     draw::TextLayout layout{font, utf8, factor};
     while (const auto placement = layout.next()) {
-        const auto bitmap = font.bitmap(*placement->glyph);
+        const auto bitmap = placement->font->bitmap(*placement->glyph);
         const base::RectI area{
             .pos = {at.x + placement->pos.x, at.y + placement->pos.y},
             .size =

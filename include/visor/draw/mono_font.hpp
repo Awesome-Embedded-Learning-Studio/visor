@@ -52,6 +52,12 @@ struct MonoFont {
     std::span<const GlyphEntry> glyphs;
     std::span<const std::uint8_t> bits;
 
+    /// The companion consulted for codepoints this font has no glyph for,
+    /// or null for a font that stands alone. The fallback may carry its own
+    /// fallback; the walk follows the chain, so a script beside the Latin
+    /// font costs one pointer here instead of a second draw path per widget.
+    const MonoFont* fallback = nullptr;
+
     /// Binary-searches the codepoint; null when the font has no glyph for it.
     [[nodiscard]] constexpr const GlyphEntry* glyph(std::uint32_t codepoint) const noexcept {
         const auto found = std::ranges::lower_bound(glyphs, codepoint, {}, &GlyphEntry::codepoint);
@@ -59,6 +65,25 @@ struct MonoFont {
             return nullptr;
         }
         return &*found;
+    }
+
+    /// Resolves the codepoint against this font and then its fallbacks.
+    ///
+    /// @param[in]  codepoint  The character to place.
+    /// @param[out] owner      Set to the font whose bits hold the glyph; the
+    ///                        caller blits with that font, not with the one it
+    ///                        asked. Null when nothing in the chain has it.
+    [[nodiscard]] constexpr const GlyphEntry* resolve(std::uint32_t codepoint,
+                                                      const MonoFont** owner) const noexcept {
+        for (const MonoFont* font = this; font != nullptr; font = font->fallback) {
+            if (const GlyphEntry* found = font->glyph(codepoint); found != nullptr) {
+                if (owner != nullptr) {
+                    *owner = font;
+                }
+                return found;
+            }
+        }
+        return nullptr;
     }
 
     /// Assembles one glyph's bitmap view over the shared bit block.
@@ -89,6 +114,9 @@ class TextLayout {
     struct Placement {
         base::PointI pos;
         const GlyphEntry* glyph = nullptr;
+        /// The font whose bits hold this glyph: the base font, or the
+        /// fallback that supplied it. Blit with this one, not the base.
+        const MonoFont* font = nullptr;
     };
 
     /// The clamp both consumers share; public so callers can scale what they
@@ -115,7 +143,8 @@ class TextLayout {
                 ++line_;
                 continue;
             }
-            const GlyphEntry* entry = font_->glyph(*codepoint);
+            const MonoFont* owner = font_;
+            const GlyphEntry* entry = font_->resolve(*codepoint, &owner);
             if (entry == nullptr) {
                 continue;
             }
@@ -127,6 +156,7 @@ class TextLayout {
                                      entry->offset_y) *
                                         scale_},
                 .glyph = entry,
+                .font = owner,
             };
         }
         return std::nullopt;
